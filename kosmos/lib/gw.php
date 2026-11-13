@@ -18,7 +18,7 @@ function gw_handle(): void {
   $a = (string)($in['a'] ?? '');
   if ($a === 'status') jout(gw_status());
   if ($a === 'ask') gw_ask($in);
-  if ($a === 'skills') gw_skills($in);   // 0.3.1 · навыки — хранятся только здесь
+  if ($a === 'skills') gw_skills($in);   // 0.3.1 · навыки (главное место — здесь, копия — в магазине)
   fail('Неизвестное действие шлюза', 404);
 }
 

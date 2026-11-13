@@ -836,7 +836,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
     if (!s) return '<p>Загрузка…</p>';
     if (!s.ok) return '<p class="vc-e">' + esc(s.error || 'Не удалось загрузить навыки') + '</p>';
     var items = s.items || [];
-    var h = '<p>' + esc(s.note || '') + '</p>' + (s.err ? '<p class="vc-e">' + esc(s.err) + '</p>' : '');
+    var h = '<p>' + esc(s.note || '') + '</p>' + (s.warn ? '<p class="vc-e">' + esc(s.warn) + '</p>' : '') + (s.err ? '<p class="vc-e">' + esc(s.err) + '</p>' : '');   /* №540 · сервер недоступен — копия из магазина */
     if (!items.length && NV_ED !== -1) h += '<p>Навыков пока нет. Они появятся, когда ' + esc(s.writer || '') + ' решит задачу в несколько шагов. Можно добавить и самому.</p>';
     h += items.map(function(x){
       var id = +x.id;

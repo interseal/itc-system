@@ -230,6 +230,8 @@ try:
     c, j = sk({'op': 'import', 'items': [{'title': 'Сверка счёта', 'steps': '1) suppliers; 2) deals; сверить суммы', 'uses': 2, 'manual': 1, 'author': 'Космос'}, {'title': 'КП для гостиницы', 'steps': '1) двойник — не нужен'}]})
     check('перенос из магазина: новое добавлено, двойник пропущен', j.get('added') == 1 and len(sk({'op': 'list'})[1]['items']) == 2, j)
     c, j = sk({'op': 'del', 'id': sid}); check('удаление', j.get('deleted') is True and [x['title'] for x in sk({'op': 'list'})[1]['items']] == ['Сверка счёта'], j)
+    c, j = sk({'op': 'import', 'items': [{'title': 'КП для гостиницы', 'steps': '1) deals; 2) make_kp — из копии магазина'}]})
+    check('удалённый руководителем навык из копии магазина не возвращается (0.3.2)', j.get('added') == 0 and [x['title'] for x in sk({'op': 'list'})[1]['items']] == ['Сверка счёта'], j)
     c, j = sk({'op': 'list'}, 'b2' * 32); check('чужой ключ шлюза к навыкам не пускает', c == 403, (c, j))
     c, j = sk({'op': 'drop'}); check('неизвестное действие — 404', c == 404, (c, j))
     con = sqlite3.connect(f'{TMP}/kosmos.sqlite'); n = con.execute('SELECT COUNT(*) FROM skills').fetchone()[0]; con.close()

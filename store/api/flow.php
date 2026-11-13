@@ -1914,8 +1914,10 @@ function ag_peer_block($me) {
 /* №538, №539 · ОБЩИЕ НАВЫКИ ДВУХ ПОМОЩНИКОВ. Навык — проверенный способ решить задачу: какими инструментами, в каком порядке,
    что проверить и что ответить. Записывает навык помощник на Claude (NVK_WRITE — «Космос»), когда решил задачу в несколько
    шагов; пользуются оба: перед ответом в правила попадают навыки, похожие на запрос, и есть инструмент skills.
-   №539 · навыки хранятся ТОЛЬКО на сервере «Космоса» в Сингапуре (решение руководителя): магазин спрашивает их через шлюз
-   (api/kosmos_lib.php, ключ шлюза) и у себя не держит. Нет связи с сервером — помощники работают без навыков.
+   №539 · главное место навыков — сервер «Космоса» в Сингапуре: магазин спрашивает их через шлюз (api/kosmos_lib.php, ключ шлюза).
+   №540 · и копия в магазине (решение руководителя: «пусть в двух местах хранятся») — таблица itc_skill_copy: обновляется после
+   каждой правки и раз в 10 минут. Сервер недоступен — помощники берут навыки из копии (править нельзя, только пользоваться).
+   Сервер пустой, а копия есть (сервер заменили) — магазин сам возвращает ему навыки из копии.
    Видит и правит навыки руководитель — в настройках любого из двух помощников. */
 const NVK_WRITE = false;   // записывает ли этот помощник навыки сам (в копии «Космоса» — true, tools/make_kosmos_flow.py)
 if (is_file(__DIR__ . '/kosmos_lib.php')) require_once __DIR__ . '/kosmos_lib.php';   // №539 · связь с сервером «Космоса»
@@ -1946,12 +1948,83 @@ function nvk_move() {
   } catch (Throwable $e) { error_log('nvk_move: ' . $e->getMessage()); }
 }
 function nvk_gw($op, $data = [], $timeout = 6) { nvk_move(); return nvk_call($op, $data, $timeout); }
-function nvk_err($c, $j) { return $c === 0 ? 'Нет связи с сервером «Космоса» в Сингапуре — навыки хранятся там. Попробуйте через минуту' : (((string)($j['error'] ?? '')) ?: 'Сервер «Космоса» ответил ' . $c); }
-function nvk_all() { [$c, $j] = nvk_gw('list'); return $c === 200 && !empty($j['ok']) ? (array)($j['items'] ?? []) : []; }
-/* навыки, похожие на запрос (сравнивает слова сервер «Космоса») */
+function nvk_err($c, $j) { return $c === 0 ? 'Сервер «Космоса» в Сингапуре сейчас недоступен — навыки правятся на нём. Помощники пока работают по копии в магазине. Попробуйте позже' : (((string)($j['error'] ?? '')) ?: 'Сервер «Космоса» ответил ' . $c); }
+/* №540 · КОПИЯ НАВЫКОВ В МАГАЗИНЕ */
+function nvk_copy_ensure() {
+  static $d = false; if ($d) return; $d = true;
+  db()->exec("CREATE TABLE IF NOT EXISTS itc_skill_copy (sid INT NOT NULL PRIMARY KEY, title VARCHAR(200) NOT NULL DEFAULT '', trig VARCHAR(600) NOT NULL DEFAULT '',
+    steps TEXT NULL, trace VARCHAR(600) NOT NULL DEFAULT '', author VARCHAR(60) NOT NULL DEFAULT '', who VARCHAR(190) NOT NULL DEFAULT '', manual TINYINT NOT NULL DEFAULT 0,
+    uses INT NOT NULL DEFAULT 0, used_at VARCHAR(19) NOT NULL DEFAULT '', created_at VARCHAR(19) NOT NULL DEFAULT '', updated_at VARCHAR(19) NOT NULL DEFAULT '',
+    synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+/* копия = то, что сейчас на сервере: новые и изменённые записать, удалённые на сервере — убрать */
+function nvk_copy_put($items) {
+  try {
+    nvk_copy_ensure(); $d = db(); $ids = [];
+    $st = $d->prepare('REPLACE INTO itc_skill_copy (sid,title,trig,steps,trace,author,who,manual,uses,used_at,created_at,updated_at,synced_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW())');
+    foreach ((array)$items as $x) {
+      if (!is_array($x) || (int)($x['id'] ?? 0) < 1) continue; $ids[] = (int)$x['id'];
+      $st->execute([(int)$x['id'], (string)($x['title'] ?? ''), (string)($x['trig'] ?? ''), (string)($x['steps'] ?? ''), (string)($x['trace'] ?? ''), (string)($x['author'] ?? ''),
+                    (string)($x['who'] ?? ''), (int)($x['manual'] ?? 0), (int)($x['uses'] ?? 0), (string)($x['used_at'] ?? ''), (string)($x['created_at'] ?? ''), (string)($x['updated_at'] ?? '')]);
+    }
+    $d->exec('DELETE FROM itc_skill_copy' . ($ids ? ' WHERE sid NOT IN (' . implode(',', $ids) . ')' : ''));
+    sp_put('nvk_copy_at', (string)time(), 'копия навыков');
+  } catch (Throwable $e) { error_log('nvk_copy_put: ' . $e->getMessage()); }
+}
+function nvk_copy_all() {
+  try { nvk_copy_ensure(); return array_map(function ($r) { $r['id'] = (int)$r['sid']; $r['uses'] = (int)$r['uses']; $r['manual'] = (int)$r['manual']; unset($r['sid'], $r['synced_at']); return $r; },
+          db()->query('SELECT * FROM itc_skill_copy ORDER BY uses DESC, sid DESC')->fetchAll()); }
+  catch (Throwable $e) { return []; }
+}
+/* подбор по копии — так же, как на сервере (lib/skills.php): совпавшие слова без окончаний, слова названия весят вдвое */
+const NVK_STOP = ['для', 'что', 'это', 'как', 'все', 'всё', 'мне', 'нам', 'его', 'она', 'они', 'при', 'про', 'или', 'так', 'там', 'тут', 'уже', 'ещё', 'еще', 'надо', 'нужно', 'можно',
+  'пожалуйста', 'сделай', 'сделать', 'давай', 'найди', 'покажи', 'посмотри', 'скажи', 'напиши', 'ты', 'вы', 'мы', 'по', 'на', 'из', 'от', 'до', 'не', 'да', 'нет', 'за', 'со', 'же', 'ли', 'бы'];
+function nvk_stems($t) {
+  $o = [];
+  foreach (preg_split('~[^\p{L}\p{N}]+~u', str_replace('ё', 'е', mb_strtolower((string)$t))) as $w) {
+    $n = mb_strlen($w); if ($n < 2 || in_array($w, NVK_STOP, true)) continue;
+    $o[$n >= 6 ? mb_substr($w, 0, 5) : ($n >= 4 ? mb_substr($w, 0, 4) : $w)] = 1;
+  }
+  return $o;
+}
+function nvk_copy_pick($text, $n = 4) {
+  $q = nvk_stems(mb_substr((string)$text, 0, 600)); if (!$q) return [];
+  $sc = [];
+  foreach (nvk_copy_all() as $r) {
+    $s = 0; foreach (nvk_stems($r['title']) as $k => $_) if (isset($q[$k])) $s += 2;
+    foreach (nvk_stems($r['trig']) as $k => $_) if (isset($q[$k])) $s += 1;
+    if ($s >= 2) { $r['score'] = $s; $sc[] = $r; }
+  }
+  usort($sc, function ($a, $b) { return [$b['score'], $b['uses'], $b['id']] <=> [$a['score'], $a['uses'], $a['id']]; });
+  return array_slice($sc, 0, max(1, (int)$n));
+}
+/* сверить копию с сервером: после правок — сразу, иначе не чаще раза в 10 минут.
+   Сервер пустой, а в копии навыки есть — сервер заменили или он потерял базу: возвращаем ему навыки из копии
+   (удалённые руководителем сервер помнит и обратно не берёт) */
+function nvk_sync($force = false) {
+  static $done = false;
+  if (!$force && ($done || time() - (int)sp_get('nvk_copy_at') < 600)) return;
+  $done = true;
+  [$c, $j] = nvk_gw('list');
+  if ($c !== 200 || empty($j['ok'])) return;
+  $items = (array)($j['items'] ?? []);
+  if (!$items && ($copy = nvk_copy_all())) {
+    [$c2, $j2] = nvk_call('import', ['items' => $copy], 15);
+    if ($c2 !== 200 || empty($j2['ok'])) return;
+    if ((int)($j2['added'] ?? 0) > 0) error_log('nvk: навыки возвращены на сервер «Космоса» из копии магазина: ' . (int)$j2['added']);
+    [$c, $j] = nvk_call('list'); if ($c !== 200 || empty($j['ok'])) return;
+    $items = (array)($j['items'] ?? []);
+  }
+  nvk_copy_put($items);
+}
+/* все навыки: с сервера, а он недоступен — из копии. Копию пишет только nvk_sync */
+function nvk_all() { [$c, $j] = nvk_gw('list'); return $c === 200 && !empty($j['ok']) ? (array)($j['items'] ?? []) : nvk_copy_all(); }
+/* навыки, похожие на запрос: подбирает сервер «Космоса»; он недоступен — подбираем по копии в магазине */
 function nvk_pick($text, $n = 4) {
   $t = mb_substr(trim((string)$text), 0, 600); if ($t === '') return [];
-  [$c, $j] = nvk_gw('pick', ['q' => $t, 'n' => (int)$n]); return $c === 200 && !empty($j['ok']) ? (array)($j['items'] ?? []) : [];
+  nvk_sync();
+  [$c, $j] = nvk_gw('pick', ['q' => $t, 'n' => (int)$n]);
+  return $c === 200 && !empty($j['ok']) ? (array)($j['items'] ?? []) : nvk_copy_pick($t, $n);
 }
 function nvk_line($r) {
   return '№' . $r['id'] . '. ' . $r['title'] . ' (записал ' . $r['author'] . ((int)$r['uses'] ? ', применяли ' . (int)$r['uses'] . ' раз' : '') . ")\n  Когда: " . $r['trig'] . "\n  Как: " . $r['steps']
@@ -1969,13 +2042,21 @@ function nvk_block($text) {
 function nvk_save($a, $author, $who, $id = 0, $auto = false) {
   [$c, $j] = nvk_gw('save', ['skill' => ['title' => $a['title'] ?? '', 'trig' => $a['trig'] ?? '', 'steps' => $a['steps'] ?? '', 'trace' => $a['trace'] ?? ''],
                              'author' => (string)$author, 'who' => (string)$who, 'id' => (int)$id, 'auto' => (bool)$auto], 10);
-  return $c === 200 && !empty($j['ok']) ? $j : ['ok' => false, 'error' => nvk_err($c, $j)];
+  if ($c === 200 && !empty($j['ok'])) { if (empty($j['skip'])) nvk_sync(true); return $j; }   // №540 · сразу и в копию магазина
+  return ['ok' => false, 'error' => nvk_err($c, $j)];
 }
-function nvk_del($id, $who) { [$c, $j] = nvk_gw('del', ['id' => (int)$id, 'who' => (string)$who]); return $c === 200 && !empty($j['ok']) ? ['ok' => true] : ['ok' => false, 'error' => nvk_err($c, $j)]; }
+function nvk_del($id, $who) {
+  [$c, $j] = nvk_gw('del', ['id' => (int)$id, 'who' => (string)$who]);
+  if ($c === 200 && !empty($j['ok'])) { nvk_sync(true); return ['ok' => true]; }
+  return ['ok' => false, 'error' => nvk_err($c, $j)];
+}
 /* итоговый ответ: отметить применённый навык; записать новый (только тот, кто пишет навыки, и только после 2+ шагов) */
 function nvk_take($me, $j, $trace) {
   try {
-    if (!empty($j['skill_used']) && (int)$j['skill_used'] > 0) nvk_gw('used', ['id' => (int)$j['skill_used']]);
+    if (!empty($j['skill_used']) && (int)$j['skill_used'] > 0) {
+      nvk_gw('used', ['id' => (int)$j['skill_used']]);
+      try { nvk_copy_ensure(); db()->prepare('UPDATE itc_skill_copy SET uses=uses+1 WHERE sid=?')->execute([(int)$j['skill_used']]); } catch (Throwable $e) {}   // №540 · и в копии
+    }
     if (!NVK_WRITE || empty($j['skill']) || !is_array($j['skill']) || count((array)$trace) < 2) return '';
     $tr = []; foreach ((array)$trace as $x) { $x = (string)$x; if ($x !== '' && end($tr) !== $x) $tr[] = $x; }
     $r = nvk_save(['title' => $j['skill']['title'] ?? '', 'trig' => $j['skill']['when'] ?? '', 'steps' => $j['skill']['steps'] ?? '', 'trace' => implode(' → ', array_slice($tr, 0, 12))],
@@ -3642,10 +3723,16 @@ try {
     if (!$me['boss']) fl_fail('Навыки — только руководитель', 403);
     $q = trim((string)fl_in('q'));
     $wr = NVK_WRITE ? AG_PEER['me'] : AG_PEER['name']; $rd = NVK_WRITE ? AG_PEER['name'] : AG_PEER['me'];
+    nvk_sync(true);   // №540 · свериться с сервером: копия — как на сервере; сервер новый и пустой — вернуть ему навыки из копии
     [$c, $j] = $q !== '' ? nvk_gw('pick', ['q' => mb_substr($q, 0, 600), 'n' => 8]) : nvk_gw('list');   // №539 · навыки — на сервере «Космоса»
-    if ($c !== 200 || empty($j['ok'])) fl_fail(nvk_err($c, $j), 502);
-    fl_out(['ok' => true, 'items' => (array)($j['items'] ?? []), 'block' => $q !== '' ? nvk_block($q) : '', 'writer' => $wr, 'reader' => $rd,
-            'note' => 'Навыки — проверенные способы решать задачи. Записывает их ' . $wr . ', когда решает задачу в несколько шагов, а ' . $rd . ' делает по ним так же. Оба видят все навыки. Неточное можно поправить, лишнее — удалить. Хранятся только на сервере «Космоса» в Сингапуре.']);
+    $warn = '';
+    if ($c === 200 && !empty($j['ok'])) $items = (array)($j['items'] ?? []);
+    elseif ($c === 0 || $c >= 500 || $c === 403) {   // №540 · сервер недоступен — показываем копию из магазина
+      $items = $q !== '' ? nvk_copy_pick($q, 8) : nvk_copy_all();
+      $warn = 'Сервер «Космоса» в Сингапуре сейчас недоступен (' . ($c === 0 ? 'нет связи' : (((string)($j['error'] ?? '')) ?: 'ответ ' . $c)) . '). Показана копия навыков из магазина — помощники работают по ней. Править навыки можно, когда сервер снова будет на связи.';
+    } else fl_fail(nvk_err($c, $j), 502);
+    fl_out(['ok' => true, 'items' => $items, 'warn' => $warn, 'block' => $q !== '' ? nvk_block($q) : '', 'writer' => $wr, 'reader' => $rd,
+            'note' => 'Навыки — проверенные способы решать задачи. Записывает их ' . $wr . ', когда решает задачу в несколько шагов, а ' . $rd . ' делает по ним так же. Оба видят все навыки. Неточное можно поправить, лишнее — удалить. Хранятся в двух местах: на сервере «Космоса» в Сингапуре и копия в магазине.']);
   }
   case 'nvk_save': {
     if (!$me['boss']) fl_fail('Навыки правит только руководитель', 403);

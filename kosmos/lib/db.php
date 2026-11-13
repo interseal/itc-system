@@ -65,7 +65,7 @@ function db_schema(PDO $d): void {
   // 0.2.0 · обращения через шлюз магазина («Космос» в Экосистеме и CRM): по людям и дням
   $d->exec("CREATE TABLE IF NOT EXISTS gw_use (day TEXT NOT NULL, phone TEXT NOT NULL, calls INTEGER NOT NULL DEFAULT 0,
     tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, phone))");
-  // 0.3.1 · навыки — общие для «Космоса» и «Фила»; хранятся только здесь (lib/skills.php, магазин — через шлюз)
+  // 0.3.1 · навыки — общие для «Космоса» и «Фила» (lib/skills.php, магазин — через шлюз; с 0.3.2 у магазина есть их копия)
   $d->exec("CREATE TABLE IF NOT EXISTS skills (
     id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, trig TEXT NOT NULL DEFAULT '', steps TEXT NOT NULL DEFAULT '',
     trace TEXT NOT NULL DEFAULT '', author TEXT NOT NULL DEFAULT '', who TEXT NOT NULL DEFAULT '', manual INTEGER NOT NULL DEFAULT 0,

@@ -36,6 +36,10 @@ html.fil-talk .av,html.fil-talk .big{animation:ringg 1s infinite;background:line
 .cfg-in select,.cfg-in textarea,.cfg-in input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:10px;color:#fff;padding:10px;font:400 .95rem Roboto,sans-serif}
 .cfg-in select option{color:#111}.cfg-in textarea{min-height:190px;resize:vertical;line-height:1.4}
 .cfg-in .r{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+/* №537 · выбор голоса */
+.vc{display:flex;align-items:center;gap:10px;padding:5px 6px;border-radius:10px}.vc.on{background:rgba(95,211,255,.12)}.vc-pl{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}.vc-pl svg{width:18px;height:18px}.vc-n{flex:1;font-size:.95rem}.vc-t{color:#5fd3ff;font-size:.8rem}.vc-t.pe{color:var(--sub)}.vc .cb{padding:6px 12px;font-size:.82rem}.vc-g{margin:10px 0 2px;color:var(--sub);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}.vc-e{color:#ffb4a8!important}
+/* №538 · навыки */
+.nv{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:rgba(255,255,255,.04)}.nv-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.nv-h b{font-size:.95rem}.nv-h span{color:var(--sub);font-size:.78rem;white-space:nowrap}.nv-w{color:var(--sub);font-size:.82rem;margin-top:4px;line-height:1.35}.nv-s{white-space:pre-wrap;font-size:.88rem;margin-top:6px;line-height:1.4;color:#dfe6ff}.nv .cb{padding:6px 12px;font-size:.82rem}.nv .cb.dn{background:#e5484d;color:#fff;border-color:#e5484d}.nv-f input,.nv-f textarea{margin-top:6px}.cfg-in .nv-f textarea{min-height:110px}
 .cps-sec{border-top:1px solid var(--line);padding:12px 0 4px}.cps-sec h4{display:flex;align-items:center;gap:8px;margin:0 0 6px}.cps-sec h4 span{flex:1}.cps-sec ul{margin:4px 0 6px;padding-left:18px;color:#dfe6ff;font-size:.9rem;line-height:1.45}.cps-sec li{margin:3px 0}.cps-sec li i{color:var(--sub);font-style:normal}.cps-say{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.06);color:#9fd8ff;display:flex;align-items:center;justify-content:center;cursor:pointer}.cps-say svg{width:18px;height:18px}.cps-say.on{background:#9fd8ff;color:#111a3d}.cps-top{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}
 .cb{border:0;border-radius:10px;padding:10px 16px;font:700 .9rem Roboto,sans-serif;cursor:pointer;background:#bbed21;color:#1d2230}.cb.s{background:rgba(255,255,255,.12);color:#fff;border:1px solid var(--line)}
 .mc label{display:flex;align-items:center;gap:8px;padding:6px 2px;font-size:.95rem}.mc input{width:auto}
@@ -244,7 +248,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
 <div class="addsh" id="addsh" onclick="if(event.target===this)addClose()"><div class="addin"><div class="addgrip"></div><div class="addhd"><button onclick="addClose()" title="Закрыть"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button><b>Добавить</b><span></span></div><div class="addg"><button onclick="addPick('fCam')"><i><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.2A3.2 3.2 0 1 0 12 8.8a3.2 3.2 0 0 0 0 6.4zM9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z"/></svg></i>Камера</button><button onclick="addPick('fPic')"><i><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></i>Фото</button><button onclick="addPick('fAny')"><i><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 15.01l1.41 1.41L11 14.84V19h2v-4.16l1.59 1.59L16 15.01 12.01 11 8 15.01z"/></svg></i>Файлы</button></div></div></div>
 <div class="mnu" id="mnu" onclick="if(event.target===this)mnuClose()"><div class="mnu-in"><div class="mnu-hd"><img src="kosmos-face-s.jpg?v=4" alt=""><b>Космос</b></div><div class="msrch"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg><input id="mq" placeholder="Поиск по разговорам и документам" autocomplete="off" onkeydown="if(event.key==='Enter')fmSearch()"></div><button class="mi" onclick="convNew()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg><span>Новый разговор</span></button><button class="mi" onclick="fmDocs()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg><span>Документы</span></button><button class="mi" onclick="fmClients()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Клиенты</span></button><button class="mi" onclick="location.href='/apps/crm/?from=kosmos'"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM8 19H4V5h4v14zm6 0h-4V5h4v14zm6 0h-4V5h4v14z"/></svg><span>Сделки</span></button><button class="mi" onclick="mnuClose();plOpen()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z"/></svg><span>Планировщик</span></button><button class="mi" onclick="fmFiles()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg><span>Файлы</span></button><button class="mi" id="miCfg" style="display:none" onclick="mnuClose();cfgOpen()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54A.48.48 0 0 0 13.92 2h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.73 8.47a.48.48 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.48.48 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg><span>Настройки</span></button><button class="mi" onclick="mnuClose();capsOpen()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></svg><span>Что умеет Космос</span></button><div class="mrec">Недавние</div><div id="convs"></div></div></div>
 <div class="pnl" id="pnl"><div class="pnl-hd"><button onclick="pnlBack()" title="Назад"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button><b id="pnlT"></b></div><div class="pnl-f" id="pnlF"></div><div class="pnl-b" id="pnlB"></div></div>
-<script src="voice.js?v=21"></script>
+<script src="voice.js?v=22"></script>
 <script>
 (function(){
   /* пропуск сотрудника — как в «Воронках сделок» */
@@ -795,6 +799,79 @@ html.fil-talk .hd .snd-t{background:#e5484d}
   })();
   /* ===== №18 · настройки Космоса (руководитель): модель, памятка, сравнение моделей ===== */
   var CFG = null;
+  /* №537 · голос: у Космоса и его напарника голоса разные — на слух сразу понятно, кто говорит. Голосом напарника говорить нельзя */
+  var VC = null, VC_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+  var VC_SAMPLE = 'Здравствуйте! Я Космос. Так звучит мой голос.';
+  function vcName(id){ var x = ((VC && VC.voices) || []).filter(function(v){ return v.id === id; })[0]; return x ? x.name : id; }
+  function vcHtml(){
+    var s = VC;
+    if (!s) return '<p>Загрузка…</p>';
+    if (!s.ok) return '<p class="vc-e">' + esc(s.error || 'Не удалось загрузить голоса') + '</p>';
+    function row(v){
+      var me = v.id === s.voice, pe = v.id === s.peer_voice;
+      return '<div class="vc' + (me ? ' on' : '') + '" data-v="' + esc(v.id) + '"><button class="vc-pl" title="Послушать" onclick="vcTry(\'' + esc(v.id) + '\')">' + VC_PLAY + '</button><span class="vc-n">' + esc(v.name) + '</span>'
+        + (me ? '<span class="vc-t">голос Космоса</span>' : pe ? '<span class="vc-t pe">голос ' + esc(s.peer_gen || s.peer) + '</span>' : '<button class="cb s" onclick="vcSet(\'' + esc(v.id) + '\')">Выбрать</button>') + '</div>';
+    }
+    var vs = s.voices || [];
+    return '<p>Космос говорит голосом «' + esc(vcName(s.voice)) + '», ' + esc(s.peer) + ' — «' + esc(vcName(s.peer_voice)) + '». Нажмите ▶, чтобы послушать. Голос ' + esc(s.peer_gen) + ' занят — так на слух сразу понятно, кто отвечает.</p>'
+      + (s.err ? '<p class="vc-e">' + esc(s.err) + '</p>' : '')
+      + (s.set ? '' : '<p class="vc-e">Голос Яндекса ещё не подключён — пока звучит голос телефона. Ключ вставляется в «Сделках» → Меню.</p>')
+      + '<div class="vc-g">Мужские</div>' + vs.filter(function(v){ return v.g === 'm'; }).map(row).join('')
+      + '<div class="vc-g">Женские</div>' + vs.filter(function(v){ return v.g === 'f'; }).map(row).join('');
+  }
+  function vcShow(){ var b = $('cfVc'); if (b) b.innerHTML = vcHtml(); }
+  function vcLoad(){ api('sp_status', {}).then(function(r){ VC = r || {ok:false}; vcShow(); }).catch(function(){ VC = {ok:false, error:'Нет связи'}; vcShow(); }); }
+  window.vcTry = function(id){ FilVoice.say(VC_SAMPLE, true, true, id); };
+  window.vcSet = function(id){
+    api('sp_voice_set', {voice:id}).then(function(r){
+      if (!r || !r.ok) { if (VC) VC.err = (r && r.error) || 'Ошибка'; vcShow(); return; }
+      VC.voice = r.voice; if (r.peer_voice) VC.peer_voice = r.peer_voice; VC.err = ''; vcShow(); st('Голос сохранён');
+      FilVoice.say('Хорошо, теперь я говорю этим голосом.', true, true);
+    }).catch(function(){ if (VC) VC.err = 'Нет связи'; vcShow(); });
+  };
+  /* №538 · навыки — общие для двух помощников: проверенные способы решать задачи. Видит и правит руководитель */
+  var NV = null, NV_ED = 0, NV_DEL = 0;
+  function nvHtml(){
+    var s = NV;
+    if (!s) return '<p>Загрузка…</p>';
+    if (!s.ok) return '<p class="vc-e">' + esc(s.error || 'Не удалось загрузить навыки') + '</p>';
+    var items = s.items || [];
+    var h = '<p>' + esc(s.note || '') + '</p>' + (s.warn ? '<p class="vc-e">' + esc(s.warn) + '</p>' : '') + (s.err ? '<p class="vc-e">' + esc(s.err) + '</p>' : '');   /* №540 · сервер недоступен — копия из магазина */
+    if (!items.length && NV_ED !== -1) h += '<p>Навыков пока нет. Они появятся, когда ' + esc(s.writer || '') + ' решит задачу в несколько шагов. Можно добавить и самому.</p>';
+    h += items.map(function(x){
+      var id = +x.id;
+      if (NV_ED === id) return nvForm(x);
+      return '<div class="nv" data-id="' + id + '"><div class="nv-h"><b>' + esc(x.title) + '</b><span>' + esc(x.author) + (+x.uses ? ' · применяли ' + (+x.uses) : '') + '</span></div>'
+        + (x.trig ? '<div class="nv-w">Когда: ' + esc(x.trig) + '</div>' : '')
+        + '<div class="nv-s">' + esc(x.steps) + '</div>'
+        + (x.trace ? '<div class="nv-w">Инструменты: ' + esc(x.trace) + '</div>' : '')
+        + '<div class="r"><button class="cb s" onclick="nvEdit(' + id + ')">Поправить</button>'
+        + (NV_DEL === id ? '<button class="cb dn" onclick="nvDel(' + id + ')">Точно удалить?</button><button class="cb s" onclick="nvNoDel()">Нет</button>' : '<button class="cb s" onclick="nvAskDel(' + id + ')">Удалить</button>')
+        + '</div></div>';
+    }).join('');
+    h += NV_ED === -1 ? nvForm({id:0, title:'', trig:'', steps:''}) : '<div class="r"><button class="cb s" onclick="nvEdit(-1)">+ Новый навык</button></div>';
+    return h;
+  }
+  function nvForm(x){
+    return '<div class="nv nv-f"><input id="nvT" placeholder="Название: что за задача" value="' + esc(x.title) + '">'
+      + '<input id="nvW" placeholder="Когда применять: как обычно об этом просят" value="' + esc(x.trig) + '">'
+      + '<textarea id="nvS" placeholder="Как делать: 1) инструмент — что искать; 2) …; что проверить; что ответить">' + esc(x.steps) + '</textarea>'
+      + '<p class="vc-e" id="nvE"></p><div class="r"><button class="cb" onclick="nvSave(' + (+x.id || 0) + ')">Сохранить навык</button><button class="cb s" onclick="nvEdit(0)">Отмена</button></div></div>';
+  }
+  function nvShow(){ var b = $('cfNv'); if (b) b.innerHTML = nvHtml(); }
+  function nvLoad(){ api('nvk_list', {}).then(function(r){ NV = r || {ok:false}; nvShow(); }).catch(function(){ NV = {ok:false, error:'Нет связи'}; nvShow(); }); }
+  function nvErr(m){ if (NV) NV.err = m; nvShow(); }
+  window.nvEdit = function(id){ NV_ED = id; NV_DEL = 0; if (NV) NV.err = ''; nvShow(); var f = $('nvT'); if (f) f.focus(); };
+  window.nvAskDel = function(id){ NV_DEL = id; nvShow(); };
+  window.nvNoDel = function(){ NV_DEL = 0; nvShow(); };
+  window.nvSave = function(id){
+    var d = {id:id, title:$('nvT').value, when:$('nvW').value, steps:$('nvS').value};
+    var fe = function(m){ var e = $('nvE'); if (e) e.textContent = m; else nvErr(m); };   /* ошибка — в самой форме, написанное не теряется */
+    api('nvk_save', d).then(function(r){ if (!r || !r.ok) { fe((r && r.error) || 'Ошибка'); return; } NV.items = r.items; NV.err = ''; NV_ED = 0; nvShow(); st('Навык сохранён'); }).catch(function(){ fe('Нет связи'); });
+  };
+  window.nvDel = function(id){
+    api('nvk_del', {id:id}).then(function(r){ if (!r || !r.ok) { nvErr((r && r.error) || 'Ошибка'); return; } NV.items = r.items; NV_DEL = 0; nvShow(); st('Навык удалён'); }).catch(function(){ nvErr('Нет связи'); });
+  };
   function cfgRender(){
     var c = CFG;
     $('cfgIn').innerHTML = '<h3>Настройки Космоса</h3>'
@@ -803,6 +880,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
       + '<h4>Модель — «мозги» Космоса</h4><p>На какой модели Claude думает Космос. Sonnet — основной, Opus — сильнее и дороже, Haiku — быстрее и дешевле. Сравнить модели можно внизу.</p>'
       + '<select id="cfM">' + c.models.map(function(m){ return '<option value="' + esc(m.id) + '"' + (m.id === c.model ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select>'
       + '<div class="r"><button class="cb" onclick="cfgSave(\'model\')">Сохранить модель</button></div>'
+      + '<h4>Голос Космоса</h4><div id="cfVc">' + vcHtml() + '</div>'
       + '<h4>Как Космос обращается к людям</h4><p>Впишите имя и отчество — Космос будет обращаться так к сотруднику и так называть его в поручениях. Вас Космос называет «Босс», а при сотрудниках — по имени и отчеству.</p>'
       + (c.staff || []).map(function(s, i){ return '<div class="nmr"><span>' + esc(s.name) + (s.role === 'boss' ? ' (вы)' : '') + '</span><input data-ph="' + esc(s.phone) + '" class="nmi" placeholder="Имя Отчество" value="' + esc(s.io && s.io !== s.name ? s.io : '') + '"></div>'; }).join('')
       + '<div class="r"><button class="cb" onclick="cfgSave(\'names\')">Сохранить</button></div>'
@@ -812,6 +890,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
       + '<h4>Что Космос выучил из поправок</h4><p>Когда вы поправляете Космоса («нет, я имел в виду SNADI»), он сам записывает правило сюда и дальше не ошибается. Лишнее можно стереть.</p>'
       + '<textarea id="cfLearn" placeholder="Пока ничего — Космос запишет сюда, когда его поправят">' + esc(c.learn || '') + '</textarea>'
       + '<div class="r"><button class="cb" onclick="cfgSave(\'learn\')">Сохранить</button></div>'
+      + '<h4>Навыки</h4><div id="cfNv">' + nvHtml() + '</div>'
       + '<h4>Сравнить модели</h4><p>Один и тот же вопрос — нескольким моделям. Действия при сравнении не выполняются, только ответы.</p>'
       + '<input id="cfQ" placeholder="Например: что у нас есть для гостиницы на 200 номеров?">'
       + '<div class="mc">' + c.models.map(function(m, i){ return '<label><input type="checkbox" value="' + esc(m.id) + '"' + (i < 2 ? ' checked' : '') + '> ' + esc(m.name) + '</label>'; }).join('') + '</div>'
@@ -912,7 +991,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
       $('cfCron').innerHTML = '<p>' + (!r || !r.ok ? esc((r && r.error) || 'Ошибка') : r.seen ? 'Работает: сервер последний раз будил Космоса ' + esc(r.seen) : 'Сервер «Космоса» ещё ни разу не будил задачи — он начнёт сам в течение нескольких минут после обновления') + '</p>';
     });
   };
-  window.cfgOpen = function(){ $('cfg').style.display = 'flex'; if (CFG) cfgRender(); else $('cfgIn').innerHTML = '<h3>Настройки Космоса</h3><p>Загрузка…</p>'; api('fil_cfg', {}).then(function(r){ if (r && r.ok) { CFG = r; cfgRender(); } }); };
+  window.cfgOpen = function(){ $('cfg').style.display = 'flex'; if (CFG) cfgRender(); else $('cfgIn').innerHTML = '<h3>Настройки Космоса</h3><p>Загрузка…</p>'; api('fil_cfg', {}).then(function(r){ if (r && r.ok) { CFG = r; cfgRender(); } }); vcLoad(); NV_ED = 0; NV_DEL = 0; nvLoad(); };
   window.cfgSave = function(w){
     if (w === 'names') { var nm = {}; document.querySelectorAll('.nmi').forEach(function(x){ nm[x.getAttribute('data-ph')] = x.value; }); api('fil_cfg', {names:nm}).then(function(r){ if (r && r.ok) { CFG = r; cfgRender(); st('Сохранено'); } else st((r && r.error) || 'Ошибка'); }); return; }
     var d = w === 'model' ? {model:$('cfM').value} : w === 'memo' ? {memo:$('cfMemo').value} : w === 'learn' ? {learn:$('cfLearn').value} : {memo_reset:1};

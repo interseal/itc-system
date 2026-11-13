@@ -11,6 +11,9 @@
 import argparse, hashlib, hmac, json, os, re, subprocess, sys, tempfile, zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# №540 · файлы магазина берём из основной папки хранилища (itc-system/store), а не из старой копии kosmos/store:
+# №539 по ошибке поставил из неё устаревшую страницу «Космоса» (без «Голоса» и «Навыков»)
+STORE = os.path.join(os.path.dirname(ROOT), 'store') if os.path.isdir(os.path.join(os.path.dirname(ROOT), 'store', 'api')) else os.path.join(ROOT, 'store')
 ap = argparse.ArgumentParser()
 ap.add_argument('--n', type=int, required=True)
 ap.add_argument('--upd-key', required=True)
@@ -32,8 +35,8 @@ if not a.no_pkg:
                                       '--notes', f'обновление магазина №{a.n}'], check=True, capture_output=True, text=True).stdout)
     for f in sorted(os.listdir(td)):
         files.append((f'store/uploads/kosmos/pkg/{f}', open(os.path.join(td, f), 'rb').read()))
-files.insert(0, ('store/api/kosmos.php', open(f'{ROOT}/store/api/kosmos.php', 'rb').read()))
-files.insert(1, ('store/apps/kosmos/index.html', open(f'{ROOT}/store/apps/kosmos/index.html', 'rb').read()))
+files.insert(0, ('store/api/kosmos.php', open(f'{STORE}/api/kosmos.php', 'rb').read()))
+files.insert(1, ('store/apps/kosmos/index.html', open(f'{STORE}/apps/kosmos/index.html', 'rb').read()))
 if a.extra:
     have = {p for p, _ in files}
     for dp, dn, fn in os.walk(a.extra):
