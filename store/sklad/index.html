@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#112C93">
+<title>ITC 仓库 · Склад</title>
+<link rel="icon" type="image/png" href="/apps/sklad/fav-64.png">
+<!-- ИТК · приложение «Склад в Китае» · /sklad/index.html · v1 (03.11.2026)
+     Открывается в главном окне приложения ИТК Глобал (там работает печать наклеек на XP-420B).
+     Сервер: /api/sklad.php. Язык: китайский / русский (кнопка вверху). -->
+<style>
+@font-face{font-family:'Roboto';font-weight:400;font-display:swap;src:url(/fonts/roboto-cyrillic-400-normal.woff2) format('woff2');unicode-range:U+0400-045F}
+@font-face{font-family:'Roboto';font-weight:400;font-display:swap;src:url(/fonts/roboto-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+2000-206F}
+@font-face{font-family:'Roboto';font-weight:700;font-display:swap;src:url(/fonts/roboto-cyrillic-700-normal.woff2) format('woff2');unicode-range:U+0400-045F}
+@font-face{font-family:'Roboto';font-weight:700;font-display:swap;src:url(/fonts/roboto-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+2000-206F}
+:root{--o:#112C93;--navy:#112C93;--g:#2E7D32;--r:#C62828;--line:#dfe3ea;--mut:#6b7385}
+*{box-sizing:border-box;font-family:'Roboto','PingFang SC','Noto Sans SC','Microsoft YaHei',Arial,sans-serif}
+html,body{margin:0;background:#f2f3f6;color:#1d2230;-webkit-tap-highlight-color:transparent}
+.top{position:sticky;top:0;z-index:20;background:var(--o);color:#fff;display:flex;align-items:center;gap:10px;padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top))}
+.top .bk{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:6px;padding:6px 11px;font-weight:700;font-size:.9rem}
+.top h1{flex:1;margin:0;font-size:1.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.top select.wh{max-width:38%}
+.lang{display:flex;border:1px solid rgba(255,255,255,.6);border-radius:6px;overflow:hidden}
+.lang button{border:0;background:transparent;color:#fff;padding:6px 10px;font-weight:700;font-size:.85rem}
+.lang button.on{background:#fff;color:var(--o)}
+.wtb{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:#f3fbe4;border-bottom:1px solid var(--line);font-size:.88rem}
+.wtb.off{background:#fff4e0}.wtb span{flex:1 1 180px}
+.wtb button{display:inline-flex;align-items:center;gap:4px;border:1px solid #c5cad4;background:#fff;border-radius:16px;padding:7px 12px;font:600 .85rem/1 Roboto,sans-serif;cursor:pointer}
+.wtb button svg{width:16px;height:16px}.wtb button.go{background:#2E7D32;border-color:#2E7D32;color:#fff}.wtb button.end{color:#c62828}
+.tabs{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:52px;z-index:19}
+.tabs button{flex:1;border:0;background:#fff;padding:12px 4px;font-weight:700;font-size:.95rem;color:#5b6272;border-bottom:3px solid transparent}
+.tabs button.on{color:var(--o);border-bottom-color:var(--o)}
+.tabs b{display:inline-block;min-width:18px;margin-left:4px;border-radius:9px;background:var(--r);color:#fff;font-size:.72rem;padding:1px 5px}
+.tabs b:empty{display:none}
+.wrap{padding:12px;max-width:760px;margin:0 auto}
+.big{display:flex;gap:8px;margin-bottom:10px}
+.big button{flex:1;border:0;border-radius:8px;background:var(--o);color:#fff;padding:16px 8px;font-weight:700;font-size:1rem;display:flex;flex-direction:column;align-items:center;gap:6px}
+.big button.sec{background:#fff;color:var(--o);border:2px solid var(--o)}
+.big svg{width:30px;height:30px}
+.find{display:flex;gap:6px;margin-bottom:12px}
+.find input{flex:1;border:1px solid #c5cad4;border-radius:6px;padding:11px;font-size:1rem}
+.find button,.btn{border:0;border-radius:6px;background:var(--navy);color:#fff;padding:11px 14px;font-weight:700;font-size:.92rem}
+.btn.g{background:var(--g)}.btn.o{background:var(--o)}.btn.w{background:#fff;color:#333;border:1px solid #c5cad4}
+.card{background:#fff;border-radius:8px;border:1px solid var(--line);padding:12px;margin-bottom:10px}
+.plan{background:#E8EAF6;border:2px solid var(--o);border-radius:8px;padding:12px;margin-bottom:10px;font-size:1.05rem;line-height:1.5}
+.plan b{color:var(--o)}
+.it{display:flex;gap:10px}
+.it img{width:76px;height:76px;object-fit:cover;border-radius:6px;background:#eee;flex:none}
+.it .t{font-weight:700;font-size:.98rem}.it .s{font-size:.82rem;color:var(--mut);margin-top:2px}
+.dest{margin-top:8px;padding:8px 10px;border-radius:6px;font-weight:700;font-size:.95rem}
+.dest.ord{background:#E3F2FD;color:#0D47A1}.dest.stk{background:#E8F5E9;color:#1B5E20}
+.qty{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:.92rem}
+.qty input{width:80px;border:1px solid #c5cad4;border-radius:6px;padding:8px;font-size:1.05rem;text-align:center}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.mut{color:var(--mut);font-size:.85rem}
+.empty{padding:26px 10px;text-align:center;color:var(--mut)}
+.ex{display:flex;gap:10px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px}
+.ex img{width:54px;height:54px;object-fit:cover;border-radius:6px;background:#eee;flex:none}
+.ex .d{margin-left:auto;font-weight:700;white-space:nowrap;font-size:.85rem}.ex .d.late{color:var(--r)}
+.msgs{display:flex;flex-direction:column;gap:8px;padding-bottom:80px}
+.m{max-width:86%;background:#fff;border-radius:10px;padding:8px 11px;box-shadow:0 1px 2px rgba(0,0,0,.08);font-size:.95rem;line-height:1.4;white-space:pre-wrap}
+.m.me{align-self:flex-end;background:#C5CAE9}.m.fil{background:#E8EAF6}
+.m small{display:block;color:#9aa0ab;font-size:.72rem;margin-top:3px}.m .sub{color:#8a8f99;font-size:.82rem;margin-top:4px}
+.send{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;gap:6px;padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+.send textarea{flex:1;border:1px solid #c5cad4;border-radius:6px;padding:9px;font-size:1rem;min-height:44px;max-height:120px;resize:none}
+.cam{position:fixed;inset:0;z-index:50;background:#000;display:flex;flex-direction:column}
+.cam video{flex:1;width:100%;object-fit:cover}
+.cam .bar{display:flex;gap:8px;padding:12px;background:#000}
+.cam .hint{position:absolute;top:30%;left:10%;right:10%;height:22%;border:3px solid #7986CB;border-radius:10px}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#263238;color:#fff;padding:10px 16px;border-radius:6px;z-index:99;max-width:88vw;text-align:center}
+.gate{padding:60px 20px;text-align:center}
+.top .qrb{display:inline-flex;align-items:center;padding:6px 8px}
+.inv{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px}
+.inv-in{background:#fff;border-radius:10px;padding:18px;max-width:380px;width:100%;text-align:center;max-height:92vh;overflow:auto}
+.inv-in .qr{display:inline-block;margin:10px auto;padding:8px;background:#fff}
+.inv-in .code{font-size:2rem;font-weight:700;letter-spacing:.3em;color:var(--navy)}
+.inv-in textarea{width:100%;height:110px;border:1px solid #c5cad4;border-radius:6px;padding:8px;font-size:.85rem}
+.chk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.95rem}
+.chk input{width:22px;height:22px}
+.ph{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.ph img{width:60px;height:60px;object-fit:cover;border-radius:6px}
+select.wh{border:0;border-radius:6px;padding:6px;font-weight:700;color:var(--o);max-width:150px}
+</style><link rel="stylesheet" href="/apps/fon.css?v=2">
+</head>
+<body>
+<!-- №470 · своя заставка приложения --><style id="itcSplCss">#itcSpl{position:fixed;inset:0;z-index:2147483000;background:#2b2a2a url(/apps/splash/sklad.jpg?v=1) 50% 50%/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:max(64px,9vh);box-sizing:border-box;transition:opacity .35s;font-family:Roboto,Arial,sans-serif}#itcSpl:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.72) 100%)}#itcSpl .nm{position:relative;color:#fff;font-size:30px;font-weight:700;letter-spacing:.3px;text-shadow:0 2px 12px rgba(0,0,0,.45);margin-bottom:22px;text-align:center;padding:0 20px}#itcSpl .sp{position:relative;width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;animation:itcSplR .9s linear infinite}@keyframes itcSplR{to{transform:rotate(360deg)}}#itcSpl.off{opacity:0;pointer-events:none}</style><div id="itcSpl"><div class="nm">Склад в Китае</div><div class="sp"></div></div><script>(function(){var s=document.getElementById("itcSpl");if(!s)return;var u=navigator.userAgent||"",sa=false;try{sa=matchMedia("(display-mode: standalone)").matches||navigator.standalone}catch(e){}if(!/ITCMini|ITCWindow|ITCSklad/.test(u)&&!sa){s.parentNode.removeChild(s);return}var t0=Date.now(),d=0;function h(){if(d)return;d=1;setTimeout(function(){s.className="off";setTimeout(function(){if(s.parentNode)s.parentNode.removeChild(s)},450)},Math.max(0,1000-(Date.now()-t0)))}if(document.readyState==="complete")h();else addEventListener("load",h);setTimeout(h,6000)})()</script>
+<div class="top"><button class="bk" id="bk" onclick="goBack()"></button><h1 id="ttl"></h1><select class="wh" id="whSel" style="display:none" onchange="S.wh=this.value;loadChat()"></select><button class="bk qrb" id="qrB" style="display:none" onclick="invOpen()" title="QR"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zm-2 16h8v-8H3v8zm2-6h4v4H5v-4zm8-12v8h8V3h-8zm6 6h-4V5h4v4zm0 10h2v2h-2zm-6-6h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm0-4h2v2h-2zm2 2h2v2h-2z"/></svg></button>
+  <div class="lang"><button id="lzh" onclick="setLang('zh')">中文</button><button id="lru" onclick="setLang('ru')">RU</button></div></div>
+<div class="wtb" id="wtb" style="display:none"></div>
+<div class="tabs" id="tabs" style="display:none"><button id="t_in" onclick="tab('in')"></button><button id="t_ex" onclick="tab('ex')"></button><button id="t_cg" onclick="tab('cg')"></button><button id="t_ch" onclick="tab('ch')"></button></div>
+<div class="wrap" id="v_in" style="display:none"></div>
+<div class="wrap" id="v_ex" style="display:none"></div>
+<div class="wrap" id="v_cg" style="display:none"></div>
+<div class="wrap" id="v_ch" style="display:none"><div class="msgs" id="msgs"></div></div>
+<div class="send" id="sendBar" style="display:none"><textarea id="msgT"></textarea><button class="btn o" onclick="sendMsg()" id="sendB"></button></div>
+<div class="gate" id="gate"><p id="gateT">…</p>
+  <div id="loginBox" style="display:none;max-width:320px;margin:0 auto"><input id="lgCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" style="width:100%;font-size:2rem;letter-spacing:.4em;text-align:center;border:1px solid #c5cad4;border-radius:8px;padding:12px" placeholder="000000">
+  <button class="btn o" style="width:100%;margin-top:12px;padding:14px" id="lgBtn" onclick="doLogin()"></button></div></div>
+<div class="inv" id="inv" style="display:none" onclick="if(event.target===this)this.style.display='none'"><div class="inv-in" id="invIn"></div></div>
+<input type="file" id="fPhoto" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this)">
+<input type="file" id="fCg" accept="image/*" capture="environment" style="display:none" onchange="onCgPhoto(this)">
+<input type="file" id="fShip" accept="image/*" capture="environment" style="display:none" onchange="onShipPhoto(this)">
+<input type="file" id="fRcv" accept="image/*" capture="environment" style="display:none" onchange="onRcvPhoto(this)">
+<script>
+var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this.parsedData=[];for(var b=[],d=0,e=this.data.length;e>d;d++){var f=this.data.charCodeAt(d);f>65536?(b[0]=240|(1835008&f)>>>18,b[1]=128|(258048&f)>>>12,b[2]=128|(4032&f)>>>6,b[3]=128|63&f):f>2048?(b[0]=224|(61440&f)>>>12,b[1]=128|(4032&f)>>>6,b[2]=128|63&f):f>128?(b[0]=192|(1984&f)>>>6,b[1]=128|63&f):b[0]=f,this.parsedData=this.parsedData.concat(b)}this.parsedData.length!=this.data.length&&(this.parsedData.unshift(191),this.parsedData.unshift(187),this.parsedData.unshift(239))}function b(a,b){this.typeNumber=a,this.errorCorrectLevel=b,this.modules=null,this.moduleCount=0,this.dataCache=null,this.dataList=[]}function i(a,b){if(void 0==a.length)throw new Error(a.length+"/"+b);for(var c=0;c<a.length&&0==a[c];)c++;this.num=new Array(a.length-c+b);for(var d=0;d<a.length-c;d++)this.num[d]=a[d+c]}function j(a,b){this.totalCount=a,this.dataCount=b}function k(){this.buffer=[],this.length=0}function m(){return"undefined"!=typeof CanvasRenderingContext2D}function n(){var a=!1,b=navigator.userAgent;return/android/i.test(b)&&(a=!0,aMat=b.toString().match(/android ([0-9]\.[0-9])/i),aMat&&aMat[1]&&(a=parseFloat(aMat[1]))),a}function r(a,b){for(var c=1,e=s(a),f=0,g=l.length;g>=f;f++){var h=0;switch(b){case d.L:h=l[f][0];break;case d.M:h=l[f][1];break;case d.Q:h=l[f][2];break;case d.H:h=l[f][3]}if(h>=e)break;c++}if(c>l.length)throw new Error("Too long data");return c}function s(a){var b=encodeURI(a).toString().replace(/\%[0-9a-fA-F]{2}/g,"a");return b.length+(b.length!=a?3:0)}a.prototype={getLength:function(){return this.parsedData.length},write:function(a){for(var b=0,c=this.parsedData.length;c>b;b++)a.put(this.parsedData[b],8)}},b.prototype={addData:function(b){var c=new a(b);this.dataList.push(c),this.dataCache=null},isDark:function(a,b){if(0>a||this.moduleCount<=a||0>b||this.moduleCount<=b)throw new Error(a+","+b);return this.modules[a][b]},getModuleCount:function(){return this.moduleCount},make:function(){this.makeImpl(!1,this.getBestMaskPattern())},makeImpl:function(a,c){this.moduleCount=4*this.typeNumber+17,this.modules=new Array(this.moduleCount);for(var d=0;d<this.moduleCount;d++){this.modules[d]=new Array(this.moduleCount);for(var e=0;e<this.moduleCount;e++)this.modules[d][e]=null}this.setupPositionProbePattern(0,0),this.setupPositionProbePattern(this.moduleCount-7,0),this.setupPositionProbePattern(0,this.moduleCount-7),this.setupPositionAdjustPattern(),this.setupTimingPattern(),this.setupTypeInfo(a,c),this.typeNumber>=7&&this.setupTypeNumber(a),null==this.dataCache&&(this.dataCache=b.createData(this.typeNumber,this.errorCorrectLevel,this.dataList)),this.mapData(this.dataCache,c)},setupPositionProbePattern:function(a,b){for(var c=-1;7>=c;c++)if(!(-1>=a+c||this.moduleCount<=a+c))for(var d=-1;7>=d;d++)-1>=b+d||this.moduleCount<=b+d||(this.modules[a+c][b+d]=c>=0&&6>=c&&(0==d||6==d)||d>=0&&6>=d&&(0==c||6==c)||c>=2&&4>=c&&d>=2&&4>=d?!0:!1)},getBestMaskPattern:function(){for(var a=0,b=0,c=0;8>c;c++){this.makeImpl(!0,c);var d=f.getLostPoint(this);(0==c||a>d)&&(a=d,b=c)}return b},createMovieClip:function(a,b,c){var d=a.createEmptyMovieClip(b,c),e=1;this.make();for(var f=0;f<this.modules.length;f++)for(var g=f*e,h=0;h<this.modules[f].length;h++){var i=h*e,j=this.modules[f][h];j&&(d.beginFill(0,100),d.moveTo(i,g),d.lineTo(i+e,g),d.lineTo(i+e,g+e),d.lineTo(i,g+e),d.endFill())}return d},setupTimingPattern:function(){for(var a=8;a<this.moduleCount-8;a++)null==this.modules[a][6]&&(this.modules[a][6]=0==a%2);for(var b=8;b<this.moduleCount-8;b++)null==this.modules[6][b]&&(this.modules[6][b]=0==b%2)},setupPositionAdjustPattern:function(){for(var a=f.getPatternPosition(this.typeNumber),b=0;b<a.length;b++)for(var c=0;c<a.length;c++){var d=a[b],e=a[c];if(null==this.modules[d][e])for(var g=-2;2>=g;g++)for(var h=-2;2>=h;h++)this.modules[d+g][e+h]=-2==g||2==g||-2==h||2==h||0==g&&0==h?!0:!1}},setupTypeNumber:function(a){for(var b=f.getBCHTypeNumber(this.typeNumber),c=0;18>c;c++){var d=!a&&1==(1&b>>c);this.modules[Math.floor(c/3)][c%3+this.moduleCount-8-3]=d}for(var c=0;18>c;c++){var d=!a&&1==(1&b>>c);this.modules[c%3+this.moduleCount-8-3][Math.floor(c/3)]=d}},setupTypeInfo:function(a,b){for(var c=this.errorCorrectLevel<<3|b,d=f.getBCHTypeInfo(c),e=0;15>e;e++){var g=!a&&1==(1&d>>e);6>e?this.modules[e][8]=g:8>e?this.modules[e+1][8]=g:this.modules[this.moduleCount-15+e][8]=g}for(var e=0;15>e;e++){var g=!a&&1==(1&d>>e);8>e?this.modules[8][this.moduleCount-e-1]=g:9>e?this.modules[8][15-e-1+1]=g:this.modules[8][15-e-1]=g}this.modules[this.moduleCount-8][8]=!a},mapData:function(a,b){for(var c=-1,d=this.moduleCount-1,e=7,g=0,h=this.moduleCount-1;h>0;h-=2)for(6==h&&h--;;){for(var i=0;2>i;i++)if(null==this.modules[d][h-i]){var j=!1;g<a.length&&(j=1==(1&a[g]>>>e));var k=f.getMask(b,d,h-i);k&&(j=!j),this.modules[d][h-i]=j,e--,-1==e&&(g++,e=7)}if(d+=c,0>d||this.moduleCount<=d){d-=c,c=-c;break}}}},b.PAD0=236,b.PAD1=17,b.createData=function(a,c,d){for(var e=j.getRSBlocks(a,c),g=new k,h=0;h<d.length;h++){var i=d[h];g.put(i.mode,4),g.put(i.getLength(),f.getLengthInBits(i.mode,a)),i.write(g)}for(var l=0,h=0;h<e.length;h++)l+=e[h].dataCount;if(g.getLengthInBits()>8*l)throw new Error("code length overflow. ("+g.getLengthInBits()+">"+8*l+")");for(g.getLengthInBits()+4<=8*l&&g.put(0,4);0!=g.getLengthInBits()%8;)g.putBit(!1);for(;;){if(g.getLengthInBits()>=8*l)break;if(g.put(b.PAD0,8),g.getLengthInBits()>=8*l)break;g.put(b.PAD1,8)}return b.createBytes(g,e)},b.createBytes=function(a,b){for(var c=0,d=0,e=0,g=new Array(b.length),h=new Array(b.length),j=0;j<b.length;j++){var k=b[j].dataCount,l=b[j].totalCount-k;d=Math.max(d,k),e=Math.max(e,l),g[j]=new Array(k);for(var m=0;m<g[j].length;m++)g[j][m]=255&a.buffer[m+c];c+=k;var n=f.getErrorCorrectPolynomial(l),o=new i(g[j],n.getLength()-1),p=o.mod(n);h[j]=new Array(n.getLength()-1);for(var m=0;m<h[j].length;m++){var q=m+p.getLength()-h[j].length;h[j][m]=q>=0?p.get(q):0}}for(var r=0,m=0;m<b.length;m++)r+=b[m].totalCount;for(var s=new Array(r),t=0,m=0;d>m;m++)for(var j=0;j<b.length;j++)m<g[j].length&&(s[t++]=g[j][m]);for(var m=0;e>m;m++)for(var j=0;j<b.length;j++)m<h[j].length&&(s[t++]=h[j][m]);return s};for(var c={MODE_NUMBER:1,MODE_ALPHA_NUM:2,MODE_8BIT_BYTE:4,MODE_KANJI:8},d={L:1,M:0,Q:3,H:2},e={PATTERN000:0,PATTERN001:1,PATTERN010:2,PATTERN011:3,PATTERN100:4,PATTERN101:5,PATTERN110:6,PATTERN111:7},f={PATTERN_POSITION_TABLE:[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],G15:1335,G18:7973,G15_MASK:21522,getBCHTypeInfo:function(a){for(var b=a<<10;f.getBCHDigit(b)-f.getBCHDigit(f.G15)>=0;)b^=f.G15<<f.getBCHDigit(b)-f.getBCHDigit(f.G15);return(a<<10|b)^f.G15_MASK},getBCHTypeNumber:function(a){for(var b=a<<12;f.getBCHDigit(b)-f.getBCHDigit(f.G18)>=0;)b^=f.G18<<f.getBCHDigit(b)-f.getBCHDigit(f.G18);return a<<12|b},getBCHDigit:function(a){for(var b=0;0!=a;)b++,a>>>=1;return b},getPatternPosition:function(a){return f.PATTERN_POSITION_TABLE[a-1]},getMask:function(a,b,c){switch(a){case e.PATTERN000:return 0==(b+c)%2;case e.PATTERN001:return 0==b%2;case e.PATTERN010:return 0==c%3;case e.PATTERN011:return 0==(b+c)%3;case e.PATTERN100:return 0==(Math.floor(b/2)+Math.floor(c/3))%2;case e.PATTERN101:return 0==b*c%2+b*c%3;case e.PATTERN110:return 0==(b*c%2+b*c%3)%2;case e.PATTERN111:return 0==(b*c%3+(b+c)%2)%2;default:throw new Error("bad maskPattern:"+a)}},getErrorCorrectPolynomial:function(a){for(var b=new i([1],0),c=0;a>c;c++)b=b.multiply(new i([1,g.gexp(c)],0));return b},getLengthInBits:function(a,b){if(b>=1&&10>b)switch(a){case c.MODE_NUMBER:return 10;case c.MODE_ALPHA_NUM:return 9;case c.MODE_8BIT_BYTE:return 8;case c.MODE_KANJI:return 8;default:throw new Error("mode:"+a)}else if(27>b)switch(a){case c.MODE_NUMBER:return 12;case c.MODE_ALPHA_NUM:return 11;case c.MODE_8BIT_BYTE:return 16;case c.MODE_KANJI:return 10;default:throw new Error("mode:"+a)}else{if(!(41>b))throw new Error("type:"+b);switch(a){case c.MODE_NUMBER:return 14;case c.MODE_ALPHA_NUM:return 13;case c.MODE_8BIT_BYTE:return 16;case c.MODE_KANJI:return 12;default:throw new Error("mode:"+a)}}},getLostPoint:function(a){for(var b=a.getModuleCount(),c=0,d=0;b>d;d++)for(var e=0;b>e;e++){for(var f=0,g=a.isDark(d,e),h=-1;1>=h;h++)if(!(0>d+h||d+h>=b))for(var i=-1;1>=i;i++)0>e+i||e+i>=b||(0!=h||0!=i)&&g==a.isDark(d+h,e+i)&&f++;f>5&&(c+=3+f-5)}for(var d=0;b-1>d;d++)for(var e=0;b-1>e;e++){var j=0;a.isDark(d,e)&&j++,a.isDark(d+1,e)&&j++,a.isDark(d,e+1)&&j++,a.isDark(d+1,e+1)&&j++,(0==j||4==j)&&(c+=3)}for(var d=0;b>d;d++)for(var e=0;b-6>e;e++)a.isDark(d,e)&&!a.isDark(d,e+1)&&a.isDark(d,e+2)&&a.isDark(d,e+3)&&a.isDark(d,e+4)&&!a.isDark(d,e+5)&&a.isDark(d,e+6)&&(c+=40);for(var e=0;b>e;e++)for(var d=0;b-6>d;d++)a.isDark(d,e)&&!a.isDark(d+1,e)&&a.isDark(d+2,e)&&a.isDark(d+3,e)&&a.isDark(d+4,e)&&!a.isDark(d+5,e)&&a.isDark(d+6,e)&&(c+=40);for(var k=0,e=0;b>e;e++)for(var d=0;b>d;d++)a.isDark(d,e)&&k++;var l=Math.abs(100*k/b/b-50)/5;return c+=10*l}},g={glog:function(a){if(1>a)throw new Error("glog("+a+")");return g.LOG_TABLE[a]},gexp:function(a){for(;0>a;)a+=255;for(;a>=256;)a-=255;return g.EXP_TABLE[a]},EXP_TABLE:new Array(256),LOG_TABLE:new Array(256)},h=0;8>h;h++)g.EXP_TABLE[h]=1<<h;for(var h=8;256>h;h++)g.EXP_TABLE[h]=g.EXP_TABLE[h-4]^g.EXP_TABLE[h-5]^g.EXP_TABLE[h-6]^g.EXP_TABLE[h-8];for(var h=0;255>h;h++)g.LOG_TABLE[g.EXP_TABLE[h]]=h;i.prototype={get:function(a){return this.num[a]},getLength:function(){return this.num.length},multiply:function(a){for(var b=new Array(this.getLength()+a.getLength()-1),c=0;c<this.getLength();c++)for(var d=0;d<a.getLength();d++)b[c+d]^=g.gexp(g.glog(this.get(c))+g.glog(a.get(d)));return new i(b,0)},mod:function(a){if(this.getLength()-a.getLength()<0)return this;for(var b=g.glog(this.get(0))-g.glog(a.get(0)),c=new Array(this.getLength()),d=0;d<this.getLength();d++)c[d]=this.get(d);for(var d=0;d<a.getLength();d++)c[d]^=g.gexp(g.glog(a.get(d))+b);return new i(c,0).mod(a)}},j.RS_BLOCK_TABLE=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],j.getRSBlocks=function(a,b){var c=j.getRsBlockTable(a,b);if(void 0==c)throw new Error("bad rs block @ typeNumber:"+a+"/errorCorrectLevel:"+b);for(var d=c.length/3,e=[],f=0;d>f;f++)for(var g=c[3*f+0],h=c[3*f+1],i=c[3*f+2],k=0;g>k;k++)e.push(new j(h,i));return e},j.getRsBlockTable=function(a,b){switch(b){case d.L:return j.RS_BLOCK_TABLE[4*(a-1)+0];case d.M:return j.RS_BLOCK_TABLE[4*(a-1)+1];case d.Q:return j.RS_BLOCK_TABLE[4*(a-1)+2];case d.H:return j.RS_BLOCK_TABLE[4*(a-1)+3];default:return void 0}},k.prototype={get:function(a){var b=Math.floor(a/8);return 1==(1&this.buffer[b]>>>7-a%8)},put:function(a,b){for(var c=0;b>c;c++)this.putBit(1==(1&a>>>b-c-1))},getLengthInBits:function(){return this.length},putBit:function(a){var b=Math.floor(this.length/8);this.buffer.length<=b&&this.buffer.push(0),a&&(this.buffer[b]|=128>>>this.length%8),this.length++}};var l=[[17,14,11,7],[32,26,20,14],[53,42,32,24],[78,62,46,34],[106,84,60,44],[134,106,74,58],[154,122,86,64],[192,152,108,84],[230,180,130,98],[271,213,151,119],[321,251,177,137],[367,287,203,155],[425,331,241,177],[458,362,258,194],[520,412,292,220],[586,450,322,250],[644,504,364,280],[718,560,394,310],[792,624,442,338],[858,666,482,382],[929,711,509,403],[1003,779,565,439],[1091,857,611,461],[1171,911,661,511],[1273,997,715,535],[1367,1059,751,593],[1465,1125,805,625],[1528,1190,868,658],[1628,1264,908,698],[1732,1370,982,742],[1840,1452,1030,790],[1952,1538,1112,842],[2068,1628,1168,898],[2188,1722,1228,958],[2303,1809,1283,983],[2431,1911,1351,1051],[2563,1989,1423,1093],[2699,2099,1499,1139],[2809,2213,1579,1219],[2953,2331,1663,1273]],o=function(){var a=function(a,b){this._el=a,this._htOption=b};return a.prototype.draw=function(a){function g(a,b){var c=document.createElementNS("http://www.w3.org/2000/svg",a);for(var d in b)b.hasOwnProperty(d)&&c.setAttribute(d,b[d]);return c}var b=this._htOption,c=this._el,d=a.getModuleCount();Math.floor(b.width/d),Math.floor(b.height/d),this.clear();var h=g("svg",{viewBox:"0 0 "+String(d)+" "+String(d),width:"100%",height:"100%",fill:b.colorLight});h.setAttributeNS("http://www.w3.org/2000/xmlns/","xmlns:xlink","http://www.w3.org/1999/xlink"),c.appendChild(h),h.appendChild(g("rect",{fill:b.colorDark,width:"1",height:"1",id:"template"}));for(var i=0;d>i;i++)for(var j=0;d>j;j++)if(a.isDark(i,j)){var k=g("use",{x:String(i),y:String(j)});k.setAttributeNS("http://www.w3.org/1999/xlink","href","#template"),h.appendChild(k)}},a.prototype.clear=function(){for(;this._el.hasChildNodes();)this._el.removeChild(this._el.lastChild)},a}(),p="svg"===document.documentElement.tagName.toLowerCase(),q=p?o:m()?function(){function a(){this._elImage.src=this._elCanvas.toDataURL("image/png"),this._elImage.style.display="block",this._elCanvas.style.display="none"}function d(a,b){var c=this;if(c._fFail=b,c._fSuccess=a,null===c._bSupportDataURI){var d=document.createElement("img"),e=function(){c._bSupportDataURI=!1,c._fFail&&_fFail.call(c)},f=function(){c._bSupportDataURI=!0,c._fSuccess&&c._fSuccess.call(c)};return d.onabort=e,d.onerror=e,d.onload=f,d.src="data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==",void 0}c._bSupportDataURI===!0&&c._fSuccess?c._fSuccess.call(c):c._bSupportDataURI===!1&&c._fFail&&c._fFail.call(c)}if(this._android&&this._android<=2.1){var b=1/window.devicePixelRatio,c=CanvasRenderingContext2D.prototype.drawImage;CanvasRenderingContext2D.prototype.drawImage=function(a,d,e,f,g,h,i,j){if("nodeName"in a&&/img/i.test(a.nodeName))for(var l=arguments.length-1;l>=1;l--)arguments[l]=arguments[l]*b;else"undefined"==typeof j&&(arguments[1]*=b,arguments[2]*=b,arguments[3]*=b,arguments[4]*=b);c.apply(this,arguments)}}var e=function(a,b){this._bIsPainted=!1,this._android=n(),this._htOption=b,this._elCanvas=document.createElement("canvas"),this._elCanvas.width=b.width,this._elCanvas.height=b.height,a.appendChild(this._elCanvas),this._el=a,this._oContext=this._elCanvas.getContext("2d"),this._bIsPainted=!1,this._elImage=document.createElement("img"),this._elImage.style.display="none",this._el.appendChild(this._elImage),this._bSupportDataURI=null};return e.prototype.draw=function(a){var b=this._elImage,c=this._oContext,d=this._htOption,e=a.getModuleCount(),f=d.width/e,g=d.height/e,h=Math.round(f),i=Math.round(g);b.style.display="none",this.clear();for(var j=0;e>j;j++)for(var k=0;e>k;k++){var l=a.isDark(j,k),m=k*f,n=j*g;c.strokeStyle=l?d.colorDark:d.colorLight,c.lineWidth=1,c.fillStyle=l?d.colorDark:d.colorLight,c.fillRect(m,n,f,g),c.strokeRect(Math.floor(m)+.5,Math.floor(n)+.5,h,i),c.strokeRect(Math.ceil(m)-.5,Math.ceil(n)-.5,h,i)}this._bIsPainted=!0},e.prototype.makeImage=function(){this._bIsPainted&&d.call(this,a)},e.prototype.isPainted=function(){return this._bIsPainted},e.prototype.clear=function(){this._oContext.clearRect(0,0,this._elCanvas.width,this._elCanvas.height),this._bIsPainted=!1},e.prototype.round=function(a){return a?Math.floor(1e3*a)/1e3:a},e}():function(){var a=function(a,b){this._el=a,this._htOption=b};return a.prototype.draw=function(a){for(var b=this._htOption,c=this._el,d=a.getModuleCount(),e=Math.floor(b.width/d),f=Math.floor(b.height/d),g=['<table style="border:0;border-collapse:collapse;">'],h=0;d>h;h++){g.push("<tr>");for(var i=0;d>i;i++)g.push('<td style="border:0;border-collapse:collapse;padding:0;margin:0;width:'+e+"px;height:"+f+"px;background-color:"+(a.isDark(h,i)?b.colorDark:b.colorLight)+';"></td>');g.push("</tr>")}g.push("</table>"),c.innerHTML=g.join("");var j=c.childNodes[0],k=(b.width-j.offsetWidth)/2,l=(b.height-j.offsetHeight)/2;k>0&&l>0&&(j.style.margin=l+"px "+k+"px")},a.prototype.clear=function(){this._el.innerHTML=""},a}();QRCode=function(a,b){if(this._htOption={width:256,height:256,typeNumber:4,colorDark:"#000000",colorLight:"#ffffff",correctLevel:d.H},"string"==typeof b&&(b={text:b}),b)for(var c in b)this._htOption[c]=b[c];"string"==typeof a&&(a=document.getElementById(a)),this._android=n(),this._el=a,this._oQRCode=null,this._oDrawing=new q(this._el,this._htOption),this._htOption.text&&this.makeCode(this._htOption.text)},QRCode.prototype.makeCode=function(a){this._oQRCode=new b(r(a,this._htOption.correctLevel),this._htOption.correctLevel),this._oQRCode.addData(a),this._oQRCode.make(),this._el.title=a,this._oDrawing.draw(this._oQRCode),this.makeImage()},QRCode.prototype.makeImage=function(){"function"==typeof this._oDrawing.makeImage&&(!this._android||this._android>=3)&&this._oDrawing.makeImage()},QRCode.prototype.clear=function(){this._oDrawing.clear()},QRCode.CorrectLevel=d}();
+function qrLat(s){return String(s==null?"":s).replace(/[А-Яа-яЁё]/g,function(ch){
+  var m={"А":"A","В":"B","Е":"E","К":"K","М":"M","Н":"H","О":"O","Р":"P","С":"C","Т":"T","У":"Y","Х":"X",
+         "а":"a","е":"e","о":"o","р":"p","с":"c","у":"y","х":"x"};
+  return m[ch]||"";
+});}
+var LBL_SIZES={S:{w:40,h:50,name:"Маленькая 40×50"},L:{w:100,h:150,name:"Большая 100×150"}};
+function lblSize(){var v="S";try{v=localStorage.getItem("itc_lbl_size")||"S";}catch(e){}return LBL_SIZES[v]?v:"S";}
+function itemLabelPng(m,sz){
+  sz=sz||lblSize();var big=(sz==="L"),dim=LBL_SIZES[sz];
+  return new Promise(function(res,rej){
+    try{
+      var W=dim.w*8,H=dim.h*8,pad=big?24:8,c=document.createElement("canvas");c.width=W;c.height=H;var x=c.getContext("2d");
+      x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#000";x.textAlign="center";x.textBaseline="top";
+      var y=big?22:8;
+      x.font="bold "+(big?34:15)+"px Arial,sans-serif";x.fillText("ITC GLOBAL",W/2,y);y+=big?48:18;
+      var code=String(m.code||"");var fs=big?120:44;x.font="bold "+fs+"px Arial,sans-serif";
+      while(x.measureText(code).width>W-pad*2&&fs>20){fs-=2;x.font="bold "+fs+"px Arial,sans-serif";}
+      x.fillText(code,W/2,y);y+=fs+(big?18:6);
+      var qs=big?560:200;
+      var qd=document.createElement("div");qd.style.cssText="position:fixed;left:-9999px;top:0";document.body.appendChild(qd);
+      new QRCode(qd,{text:itemQRText(code,m.key),width:qs,height:qs,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+      var qc=qd.querySelector("canvas");if(qc)x.drawImage(qc,(W-qs)/2,y,qs,qs);
+      if(qd.parentNode)qd.parentNode.removeChild(qd);
+      y+=qs+(big?26:6);
+      var _sp=stockSplitName(m.nm||"");var nm=(_sp.v?_sp.v+" · "+_sp.base:_sp.base)+" · "+(parseInt(m.qty,10)||1)+" шт";
+      var lh=big?40:16;x.font=(big?"32px":"13px")+" Arial,sans-serif";
+      var words=nm.split(/\s+/),line="",lines=[];
+      words.forEach(function(w){var t=line?line+" "+w:w;if(x.measureText(t).width>W-pad*2){if(line)lines.push(line);line=w;}else line=t;});
+      if(line)lines.push(line);
+      var maxL=big?5:3;if(lines.length>maxL){lines=lines.slice(0,maxL);lines[maxL-1]=lines[maxL-1].replace(/.{0,2}$/,"")+"…";}
+      lines.forEach(function(l){x.fillText(l,W/2,y);y+=lh;});
+      if(m.pvz){x.font="bold "+(big?44:15)+"px Arial,sans-serif";var pv=String(m.pvz);while(x.measureText(pv).width>W-pad*2&&pv.length>4)pv=pv.slice(0,-2);
+        x.fillText(pv,W/2,Math.min(y+(big?14:4),H-(big?110:22)));}
+      if(big){x.font="24px Arial,sans-serif";x.fillText("Один товар — одна наклейка",W/2,H-56);}
+      x.strokeStyle="#000";x.lineWidth=big?4:2;x.strokeRect(big?3:1,big?3:1,W-(big?6:2),H-(big?6:2));
+      res(c.toDataURL("image/png"));
+    }catch(e){rej(e);}
+  });
+}
+/* №819: прямая печать на XP-420B через приложение 1.6 (Bluetooth, TSPL).
+   Настройки этикетки 40×50 мм, зазор 2 мм. Итог приходит в itcLabelDone. */
+var XP_OPTS={w:40,h:50,gap:2,dir:1,density:10};
+function xpPrint(urls,copies,sz){
+  try{var o=JSON.parse(JSON.stringify(XP_OPTS));o.copies=copies||1;var d=LBL_SIZES[sz||lblSize()];o.w=d.w;o.h=d.h;
+    AndroidLabel.print(JSON.stringify(urls.map(function(u){return String(u).split(",")[1]||u;})),JSON.stringify(o));
+  }catch(e){toast("Печать недоступна: "+e.message);}
+}
+window.itcLabelDone=function(r){try{toast((r&&r.msg)||(r&&r.ok?"Готово":"Ошибка печати"));}catch(e){}};
+function itemQRText(code,key){var o={t:"i",c:qrLat(code||"")};if(key)o.k=String(key);return JSON.stringify(o);}  /* №821: ключ подлинности */
+function stockQRText(code,key){return JSON.stringify({t:"s",c:qrLat(code||""),k:String(key||"")});}
+function stockSplitName(nm){var s=String(nm||"");var i=s.indexOf(" · ");return i>0?{base:s.slice(0,i),v:s.slice(i+3)}:{base:s,v:""};}
+function stockLabelPng(u,b,sz){
+  sz=sz||lblSize();var big=(sz==="L"),dim=LBL_SIZES[sz];
+  return new Promise(function(res,rej){
+    try{
+      var W=dim.w*8,H=dim.h*8,pad=big?24:8,c=document.createElement("canvas");c.width=W;c.height=H;var x=c.getContext("2d");
+      x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#000";x.textAlign="center";x.textBaseline="top";
+      var y=big?22:6;
+      x.font="bold "+(big?34:14)+"px Arial,sans-serif";x.fillText("ITC GLOBAL · СКЛАД",W/2,y);y+=big?46:16;
+      var code=String(u.code||"");var fs=big?110:40;x.font="bold "+fs+"px Arial,sans-serif";
+      while(x.measureText(code).width>W-pad*2&&fs>18){fs-=2;x.font="bold "+fs+"px Arial,sans-serif";}
+      x.fillText(code,W/2,y);y+=fs+(big?14:4);
+      var qs=big?520:180;
+      var qd=document.createElement("div");qd.style.cssText="position:fixed;left:-9999px;top:0";document.body.appendChild(qd);
+      new QRCode(qd,{text:stockQRText(code,u.key),width:qs,height:qs,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+      var qc=qd.querySelector("canvas");if(qc)x.drawImage(qc,(W-qs)/2,y,qs,qs);
+      if(qd.parentNode)qd.parentNode.removeChild(qd);
+      y+=qs+(big?18:4);
+      var nm=stockSplitName(b.name);
+      if(nm.v){var vf=big?48:18;x.font="bold "+vf+"px Arial,sans-serif";var vv=nm.v.toUpperCase();
+        while(x.measureText(vv).width>W-pad*2&&vf>11){vf-=1;x.font="bold "+vf+"px Arial,sans-serif";}
+        x.fillText(vv,W/2,y);y+=vf+(big?10:3);}
+      var lh=big?36:14;x.font=(big?"30px":"12px")+" Arial,sans-serif";
+      var words=nm.base.split(/\s+/),line="",lines=[];
+      words.forEach(function(w){var t=line?line+" "+w:w;if(x.measureText(t).width>W-pad*2){if(line)lines.push(line);line=w;}else line=t;});
+      if(line)lines.push(line);
+      var maxL=big?4:2;if(lines.length>maxL){lines=lines.slice(0,maxL);lines[maxL-1]=lines[maxL-1].replace(/.{0,2}$/,"")+"…";}
+      lines.forEach(function(l){x.fillText(l,W/2,y);y+=lh;});
+      x.font=(big?"bold 30px":"bold 12px")+" Arial,sans-serif";
+      x.fillText("партия "+(b.num||"")+" · "+(u.seq||"")+" из "+(b.qty||""),W/2,H-(big?60:17));
+      x.strokeStyle="#000";x.lineWidth=big?4:2;x.strokeRect(big?3:1,big?3:1,W-(big?6:2),H-(big?6:2));
+      res(c.toDataURL("image/png"));
+    }catch(e){rej(e);}
+  });
+}
+
+</script>
+<script>
+var T = {
+  zh:{title:'ITC 仓库', back:'返回', tin:'收货', tex:'待到', tch:'聊天', scan:'扫描条码', photo:'拍标签', code:'快递单号 / 1688订单号', find:'查找',
+      nothing:'没找到。请再拍清楚一点，或输入单号。', look:'正在识别…', fil:'Fil 正在对比标签…', plan:'怎么贴标签', ordL:'张订单标签', stkL:'张库存标签',
+      toOrder:'订单', toStock:'放库存（发俄罗斯仓库）', expect:'应到', got:'实收', print:'打印标签', accept:'确认收货', damaged:'有破损 / 质量问题', note:'备注（可不填）',
+      addPh:'拍照', done:'已收货', prob:'有问题 — 已通知办公室', noPrinter:'打印标签：请在 ITC GLOBAL 应用（1.6 以上）里打开，连接 XP-420B 打印机',
+      days:'天', late:'超过7天', send:'发送', msgPh:'写给办公室（中文即可，Fil 会翻译成俄语）', office:'办公室', fil2:'Fil', you:'我', noAccess:'没有权限。请用仓库账号登录 ITC 商城。', retry:'网络错误',
+      lgT:'请输入登录码（6位数字）', lgBtn:'登录',
+      wtOff:'今天还没开始上班', wtStart:'开始上班', wtOn:'上班中，从', wtBrk:'休息中', wtPause:'休息', wtBack:'继续工作', wtEnd:'下班', wtEndQ:'确定下班吗？', wtDone:'已下班', wtWorked:'工作时间',
+      size:'标签尺寸', S:'小 40×50', L:'大 100×150', why:'Fil：', recvd:'已收', camErr:'无法打开相机，请用“拍标签”或输入单号',
+      tcg:'无标签货', cgNew:'登记无标签货物', cgHint:'没有标签、不知道是什么的货：拍几张照片（外箱、标签、货物本身），写上件数和重量。办公室采购会告诉你是什么、发到哪里。',
+      cgNote:'说明（中文即可）', cgBoxes:'件数', cgW:'重量 kg', cgSend:'发给办公室', cgNeedPh:'请至少拍一张照片', cgSt:{'new':'等待办公室确认','known':'已确认，等待发货指示','order':'请按指示发货','shipped':'已发出'},
+      cgWhat:'这是什么', cgInstr:'发货指示', cgAsk:'问办公室…', cgShip:'已发出', cgTrack:'快递单号（可不填）', cgShipPh:'拍发货照片', none:'没有'},
+  ru:{title:'Склад в Китае', back:'Назад', tin:'Приёмка', tex:'Ожидаем', tch:'Чат', scan:'Сканировать код', photo:'Фото этикетки', code:'Трек-номер / номер заказа 1688', find:'Найти',
+      nothing:'Не нашлось. Сфотографируйте этикетку чётче или введите номер.', look:'Распознаю…', fil:'Фил сравнивает этикетку…', plan:'Как клеить наклейки', ordL:'накл. заказа', stkL:'складских накл.',
+      toOrder:'Заказ', toStock:'На склад (едет на склад в России)', expect:'Ожидается', got:'Пришло', print:'Печать наклеек', accept:'Принять', damaged:'Брак / повреждение', note:'Заметка (необязательно)',
+      addPh:'Фото', done:'Принято', prob:'Есть проблема — офис получил задачу', noPrinter:'Печать наклеек — в приложении ИТК Глобал 1.6+ с принтером XP-420B',
+      days:'дн.', late:'дольше 7 дней', send:'Отправить', msgPh:'Сообщение складу (Фил переведёт на китайский)', office:'Офис', fil2:'Фил', you:'Я', noAccess:'Нет доступа. Войдите в магазин ИТК рабочим входом.', retry:'Ошибка сети',
+      lgT:'Введите код входа (6 цифр)', lgBtn:'Войти',
+      wtOff:'Рабочий день не начат', wtStart:'Начать работу', wtOn:'На работе с', wtBrk:'Перерыв', wtPause:'Перерыв', wtBack:'Продолжить', wtEnd:'Завершить день', wtEndQ:'Завершить рабочий день?', wtDone:'День завершён', wtWorked:'отработано',
+      size:'Размер наклейки', S:'Маленькая 40×50', L:'Большая 100×150', why:'Фил: ', recvd:'принято', camErr:'Камера не открылась — сфотографируйте этикетку или введите номер',
+      tcg:'Грузы', cgNew:'Неопознанный груз', cgHint:'Груз без наклеек, непонятно что: сфотографируйте коробку, этикетки и сам товар, укажите места и вес. Закупщик напишет, что это и куда отправить.',
+      cgNote:'Заметка', cgBoxes:'Мест', cgW:'Вес, кг', cgSend:'Отправить в офис', cgNeedPh:'Нужно хотя бы одно фото', cgSt:{'new':'Ждём, что скажет офис','known':'Опознан — ждём распоряжения','order':'Отправить по распоряжению','shipped':'Отправлен'},
+      cgWhat:'Что это', cgInstr:'Распоряжение', cgAsk:'Вопрос офису…', cgShip:'Отправлено', cgTrack:'Трек-номер (необязательно)', cgShipPh:'Фото отправки', none:'нет'}
+};
+var S = {lang:'zh', me:null, tab:'in', items:[], photos:[], wh:'', tr:{}};
+try { S.lang = localStorage.getItem('sk_lang') || ''; } catch(e){}
+function L(k){ return (T[S.lang] || T.zh)[k] || k; }
+function $(id){ return document.getElementById(id); }
+function esc(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function toast(t){ var m = document.createElement('div'); m.className = 'toast'; m.textContent = t; document.body.appendChild(m); setTimeout(function(){ m.remove(); }, 3200); }
+var TOK = (function(){
+  var m = /[?&]t=([^&]+)/.exec(location.search || ''), t = '';
+  if (m) { try { t = decodeURIComponent(m[1]); } catch(e){} try { history.replaceState(null, '', location.pathname); } catch(e){} }
+  if (!t) try { t = sessionStorage.getItem('sk_t') || ''; } catch(e){}
+  if (!t) try { t = localStorage.getItem('sk_tok') || ''; } catch(e){}   // отдельное приложение склада: вход по коду запоминается
+  if (!t) try { var a = JSON.parse(localStorage.getItem('itc_auth') || 'null'); if (a && a.token) t = a.token; } catch(e){}
+  try { if (t) sessionStorage.setItem('sk_t', t); } catch(e){}
+  return t;
+})();
+function api(a, d){
+  d = d || {}; d.t = TOK;
+  return fetch('/api/sklad.php?action=' + a + '&t=' + encodeURIComponent(TOK), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)})
+    .then(function(r){ return r.json(); });
+}
+var SOLO = !!(window.AndroidSklad) || /ITCSklad/i.test(navigator.userAgent) || (function(){ try { return !!localStorage.getItem('sk_tok'); } catch(e){ return false; } })();
+function goBack(){ if (S.tab === 'in' && S.items.length) { S.items = []; renderIn(); return; } if (SOLO) { if (S.tab !== 'in') tab('in'); return; } location.href = '/'; }
+window.itcNativeBack = function(){ if (S.tab === 'in' && S.items.length) { S.items = []; renderIn(); return true; } return false; };
+
+function setLang(l){ S.lang = l; try { localStorage.setItem('sk_lang', l); } catch(e){} paint(); }
+function paint(){
+  document.documentElement.lang = S.lang === 'zh' ? 'zh' : 'ru';
+  $('lzh').className = S.lang === 'zh' ? 'on' : ''; $('lru').className = S.lang === 'ru' ? 'on' : '';
+  $('ttl').textContent = L('title'); $('bk').textContent = '← ' + L('back');
+  $('t_in').textContent = L('tin'); $('t_ex').innerHTML = esc(L('tex')) + '<b id="lateN"></b>'; $('t_cg').innerHTML = esc(L('tcg')) + '<b id="cgN"></b>'; $('t_ch').textContent = L('tch');
+  $('msgT').placeholder = L('msgPh'); $('sendB').textContent = L('send');
+  if (S.me) tab(S.tab, true);
+  wtPaint();
+}
+function tab(t, keep){
+  S.tab = t;
+  ['in','ex','cg','ch'].forEach(function(x){ $('v_' + x).style.display = x === t ? '' : 'none'; $('t_' + x).className = x === t ? 'on' : ''; });
+  $('sendBar').style.display = t === 'ch' ? 'flex' : 'none';
+  if (t === 'in') renderIn(); if (t === 'ex') loadEx(); if (t === 'cg') loadCg(); if (t === 'ch') loadChat();
+}
+
+/* ---------- приёмка ---------- */
+var IC = {
+  scan:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h4V2H2v6h2zm16-2h-6v2h4v4h2zM4 16H2v6h6v-2H4zm16 4h-4v2h6v-6h-2zM7 7h2v10H7zm3 0h1v10h-1zm2 0h2v10h-2zm3 0h1v10h-1zm2 0h1v10h-1z"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.2A3.2 3.2 0 1 0 12 8.8a3.2 3.2 0 0 0 0 6.4zM9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>'
+};
+function renderIn(){
+  var h = '<div class="big"><button onclick="scanOpen()">' + IC.scan + L('scan') + '</button><button class="sec" onclick="$(\'fPhoto\').click()">' + IC.cam + L('photo') + '</button></div>'
+    + '<div class="find"><input id="code" placeholder="' + esc(L('code')) + '" onkeydown="if(event.key===\'Enter\')findCode()"><button onclick="findCode()">' + L('find') + '</button></div>'
+    + '<div id="res"></div>';
+  $('v_in').innerHTML = h;
+  if (S.items.length) renderPlan();
+}
+function findCode(c){
+  c = c || ($('code') ? $('code').value.trim() : ''); if (!c) return;
+  $('res').innerHTML = '<div class="empty">' + L('look') + '</div>';
+  api('sk_find', {code:c}).then(function(r){ showItems(r); }).catch(function(){ $('res').innerHTML = '<div class="empty">' + L('retry') + '</div>'; });
+}
+function onPhoto(inp){
+  var f = inp.files && inp.files[0]; inp.value = ''; if (!f) return;
+  $('res').innerHTML = '<div class="empty">' + L('look') + '</div>';
+  shrink(f, 1600, function(d){
+    setTimeout(function(){ if ($('res') && /…/.test($('res').textContent)) $('res').innerHTML = '<div class="empty">' + L('fil') + '</div>'; }, 2500);
+    api('sk_photo', {img:d}).then(function(r){ showItems(r); }).catch(function(){ $('res').innerHTML = '<div class="empty">' + L('retry') + '</div>'; });
+  });
+}
+function shrink(f, max, cb){
+  var img = new Image(), u = URL.createObjectURL(f);
+  img.onload = function(){ var s = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = img.width * s; c.height = img.height * s;
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); cb(c.toDataURL('image/jpeg', 0.85)); };
+  img.src = u;
+}
+function showItems(r){
+  if (!r || !r.ok) { $('res').innerHTML = '<div class="empty">' + esc((r && r.error) || L('retry')) + '</div>'; return; }
+  S.items = r.items || []; S.photos = []; S.why = r.why || '';
+  if (!S.items.length) { $('res').innerHTML = '<div class="empty">' + L('nothing') + '</div>'; return; }
+  S.items.forEach(function(it){ it.got = it.qty; });
+  translateNames().then(renderPlan);
+}
+function nameOf(it){
+  if (S.lang === 'zh') return it.title_cn || S.tr['zh|' + it.name_ru] || it.name_ru;
+  return it.name_ru || it.title_cn;
+}
+function translateNames(){
+  if (S.lang !== 'zh') return Promise.resolve();
+  var need = S.items.filter(function(it){ return !it.title_cn && it.name_ru && !S.tr['zh|' + it.name_ru]; }).map(function(it){ return it.name_ru; });
+  if (!need.length) return Promise.resolve();
+  return api('sk_tr', {list:need, to:'zh'}).then(function(r){ (r.list || []).forEach(function(t, i){ if (t) S.tr['zh|' + need[i]] = t; }); }).catch(function(){});
+}
+function renderPlan(){
+  var nOrd = 0, nStk = 0, dests = {};
+  S.items.forEach(function(it){ if (it.kind === 'order') { nOrd += (it.labels || []).length; if (it.pvz || it.city) dests[it.pvz || it.city] = 1; } else nStk += (it.units || []).length; });
+  var plan = '<div class="plan"><div style="font-weight:700;margin-bottom:4px">' + L('plan') + '</div>'
+    + (nOrd ? '<div><b>' + nOrd + '</b> ' + L('ordL') + (Object.keys(dests).length ? ' → ' + esc(Object.keys(dests).join(', ')) : '') + '</div>' : '')
+    + (nStk ? '<div><b>' + nStk + '</b> ' + L('stkL') + '</div>' : '')
+    + (S.why ? '<div class="mut" style="margin-top:4px">' + esc(L('why') + S.why) + '</div>' : '') + '</div>';
+  var cards = S.items.map(function(it, i){
+    var dest = it.kind === 'order'
+      ? '<div class="dest ord">' + L('toOrder') + ' ' + esc(it.order_num || '') + ' · ' + (it.labels || []).map(function(l){ return esc(l.code) + ' (' + l.qty + ')'; }).join(', ') + (it.pvz ? ' → ' + esc(it.pvz) : '') + '</div>'
+      : '<div class="dest stk">' + L('toStock') + ' · ' + (it.units || []).length + ' × ' + esc((it.units[0] || {}).code || '') + '…</div>';
+    return '<div class="card"><div class="it">' + (it.img ? '<img src="' + esc(it.img) + '" alt="">' : '') + '<div><div class="t">' + esc(nameOf(it)) + '</div>'
+      + '<div class="s">' + esc(it.sku_cn || '') + (it.shop ? ' · ' + esc(it.shop) : '') + '</div><div class="s">1688: ' + esc(it.src || '—') + (it.track ? ' · ' + esc(it.track) : '') + '</div></div></div>'
+      + dest
+      + '<div class="qty">' + L('expect') + ': <b>' + it.qty + '</b> &nbsp; ' + L('got') + ': <input type="number" min="0" value="' + it.got + '" oninput="S.items[' + i + '].got=+this.value||0">'
+      + ((it.status === 'received' || it.received) ? ' <span class="mut">✓ ' + L('recvd') + '</span>' : '') + '</div></div>';
+  }).join('');
+  var sz = (function(){ try { return localStorage.getItem('itc_lbl_size') || 'S'; } catch(e){ return 'S'; } })();
+  var foot = '<div class="card"><div class="row" style="margin-top:0;align-items:center"><span class="mut">' + L('size') + ':</span>'
+    + '<select onchange="try{localStorage.setItem(\'itc_lbl_size\',this.value)}catch(e){}"><option value="S"' + (sz === 'S' ? ' selected' : '') + '>' + L('S') + '</option><option value="L"' + (sz === 'L' ? ' selected' : '') + '>' + L('L') + '</option></select>'
+    + '<button class="btn o" onclick="printAll()">' + L('print') + '</button></div>'
+    + '<label class="chk"><input type="checkbox" id="dam">' + L('damaged') + '</label>'
+    + '<input id="note" placeholder="' + esc(L('note')) + '" style="width:100%;margin-top:8px;border:1px solid #c5cad4;border-radius:6px;padding:9px;font-size:.95rem">'
+    + '<div class="ph" id="phs"></div>'
+    + '<div class="row"><button class="btn w" onclick="$(\'fRcv\').click()">' + L('addPh') + '</button><button class="btn g" style="flex:1" onclick="accept()">' + L('accept') + '</button></div></div>';
+  $('res').innerHTML = plan + cards + foot;
+  phPaint();
+}
+function printAll(){
+  if (!window.AndroidLabel) { toast(L('noPrinter')); return; }
+  var jobs = [];
+  S.items.forEach(function(it){
+    if (it.kind === 'order') (it.labels || []).forEach(function(l){ jobs.push(function(){ return itemLabelPng({code:l.code, key:l.key, nm:l.nm, qty:l.qty, pvz:l.pvz}); }); });
+    else (it.units || []).forEach(function(u){ jobs.push(function(){ return stockLabelPng(u, it.batch); }); });
+  });
+  if (!jobs.length) return;
+  toast((S.lang === 'zh' ? '准备 ' : 'Готовлю ') + jobs.length + (S.lang === 'zh' ? ' 张标签…' : ' наклеек…'));
+  var out = [], i = 0;
+  (function next(){ if (i >= jobs.length) { xpPrint(out, 1); return; } jobs[i]().then(function(u){ out.push(u); i++; next(); }).catch(function(){ i++; next(); }); })();
+}
+function onRcvPhoto(inp){
+  var f = inp.files && inp.files[0]; inp.value = ''; if (!f) return;
+  shrink(f, 1400, function(d){
+    var b = atob(d.split(',')[1]), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+    var fd = new FormData(); fd.append('file', new File([u], 'sklad.jpg', {type:'image/jpeg'})); fd.append('t', TOK);
+    fetch('/api/api.php?action=upload_media&t=' + encodeURIComponent(TOK), {method:'POST', body:fd}).then(function(r){ return r.json(); })
+      .then(function(r){ if (r && r.url) { S.photos.push(r.url); phPaint(); } else toast((r && r.error) || L('retry')); }).catch(function(){ toast(L('retry')); });
+  });
+}
+function phPaint(){ var p = $('phs'); if (p) p.innerHTML = S.photos.map(function(u){ return '<img src="' + esc(u) + '">'; }).join(''); }
+function accept(){
+  var items = S.items.map(function(it){ return {kind:it.kind, id:it.id, qty:it.qty, got:it.got, name:it.name_ru, order_num:it.order_num}; });
+  api('sk_receive', {items:items, damaged:$('dam').checked ? 1 : 0, note:$('note').value, photos:S.photos}).then(function(r){
+    if (!r || !r.ok) { toast((r && r.error) || L('retry')); return; }
+    toast(r.problem ? L('prob') : L('done')); S.items = []; renderIn();
+  }).catch(function(){ toast(L('retry')); });
+}
+
+/* ---------- сканер штрих-кода камерой ---------- */
+var CAM = null;
+function scanOpen(){
+  if (!('BarcodeDetector' in window) || !navigator.mediaDevices) { toast(L('camErr')); return; }
+  var det; try { det = new BarcodeDetector({formats:['code_128','code_39','ean_13','qr_code','itf','codabar']}); } catch(e){ toast(L('camErr')); return; }
+  var box = document.createElement('div'); box.className = 'cam';
+  box.innerHTML = '<video playsinline muted autoplay></video><div class="hint"></div><div class="bar"><button class="btn w" style="flex:1" id="camX">' + L('back') + '</button></div>';
+  document.body.appendChild(box);
+  var v = box.querySelector('video'), stop = function(){ try { CAM && CAM.getTracks().forEach(function(t){ t.stop(); }); } catch(e){} CAM = null; box.remove(); };
+  box.querySelector('#camX').onclick = stop;
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(st){
+    CAM = st; v.srcObject = st;
+    (function loop(){ if (!CAM) return; det.detect(v).then(function(c){ if (c && c.length) { var code = c[0].rawValue; stop(); if ($('code')) $('code').value = code; findCode(code); return; } setTimeout(loop, 250); }).catch(function(){ setTimeout(loop, 400); }); })();
+  }).catch(function(){ stop(); toast(L('camErr')); });
+}
+
+/* ---------- ожидаем ---------- */
+function loadEx(){
+  $('v_ex').innerHTML = '<div class="empty">…</div>';
+  api('sk_expected', {}).then(function(r){
+    if (!r || !r.ok) { $('v_ex').innerHTML = '<div class="empty">' + esc((r && r.error) || L('retry')) + '</div>'; return; }
+    var n = $('lateN'); if (n) n.textContent = r.late || '';
+    S.items = r.rows; translateNames().then(function(){
+      $('v_ex').innerHTML = r.rows.length ? r.rows.map(function(x){
+        return '<div class="ex" onclick="openEx(\'' + x.kind + '\',\'' + esc(x.id) + '\')">' + (x.img ? '<img src="' + esc(x.img) + '">' : '') + '<div><div style="font-weight:700">' + esc(nameOf(x)) + '</div>'
+          + '<div class="mut">' + x.qty + ' · ' + (x.kind === 'order' ? esc(x.order_num || '') + (x.pvz ? ' → ' + esc(x.pvz) : '') : L('toStock')) + '</div><div class="mut">1688: ' + esc(x.src || '—') + '</div></div>'
+          + '<div class="d' + (x.days >= 7 ? ' late' : '') + '">' + x.days + ' ' + L('days') + '</div></div>';
+      }).join('') : '<div class="empty">—</div>';
+      S.items = [];
+    });
+  });
+}
+function openEx(kind, id){
+  tab('in'); $('res').innerHTML = '<div class="empty">' + L('look') + '</div>';
+  api('sk_open', {kind:kind, id:id}).then(showItems);
+}
+
+/* ---------- неопознанные грузы ---------- */
+S.cg = {photos:[], first:''}; S.ship = {};
+function upload(f, cb){
+  shrink(f, 1400, function(d){
+    var b = atob(d.split(',')[1]), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+    var fd = new FormData(); fd.append('file', new File([u], 'sklad.jpg', {type:'image/jpeg'})); fd.append('t', TOK);
+    fetch('/api/api.php?action=upload_media&t=' + encodeURIComponent(TOK), {method:'POST', body:fd}).then(function(r){ return r.json(); })
+      .then(function(r){ if (r && r.url) cb(r.url, d); else toast((r && r.error) || L('retry')); }).catch(function(){ toast(L('retry')); });
+  });
+}
+function onCgPhoto(inp){ var f = inp.files && inp.files[0]; inp.value = ''; if (!f) return; upload(f, function(u, d){ S.cg.photos.push(u); if (!S.cg.first) S.cg.first = d; cgPh(); }); }
+function cgPh(){ var p = $('cgPh'); if (p) p.innerHTML = S.cg.photos.map(function(u){ return '<img src="' + esc(u) + '">'; }).join(''); }
+function cgSend(){
+  if (!S.cg.photos.length) { toast(L('cgNeedPh')); return; }
+  toast('…');
+  api('sk_cargo_new', {photos:S.cg.photos, img:S.cg.first, note:$('cgNote').value, boxes:$('cgB').value, weight:$('cgWt').value, wh:S.wh}).then(function(r){
+    if (!r || !r.ok) { toast((r && r.error) || L('retry')); return; }
+    S.cg = {photos:[], first:''}; toast(L('done')); loadCg();
+  }).catch(function(){ toast(L('retry')); });
+}
+function loadCg(){
+  var form = '<div class="card"><b>' + L('cgNew') + '</b><div class="mut" style="margin:6px 0">' + L('cgHint') + '</div>'
+    + '<div class="ph" id="cgPh"></div><div class="row"><button class="btn o" onclick="$(\'fCg\').click()">' + L('addPh') + '</button></div>'
+    + '<input id="cgNote" placeholder="' + esc(L('cgNote')) + '" style="width:100%;margin-top:8px;border:1px solid #c5cad4;border-radius:6px;padding:9px;font-size:.95rem">'
+    + '<div class="row"><input id="cgB" type="number" min="0" placeholder="' + esc(L('cgBoxes')) + '" style="flex:1;border:1px solid #c5cad4;border-radius:6px;padding:9px"><input id="cgWt" inputmode="decimal" placeholder="' + esc(L('cgW')) + '" style="flex:1;border:1px solid #c5cad4;border-radius:6px;padding:9px"></div>'
+    + '<div class="row"><button class="btn g" style="flex:1" onclick="cgSend()">' + L('cgSend') + '</button></div></div><div id="cgList"><div class="empty">…</div></div>';
+  $('v_cg').innerHTML = form; cgPh();
+  api('sk_cargo_list', {lang:S.lang}).then(function(r){
+    if (!r || !r.ok) { $('cgList').innerHTML = '<div class="empty">' + esc((r && r.error) || L('retry')) + '</div>'; return; }
+    var act = r.rows.filter(function(c){ return c.status === 'order'; }).length; var n = $('cgN'); if (n) n.textContent = act || '';
+    var st = L('cgSt');
+    $('cgList').innerHTML = r.rows.map(function(c){
+      var col = c.status === 'order' ? '#112C93' : (c.status === 'shipped' ? '#2E7D32' : '#6b7385');
+      return '<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><b>№' + c.id + '</b><span style="color:' + col + ';font-weight:700">' + esc(st[c.status] || c.status) + '</span></div>'
+        + '<div class="ph">' + (c.photos || []).map(function(u){ return '<img src="' + esc(u) + '">'; }).join('') + '</div>'
+        + (c.note ? '<div class="mut" style="margin-top:4px">' + esc(c.note) + '</div>' : '')
+        + (c.what ? '<div class="dest stk">' + L('cgWhat') + ': ' + esc(c.what) + '</div>' : '')
+        + (c.instr ? '<div class="dest ord" style="white-space:pre-wrap">' + L('cgInstr') + ':\n' + esc(c.instr) + '</div>' : '')
+        + ((c.msgs || []).length ? '<div style="margin-top:8px">' + c.msgs.map(function(m){ return '<div class="m' + (/^Склад/.test(m.who) ? ' me' : '') + '" style="max-width:100%;margin-bottom:6px">' + esc(m.show) + '<small>' + esc(m.who) + '</small></div>'; }).join('') + '</div>' : '')
+        + '<div class="row"><input id="cq' + c.id + '" placeholder="' + esc(L('cgAsk')) + '" style="flex:1;border:1px solid #c5cad4;border-radius:6px;padding:9px"><button class="btn" onclick="cgAsk(' + c.id + ')">' + L('send') + '</button></div>'
+        + (c.status !== 'shipped' ? '<div class="row"><input id="ct' + c.id + '" placeholder="' + esc(L('cgTrack')) + '" style="flex:1;border:1px solid #c5cad4;border-radius:6px;padding:9px"><button class="btn w" onclick="S.shipId=' + c.id + ';$(\'fShip\').click()">' + L('cgShipPh') + '</button></div>'
+          + '<div class="ph" id="sp' + c.id + '"></div><div class="row"><button class="btn g" style="flex:1" onclick="cgShip(' + c.id + ')">' + L('cgShip') + '</button></div>' : (c.track ? '<div class="mut">' + esc(c.track) + '</div>' : ''))
+        + '</div>';
+    }).join('') || '<div class="empty">' + L('none') + '</div>';
+  });
+}
+function cgAsk(id){ var i = $('cq' + id), t = i.value.trim(); if (!t) return; api('sk_cargo_msg', {id:id, text:t}).then(function(r){ if (r && r.ok) { i.value = ''; loadCg(); } else toast((r && r.error) || L('retry')); }); }
+function onShipPhoto(inp){ var f = inp.files && inp.files[0]; inp.value = ''; if (!f) return; var id = S.shipId; upload(f, function(u){ (S.ship[id] = S.ship[id] || []).push(u); var p = $('sp' + id); if (p) p.innerHTML = S.ship[id].map(function(x){ return '<img src="' + esc(x) + '">'; }).join(''); }); }
+function cgShip(id){ api('sk_cargo_ship', {id:id, track:$('ct' + id).value, photos:S.ship[id] || []}).then(function(r){ if (r && r.ok) { toast(L('done')); loadCg(); } else toast((r && r.error) || L('retry')); }); }
+
+/* ---------- чат с офисом ---------- */
+var chatT = null;
+function loadChat(){
+  if (!S.me) return;
+  if (!S.me.wh && !S.wh) { $('msgs').innerHTML = '<div class="empty">—</div>'; return; }
+  api('sk_chat', {lang:S.lang, wh:S.wh}).then(function(r){
+    if (!r || !r.ok) { $('msgs').innerHTML = '<div class="empty">' + esc((r && r.error) || L('retry')) + '</div>'; return; }
+    var meWh = S.me.wh;
+    $('msgs').innerHTML = r.rows.map(function(m){
+      var mine = meWh ? m.sender === 'buyer' : m.sender !== 'buyer', fil = m.staff === 'Фил';
+      var who = m.sender === 'buyer' ? (meWh ? L('you') : '仓库') : (fil ? L('fil2') : (meWh ? L('office') + (m.staff ? ' · ' + m.staff : '') : (m.staff || L('office'))));
+      return '<div class="m' + (mine ? ' me' : '') + (fil ? ' fil' : '') + '">' + esc(m.show) + (m.sub ? '<div class="sub">' + esc(m.sub) + '</div>' : '') + '<small>' + esc(who) + ' · ' + esc(String(m.created_at).substr(5, 11)) + '</small></div>';
+    }).join('') || '<div class="empty">—</div>';
+    window.scrollTo(0, document.body.scrollHeight);
+  });
+  clearTimeout(chatT); chatT = setTimeout(function(){ if (S.tab === 'ch') loadChat(); }, 15000);
+}
+function sendMsg(){
+  var t = $('msgT').value.trim(); if (!t) return;
+  $('sendB').disabled = true;
+  api('sk_chat_send', {text:t, wh:S.wh}).then(function(r){ $('sendB').disabled = false; if (!r || !r.ok) { toast((r && r.error) || L('retry')); return; } $('msgT').value = ''; loadChat(); })
+    .catch(function(){ $('sendB').disabled = false; toast(L('retry')); });
+}
+
+/* ---------- вход по коду (кладовщик) ---------- */
+function showLogin(){
+  $('gate').style.display = ''; $('tabs').style.display = 'none'; $('gateT').textContent = L('lgT'); $('lgBtn').textContent = L('lgBtn'); $('loginBox').style.display = '';
+  setTimeout(function(){ try { $('lgCode').focus(); } catch(e){} }, 200);
+}
+function doLogin(){
+  var c = ($('lgCode').value || '').replace(/\D/g, ''); if (c.length !== 6) { toast(L('lgT')); return; }
+  fetch('/api/sklad.php?action=sk_login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code:c})}).then(function(r){ return r.json(); }).then(function(r){
+    if (!r || !r.ok) { toast((r && r.error) || L('retry')); return; }
+    try { localStorage.setItem('sk_tok', r.t); localStorage.setItem('sk_lang', 'zh'); sessionStorage.setItem('sk_t', r.t); } catch(e){}
+    try { if (window.AndroidSklad && AndroidSklad.loggedIn) AndroidSklad.loggedIn(r.t); } catch(e){}
+    location.replace('/sklad/');
+  }).catch(function(){ toast(L('retry')); });
+}
+/* ---------- QR для кладовщика (офис) ---------- */
+function invOpen(gen){
+  $('inv').style.display = 'flex'; $('invIn').innerHTML = '…';
+  api('sk_invite', {wh:S.wh, 'new': gen ? 1 : 0}).then(function(r){
+    if (!r || !r.ok) { $('invIn').innerHTML = esc((r && r.error) || 'Ошибка'); return; }
+    var msg = '你好！请用手机相机扫描二维码，或打开链接下载「ITC 仓库」App：\n' + r.url + '\n安装后打开App，输入登录码：' + r.code + '\n（登录码有效期至 ' + r.till + '）';
+    $('invIn').innerHTML = '<b style="font-size:1.05rem">Приложение для кладовщика</b><div class="mut" style="margin-top:4px">Кладовщик наводит камеру телефона на QR-код — откроется страница скачивания на китайском.</div>'
+      + '<div class="qr" id="invQr"></div><div>Код входа</div><div class="code">' + esc(r.code) + '</div><div class="mut">действует до ' + esc(r.till) + '</div>'
+      + '<div style="margin:12px 0 4px;text-align:left" class="mut">Или перешлите в WeChat готовый текст:</div><textarea id="invTx" readonly>' + esc(msg) + '</textarea>'
+      + '<div class="row"><button class="btn" style="flex:1" onclick="invCopy()">Скопировать текст</button><button class="btn w" style="flex:1" onclick="invOpen(1)">Новый код</button></div>'
+      + '<div class="row"><button class="btn w" style="flex:1" onclick="$(\'inv\').style.display=\'none\'">Закрыть</button></div>';
+    try { new QRCode($('invQr'), {text:r.url, width:220, height:220, colorDark:'#000000', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M}); } catch(e){}
+  });
+}
+function invCopy(){ var t = $('invTx'); t.select(); try { navigator.clipboard.writeText(t.value).then(function(){ toast('Скопировано'); }, function(){ document.execCommand('copy'); toast('Скопировано'); }); } catch(e){ document.execCommand('copy'); toast('Скопировано'); } }
+
+/* ---------- рабочее время (общий учёт с офисом, /api/flow.php) ---------- */
+var WT = null, WIC = {play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>', pause:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>', stop:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>'};
+function wtApi(a, d){ d = d || {}; d.t = TOK; return fetch('/api/flow.php?action=' + a + '&t=' + encodeURIComponent(TOK), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(function(r){ return r.json(); }); }
+function wtHm(m){ m = +m || 0; return S.lang === 'zh' ? Math.floor(m/60) + '小时' + (m%60) + '分' : Math.floor(m/60) + ' ч ' + ('0' + m%60).slice(-2) + ' мин'; }
+function wtPaint(){
+  var b = $('wtb'); if (!b || !WT) return; b.style.display = 'flex'; var h = '';
+  if (WT.status === 'off' && !WT.start) h = '<span>' + L('wtOff') + ' · ' + esc(WT.sched) + '</span><button class="go" onclick="wtMark(\'start\')">' + WIC.play + L('wtStart') + '</button>';
+  else if (WT.status === 'off') h = '<span>' + L('wtDone') + ' ' + esc(WT.end) + ' · ' + L('wtWorked') + ' ' + wtHm(WT.worked) + '</span><button onclick="wtMark(\'start\')">' + WIC.play + L('wtBack') + '</button>';
+  else h = '<span><b>' + (WT.status === 'break' ? L('wtBrk') : L('wtOn') + ' ' + esc(WT.start)) + '</b> · ' + wtHm(WT.worked) + '</span>'
+    + (WT.status === 'break' ? '<button class="go" onclick="wtMark(\'start\')">' + WIC.play + L('wtBack') + '</button>' : '<button onclick="wtMark(\'break\')">' + WIC.pause + L('wtPause') + '</button>')
+    + '<button class="end" onclick="wtMark(\'end\')">' + WIC.stop + L('wtEnd') + '</button>';
+  b.innerHTML = h; b.className = 'wtb' + (WT.status === 'off' && !WT.start ? ' off' : '');
+}
+function wtLoad(){ wtApi('wt_state', {}).then(function(r){ if (r && r.ok) { WT = r.st; wtPaint(); } }).catch(function(){}); }
+function wtMark(a){
+  if (a === 'end' && !confirm(L('wtEndQ'))) return;
+  wtApi('wt_mark', {act:a}).then(function(r){ if (!r || !r.ok) { toast((r && r.error) || L('retry')); return; } WT = r.st; wtPaint(); toast(L('done')); }).catch(function(){ toast(L('retry')); });
+}
+
+/* ---------- старт ---------- */
+(function(){
+  if (!S.lang) S.lang = 'zh';
+  paint();
+  if (!TOK) { showLogin(); return; }
+  api('sk_me', {}).then(function(r){
+    if (!r || !r.ok) {
+      if (r && /Сесси|авториз/i.test(r.error || '')) { try { localStorage.removeItem('sk_tok'); sessionStorage.removeItem('sk_t'); } catch(e){} showLogin(); return; }
+      $('gateT').textContent = (r && r.error) || L('noAccess'); return; }
+    S.me = r.me;
+    try { if (!localStorage.getItem('sk_lang')) S.lang = r.lang; } catch(e){ S.lang = r.lang; }
+    if (!r.me.wh) { var ws = r.whs || []; $('whSel').innerHTML = ws.map(function(w){ return '<option value="' + esc(w.id) + '">' + esc(w.name) + '</option>'; }).join(''); $('whSel').style.display = ws.length ? '' : 'none';
+      var cn = ws.filter(function(w){ return /кита|china|广|佛|义乌|guang|fosh/i.test((w.city || '') + (w.name || '')); })[0]; S.wh = (cn || ws[0] || {}).id || ''; $('whSel').value = S.wh; }
+    $('gate').style.display = 'none'; $('tabs').style.display = 'flex';
+    if (!r.me.wh) $('qrB').style.display = 'inline-flex';
+    if (SOLO) $('bk').style.display = 'none';
+    try { if (window.AndroidSklad && AndroidSklad.loggedIn) AndroidSklad.loggedIn(TOK); } catch(e){}   // приложение склада: пропуск для уведомлений
+    var tq = /[?&]tab=(in|ex|cg|ch)/.exec(location.search || '');
+    paint(); tab(tq ? tq[1] : 'in');   // склад рабочий день не отмечает — кладовщик работает, когда приезжает груз
+    api('sk_expected', {}).then(function(x){ var n = $('lateN'); if (n && x && x.ok) n.textContent = x.late || ''; });
+    api('sk_cargo_list', {lang:S.lang}).then(function(x){ var n = $('cgN'); if (n && x && x.ok) n.textContent = x.rows.filter(function(c){ return c.status === 'order'; }).length || ''; });
+  }).catch(function(){ $('gateT').textContent = L('retry'); });
+})();
+</script>
+<script src="/ptr.js" defer></script>
+</body></html>

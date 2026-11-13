@@ -1,0 +1,77 @@
+{
+    "started": "2026-11-04T09:48:38+08:00",
+    "sources": [
+        {
+            "name": "tradefairdates · комплекс Кантонской ярмарки",
+            "url": "https:\/\/www.tradefairdates.com\/Exhibition-Centre-Canton-Fair-Complex-Guangzhou-ZS7743.html",
+            "ok": true,
+            "n": 40,
+            "err": ""
+        },
+        {
+            "name": "tradefairdates · PWTC",
+            "url": "https:\/\/www.tradefairdates.com\/Exhibition-Centre-PWTC-Poly-World-Trade-Center-Guangzhou-ZS3855.html",
+            "ok": true,
+            "n": 12,
+            "err": ""
+        },
+        {
+            "name": "jufair · guangzhou (7 стр.)",
+            "url": "https:\/\/www.jufair.com\/t-guangzhou\/",
+            "ok": true,
+            "n": 143,
+            "err": ""
+        },
+        {
+            "name": "jufair · foshan (1 стр.)",
+            "url": "https:\/\/www.jufair.com\/t-foshan\/",
+            "ok": true,
+            "n": 13,
+            "err": ""
+        },
+        {
+            "name": "LocalHub афиша · guangzhou (33 площадок)",
+            "url": "https:\/\/localhub.to\/guangzhou?lang=zh",
+            "ok": true,
+            "n": 304,
+            "err": ""
+        },
+        {
+            "name": "LocalHub афиша · foshan (0 площадок)",
+            "url": "https:\/\/localhub.to\/foshan?lang=zh",
+            "ok": true,
+            "n": 0,
+            "err": ""
+        },
+        {
+            "name": "Songkick · Гуанчжоу",
+            "url": "https:\/\/www.songkick.com\/metro-areas\/27728-china-guangzhou",
+            "ok": true,
+            "n": 5,
+            "err": ""
+        },
+        {
+            "name": "Bachtrack · Гуанчжоу",
+            "url": "https:\/\/bachtrack.com\/city\/guangzhou",
+            "ok": true,
+            "n": 0,
+            "err": ""
+        }
+    ],
+    "ai": {
+        "calls": 2,
+        "ok": 2,
+        "err": ""
+    },
+    "notes": [
+        "Кантонская ярмарка: 140-я сессия — даты фаз с tradefairdates"
+    ],
+    "added": {
+        "expo": 102,
+        "fun": 37,
+        "upd": 7
+    },
+    "total": 241,
+    "sec": 48.1,
+    "finished": "2026-11-04T09:49:26+08:00"
+}

@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Фил — голосовой помощник ИТК</title>
+<meta name="theme-color" content="#0a1a66">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="fav-64.png"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link href="/fonts/itk-fonts.css?v=1" rel="stylesheet">
+<!-- ИТК · «Фил» (№14): отдельное приложение для команд голосом.
+     Нажал микрофон → сказал → нажал ещё раз: Фил распознаёт (Яндекс SpeechKit), понимает, СРАЗУ выполняет и отвечает голосом.
+     10 секунд можно нажать «Отменить». Сервер: /api/flow.php (fc_cmd, fc_undo, fc_hist, sp_hear, sp_say). -->
+<style>
+:root{--bg:#030b2e;--glass:rgba(255,255,255,.1);--line:rgba(255,255,255,.18);--tx:#fff;--sub:#b9c9ec;--acc:#5fd3ff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font-family:'Roboto',sans-serif}
+body{background:#030b2e url(/apps/crm/bg/ice-p.jpg) center/cover fixed no-repeat;display:flex;flex-direction:column;height:100dvh}
+@media (orientation:landscape){body{background-image:url(/apps/crm/bg/ice.jpg)}}
+.hd{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;background:rgba(6,18,66,.6);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.av{position:relative;flex:none;width:44px;height:44px;border-radius:50%;padding:2px;background:linear-gradient(135deg,#5fd3ff,#2a4fd8)}
+.av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;border:2px solid #0a1a66}
+html.fil-listen .av,html.fil-listen .big{animation:ring 1.2s infinite;background:linear-gradient(135deg,#ff8a85,#e53935)}
+html.fil-talk .av,html.fil-talk .big{animation:ringg 1s infinite;background:linear-gradient(135deg,#b8f060,#7BD500)}
+@keyframes ring{0%{box-shadow:0 0 0 0 rgba(255,87,82,.6)}100%{box-shadow:0 0 0 16px rgba(255,87,82,0)}}
+@keyframes ringg{0%{box-shadow:0 0 0 0 rgba(123,213,0,.6)}100%{box-shadow:0 0 0 18px rgba(123,213,0,0)}}
+.big{width:150px;height:150px;border-radius:50%;padding:4px;background:linear-gradient(135deg,#5fd3ff,#2a4fd8);margin:6px auto 12px}
+.big img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;border:3px solid #0a1a66}
+.b.fil{display:flex;gap:9px;align-items:flex-start}.b.fil>img{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:none;margin-top:1px;border:1px solid rgba(255,255,255,.35)}
+.b.fil>div{min-width:0;white-space:pre-line}
+.hd b{font-size:1.15rem;display:block}.hd small{color:var(--sub);font-size:.8rem}
+.gear{margin-left:8px;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}.gear svg{width:22px;height:22px}
+.cfg{position:fixed;inset:0;z-index:40;background:rgba(2,8,34,.55);display:flex;align-items:flex-end}
+.cfg-in{width:100%;max-height:88vh;overflow:auto;background:#111a3d;border-radius:18px 18px 0 0;padding:16px 14px calc(20px + env(safe-area-inset-bottom))}
+.cfg-in h3{margin:4px 0 12px;font-size:1.2rem}.cfg-in h4{margin:18px 0 6px;color:#9fd8ff;font-size:.85rem;text-transform:uppercase;letter-spacing:.05em}
+.cfg-in p{color:var(--sub);font-size:.85rem;margin:4px 0 8px;line-height:1.4}
+.cfg-in select,.cfg-in textarea,.cfg-in input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:10px;color:#fff;padding:10px;font:400 .95rem Roboto,sans-serif}
+.cfg-in select option{color:#111}.cfg-in textarea{min-height:190px;resize:vertical;line-height:1.4}
+.cfg-in .r{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.cps-sec{border-top:1px solid var(--line);padding:12px 0 4px}.cps-sec h4{display:flex;align-items:center;gap:8px;margin:0 0 6px}.cps-sec h4 span{flex:1}.cps-sec ul{margin:4px 0 6px;padding-left:18px;color:#dfe6ff;font-size:.9rem;line-height:1.45}.cps-sec li{margin:3px 0}.cps-sec li i{color:var(--sub);font-style:normal}.cps-say{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.06);color:#9fd8ff;display:flex;align-items:center;justify-content:center;cursor:pointer}.cps-say svg{width:18px;height:18px}.cps-say.on{background:#9fd8ff;color:#111a3d}.cps-top{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}
+.cb{border:0;border-radius:10px;padding:10px 16px;font:700 .9rem Roboto,sans-serif;cursor:pointer;background:#bbed21;color:#1d2230}.cb.s{background:rgba(255,255,255,.12);color:#fff;border:1px solid var(--line)}
+.mc label{display:flex;align-items:center;gap:8px;padding:6px 2px;font-size:.95rem}.mc input{width:auto}
+.ans{margin-top:10px;padding:12px;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid var(--line);white-space:pre-line;line-height:1.45}
+.ans b{display:block;color:#9fd8ff;margin-bottom:4px}.ans small{display:block;color:var(--sub);margin-top:6px}
+.hd a{margin-left:auto;color:var(--acc);text-decoration:none;font-size:.85rem;border:1px solid rgba(95,211,255,.5);border-radius:16px;padding:6px 12px}
+.feed{flex:1;overflow-y:auto;padding:16px 14px 8px;display:flex;flex-direction:column;gap:10px}
+.b{max-width:86%;padding:10px 13px;border-radius:16px;line-height:1.4;font-size:.98rem;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.b.me{align-self:flex-end;background:rgba(95,211,255,.22);border:1px solid rgba(95,211,255,.45);border-bottom-right-radius:4px}
+.b.fil{align-self:flex-start;background:linear-gradient(135deg,rgba(255,255,255,.17),rgba(255,255,255,.07));border:1px solid var(--line);border-bottom-left-radius:4px}
+.b small{display:block;color:var(--sub);font-size:.72rem;margin-top:4px}
+.b .go{display:inline-flex;align-items:center;gap:4px;margin-top:8px;color:var(--acc);font-size:.85rem;text-decoration:none;border:1px solid rgba(95,211,255,.45);border-radius:14px;padding:4px 10px}
+.hint{color:var(--sub);text-align:center;font-size:.9rem;line-height:1.5;margin:auto 10px;padding:14px;border-radius:14px;background:rgba(6,18,66,.45)}
+.hint b{color:#fff}
+.undo{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);display:none;align-items:center;gap:12px;background:#263238;border-radius:24px;padding:8px 8px 8px 16px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:10;white-space:nowrap}
+.undo button{border:0;background:#ffa900;color:#fff;font:700 .9rem 'Roboto',sans-serif;border-radius:18px;padding:9px 16px;cursor:pointer}
+.bar{padding:10px 14px calc(14px + env(safe-area-inset-bottom));background:rgba(6,18,66,.7);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid var(--line)}
+.st{text-align:center;color:var(--sub);font-size:.85rem;min-height:1.2em;margin-bottom:8px}
+.row{display:flex;align-items:center;gap:10px}
+.row input{flex:1;min-width:0;background:var(--glass);border:1px solid var(--line);border-radius:22px;color:#fff;padding:12px 16px;font:400 1rem 'Roboto',sans-serif;outline:0}
+.row input::placeholder{color:rgba(220,232,255,.5)}
+.snd{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--glass);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;padding:0}
+.snd svg{width:22px;height:22px}
+.att{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.att:empty{display:none}
+.chip{display:flex;align-items:center;gap:6px;max-width:100%;padding:6px 8px 6px 10px;border-radius:14px;background:rgba(255,255,255,.12);border:1px solid var(--line);font-size:.82rem}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}.chip small{color:var(--sub)}.chip.err{border-color:#ff5752;color:#ffb3b0}
+.chip b{cursor:pointer;color:var(--sub);font-weight:400;padding:0 2px}
+.chip i{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#5fd3ff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.mic{width:76px;height:76px;border-radius:50%;border:0;background:radial-gradient(circle at 50% 40%,#5fd3ff,#2a4fd8 70%);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;box-shadow:0 0 0 6px rgba(95,211,255,.18),0 10px 26px rgba(0,0,0,.45);padding:0}
+.mic svg{width:36px;height:36px}
+.mic.rec{background:radial-gradient(circle at 50% 40%,#ff8a85,#e53935 70%);animation:pulse 1.2s infinite}
+.mic.busy{opacity:.6}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,87,82,.55)}100%{box-shadow:0 0 0 22px rgba(255,87,82,0)}}
+.gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#030b2e;z-index:50;padding:24px;text-align:center}
+.gate a{color:#5fd3ff}
+
+/* №26 · Фил занят делом: бегущие точки, полоска и вращающееся кольцо */
+.fdots{display:inline-flex;gap:4px;align-items:center;vertical-align:middle}
+.fdots i{width:7px;height:7px;border-radius:50%;background:#5fd3ff;display:block;animation:fdB 1.1s infinite ease-in-out}
+.fdots i:nth-child(2){animation-delay:.15s;background:#8fe3ff}.fdots i:nth-child(3){animation-delay:.3s;background:#7BD500}
+@keyframes fdB{0%,80%,100%{transform:translateY(0);opacity:.45}40%{transform:translateY(-6px);opacity:1}}
+.fbar{height:3px;border-radius:3px;margin-top:8px;background:rgba(255,255,255,.12);overflow:hidden;position:relative}
+.fbar:after{content:'';position:absolute;top:0;bottom:0;width:35%;border-radius:3px;background:linear-gradient(90deg,transparent,#5fd3ff,#7BD500,transparent);animation:fbM 1.4s infinite linear}
+@keyframes fbM{0%{left:-35%}100%{left:100%}}
+@keyframes fdSpin{to{transform:rotate(360deg)}}
+.av:before{content:'';position:absolute;inset:-4px;border-radius:50%;background:conic-gradient(#5fd3ff,transparent 35%,#7BD500 55%,transparent 80%,#5fd3ff);animation:fdSpin 1.1s linear infinite;opacity:0;transition:opacity .3s}
+html.fil-busy .av:before{opacity:1}.av img{position:relative;z-index:1}
+.b.typing>div{display:flex;align-items:center;gap:10px;padding:2px 0}
+.snd-t{width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;padding:8px;cursor:pointer;flex:none}.snd-t svg{width:22px;height:22px}.snd-t.off{opacity:.55}html.fil-talk .snd-t{background:#e5484d;border-color:#e5484d;animation:sndP 1s infinite}@keyframes sndP{50%{opacity:.7}}
+/* №31 · «послушать» у сообщения */
+.b small{display:flex;align-items:center;gap:6px}
+.rp{margin-left:auto;width:30px;height:30px;flex:none;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;padding:6px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.rp svg{width:17px;height:17px}.rp svg+svg{display:none}.rp.on{background:#e5484d;border-color:#e5484d}.rp.on svg{display:none}.rp.on svg+svg{display:block}
+/* №24 · фоновые задачи */
+.tk{margin-top:9px;padding:9px 11px;border-radius:12px;background:rgba(0,0,0,.18);border:1px solid var(--line);white-space:normal}
+.tk b{display:block;font-size:.92rem;margin-bottom:3px}
+.tk .tk-s{display:flex;align-items:center;gap:6px;font-size:.8rem;opacity:.85}
+.tk .tk-s>i{width:8px;height:8px;border-radius:50%;background:#5fe08a;flex:none}.tk.work .tk-s>i{display:none}
+.tk.stop .tk-s>i,.tk.fail .tk-s>i{background:#ff7a7a}
+@keyframes tkp{50%{opacity:.3}}
+.tk ul{margin:6px 0 0;padding:0;list-style:none;font-size:.8rem;opacity:.8}.tk li{padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk .tk-r{margin-top:7px;font-size:.9rem;white-space:pre-line}
+.tk button{margin-top:8px;background:none;color:inherit;border:1px solid rgba(255,255,255,.35);border-radius:14px;padding:4px 12px;font:inherit;font-size:.82rem}
+/* №34 · ход работы Фила: что делает сейчас, по нажатию — список шагов */
+.stp{margin:0 0 6px;font-size:.84rem}
+.stp-h{display:flex;align-items:center;gap:7px;cursor:pointer;opacity:.85;background:none;border:0;color:inherit;font:inherit;padding:2px 0;text-align:left;max-width:100%}
+.stp-h>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stp-h .chev{width:18px;height:18px;flex:none;transition:transform .2s}.stp.open .stp-h .chev{transform:rotate(90deg)}
+.stp ol{display:none;margin:6px 0 2px 4px;padding:0;list-style:none;border-left:2px solid rgba(255,255,255,.18)}
+.stp.open ol{display:block}
+.stp li{padding:4px 0 4px 12px;position:relative;line-height:1.3}
+.stp li::before{content:'';position:absolute;left:-5px;top:9px;width:8px;height:8px;border-radius:50%;background:#5fe08a}
+.stp li.run::before{background:#5fd3ff;animation:fdB 1.1s infinite ease-in-out}
+.stp li small{display:block;opacity:.6;font-size:.76rem;margin-top:1px}
+.inst{display:none;align-items:center;gap:6px;margin-left:8px;height:38px;border-radius:19px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;padding:0 9px;font:inherit;font-size:.82rem;cursor:pointer;flex:none}
+.inst svg{width:22px;height:22px}.inst span{display:none}
+@media (min-width:700px){.inst span{display:inline}.inst{padding:0 14px 0 10px}}
+@media (min-width:700px){.cfg{align-items:center;justify-content:center}.cfg-in{max-width:560px;border-radius:18px}}
+#fsplash{position:fixed;inset:0;z-index:100;background:#0b1640 url(fil-splash.jpg?v=1) 50% 0/auto 100% no-repeat;overflow:hidden;transition:opacity .4s}#fsplash.hide{opacity:0;pointer-events:none}
+#fsplash .sh{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 40%,rgba(0,0,0,.55) 62%,rgba(0,0,0,.72) 100%)}
+#fsplash .top{display:flex;align-items:center;justify-content:space-between;gap:16px}#fsplash .top img{height:clamp(30px,4.2vh,46px);filter:drop-shadow(0 2px 8px rgba(0,0,0,.6))}
+#fsplash .fx{list-style:none;margin:2.2vh 0 0;padding:0}#fsplash .fx li{font-size:clamp(14px,1.85vh,20px);line-height:1.35;color:#dfe7ff;padding:.45vh 0 .45vh 1.6em;position:relative}#fsplash .fx li:before{content:"";position:absolute;left:0;top:.75em;width:.5em;height:.5em;border-radius:50%;background:#8fe03a}
+#fsplash .lg{position:absolute;top:4.5vh;right:8%;height:clamp(30px,4.2vh,46px);filter:drop-shadow(0 2px 10px rgba(0,0,0,.6))}
+#fsplash .tx{position:absolute;left:9%;right:9%;bottom:5%;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6)}
+#fsplash .lb{font-size:clamp(12px,1.6vh,17px);letter-spacing:.3em;color:#8fe03a;font-weight:700}
+#fsplash .nm{font-size:clamp(36px,4.8vh,56px);font-weight:700;line-height:1}
+#fsplash .rl{font-size:clamp(19px,2.5vh,30px);margin-top:10px;color:#e6edff}#fsplash .rl b{color:#8fe03a}
+#fsplash .ft{position:absolute;left:9%;right:9%;bottom:13%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:2.2vh;border-top:1px solid rgba(255,255,255,.18);color:#cfd8f5;font-size:clamp(12px,1.5vh,16px)}
+#fsplash .ft img{height:clamp(26px,3.4vh,40px)}
+@media (min-aspect-ratio:1/1){#fsplash{background-position:right 0 top 0;background-size:auto 100%}
+#fsplash{background-color:#030b2e}#fsplash .sh{left:auto;right:0;width:100vh;background:linear-gradient(to right,#030b2e 0%,rgba(3,11,46,0) 40%),linear-gradient(to bottom,rgba(3,11,46,0) 60%,rgba(3,11,46,.7))}
+#fsplash .tx{left:7%;right:auto;bottom:10%;width:38%;text-shadow:none}#fsplash .lg{top:27%;right:auto;left:7%;transform:translateY(-50%);height:clamp(47px,10.8vh,115px);filter:none}#fsplash .ft{left:7%;right:auto;width:36%}}
+.pl-add{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 6px}.pl-add .w{grid-column:1/-1}.pl-add input,.pl-add select{width:100%;box-sizing:border-box;background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:10px;color:#fff;padding:10px;font:400 .95rem Roboto,sans-serif;color-scheme:dark}.pl-add select option{color:#111}
+.pl-day{margin:14px 0 6px;font:700 .8rem Roboto,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#9fb3ff}.pl-day.late{color:#ff8a80}
+.pl-it{display:flex;gap:10px;align-items:flex-start;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:10px;margin-bottom:6px}.pl-it.late{border-color:rgba(255,138,128,.55)}
+.pl-tm{min-width:44px;font:700 .95rem Roboto,sans-serif;color:#bbed21}.pl-tx{flex:1;min-width:0}.pl-tx b{display:block;font-weight:500;font-size:.95rem;overflow-wrap:anywhere}.pl-tx small{display:block;opacity:.75;font-size:.8rem;margin-top:2px;overflow-wrap:anywhere}
+.pl-bt{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}.pl-bt button,.pl-bt a{width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.1);border:0;color:#fff;cursor:pointer}.pl-bt svg{width:18px;height:18px}.nmr{display:flex;align-items:center;gap:8px;margin:6px 0}.nmr span{flex:0 0 40%;font-size:.9rem;overflow-wrap:anywhere}.nmr input{flex:1}
+.pl-tabs{display:flex;gap:6px;margin:4px 0 10px}.pl-tabs button{flex:1;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:#fff;font:500 .9rem Roboto,sans-serif;cursor:pointer}.pl-tabs button.on{background:#bbed21;color:#1d2230;border-color:#bbed21}
+.pl-from{color:#9fe0ff!important;opacity:1!important}.pl-ok{color:#bbed21}.pl-late{color:#ff8a80}.pl-wait{color:#ffd180}.pl-rp{display:flex;gap:6px;margin-top:6px}.pl-rp:empty{display:none}.pl-rp input{flex:1;min-width:0;background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:10px;color:#fff;padding:8px;font:400 .9rem Roboto,sans-serif}.pl-rp .cb{padding:8px 12px}
+.pl-tg{display:flex;align-items:center;gap:8px;font-size:.9rem;margin:6px 0}.pl-tg input{width:auto!important;margin:0}
+.edf{margin:8px 0 4px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:10px}.edf b{display:block;font-size:.92rem;margin-bottom:6px}.edb{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.edb .cb{padding:8px 12px;font-size:.85rem}.eds{color:#bbed21;font-weight:700;font-size:.88rem}.edi{margin:6px 0 10px}.edn{font-size:.82rem;opacity:.9;margin-bottom:4px;overflow-wrap:anywhere}.edl{font-size:.78rem;opacity:.75;margin:4px 0 2px}.edp{white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;margin:0;padding:8px;border-radius:8px;font:400 .8rem/1.35 Roboto,sans-serif;background:rgba(0,0,0,.3)}.edp.o{border-left:3px solid #ef5350}.edp.n{border-left:3px solid #bbed21}
+.kpf{margin:8px 0 4px;display:flex;flex-direction:column;gap:6px}.kpf .kpr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:8px 10px}.kpf .kpr b{flex:1 1 140px;font-size:.9rem}.kpf a{display:inline-flex;align-items:center;gap:5px;color:#fff;text-decoration:none;font-size:.82rem;border:1px solid rgba(255,255,255,.35);border-radius:14px;padding:4px 10px;background:rgba(255,255,255,.08)}.kpf a svg{width:16px;height:16px}
+.cmp{background:var(--glass);border:1px solid var(--line);border-radius:28px;padding:8px}
+.crow{display:flex;align-items:flex-end;gap:8px}.crow[hidden]{display:none}
+.crow textarea{flex:1;min-width:0;resize:none;background:transparent;border:0;color:#fff;padding:12px 4px;font:400 1rem/1.35 'Roboto',sans-serif;outline:0;max-height:140px;overflow-y:auto;box-sizing:border-box}
+.crow textarea::placeholder{color:rgba(220,232,255,.5)}
+.crow .snd{width:44px;height:44px}
+.cmp .gosnd{background:rgba(255,255,255,.14);color:rgba(220,232,255,.55);transition:background .15s,color .15s,transform .1s}
+.cmp .gosnd.on{background:#5fd3ff;color:#06123f}
+.cmp .gosnd:active,.cmp .mic:active,.crow .snd:active{transform:scale(.92)}
+html.fil-busy .cmp #go{background:rgba(255,255,255,.14);color:transparent;position:relative}
+html.fil-busy .cmp #go:after{content:"";position:absolute;inset:12px;border:2.5px solid rgba(95,211,255,.35);border-top-color:#5fd3ff;border-radius:50%;animation:spin .8s linear infinite}
+.cmp .mic{touch-action:none;-webkit-user-select:none;user-select:none}
+.cmp .mic.hold{background:radial-gradient(circle at 50% 40%,#ff8a85,#e53935 70%);transform:scale(1.12)}
+.wave{flex:1;min-width:0;height:44px;display:flex;align-items:center;justify-content:center;gap:3px;overflow:hidden}
+.wave i{display:block;width:3px;border-radius:2px;background:#fff;height:6px;transition:height .08s}
+.wave.auto i{animation:wv 1s ease-in-out infinite}
+@keyframes wv{0%,100%{height:6px}50%{height:26px}}
+.cmp .row{gap:8px}.cmp .mic{width:44px;height:44px;box-shadow:none}.cmp .mic svg{width:22px;height:22px}
+.gosnd{width:44px;height:44px;border-radius:50%;border:0;background:#5fd3ff;color:#06123f;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;padding:0}.gosnd svg{width:22px;height:22px}
+.att{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:8px;padding:2px 2px 8px}.att:empty{display:none}
+.tile{position:relative;flex:none;width:96px;height:96px;border-radius:14px;overflow:hidden;background:rgba(255,255,255,.12);border:1px solid var(--line)}
+.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.tile .doc{display:flex;flex-direction:column;justify-content:space-between;height:100%;box-sizing:border-box;padding:8px}.tile .doc svg{width:26px;height:26px;color:#9fd8ff}
+.tile .doc span{font-size:.72rem;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;word-break:break-word}
+.tile .ext{position:absolute;left:6px;bottom:6px;font:700 .62rem Roboto,sans-serif;background:rgba(3,11,46,.75);border-radius:6px;padding:2px 5px;text-transform:uppercase}
+.tile .x{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(3,11,46,.8);color:#fff;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}.tile .x svg{width:16px;height:16px}
+.tile .ld{position:absolute;inset:0;background:rgba(3,11,46,.55);display:flex;align-items:center;justify-content:center}.tile .ld i{width:22px;height:22px;border:3px solid rgba(255,255,255,.3);border-top-color:#5fd3ff;border-radius:50%;animation:spin .8s linear infinite}
+.tile.err{border-color:#ff5752}.tile .em{position:absolute;left:0;right:0;bottom:0;background:rgba(229,57,53,.85);font-size:.62rem;padding:2px 4px;text-align:center}
+.addsh{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:none;align-items:flex-end}.addsh.on{display:flex}
+.addin{width:100%;background:#0b1747;border-top-left-radius:24px;border-top-right-radius:24px;padding:8px 14px calc(18px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.addgrip{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.3);margin:4px auto 10px}
+.addhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.addhd b{font-size:1.05rem}.addhd span{width:36px}
+.addhd button{width:36px;height:36px;border:0;background:transparent;color:#fff;padding:0;cursor:pointer}.addhd button svg{width:26px;height:26px}
+.addg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.addg button{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 6px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;font:500 .95rem Roboto,sans-serif;cursor:pointer}
+.addg i{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center}.addg i svg{width:26px;height:26px}
+/* №878 · шапка: только лицо Фила и ровный ряд значков, без надписей и овалов */
+.hd{gap:0;justify-content:space-between;padding-left:14px;padding-right:10px;background:rgba(6,18,66,.82);border-bottom:0}.hd .hsp{display:none}
+.hd .av{width:40px;height:40px;margin-right:6px}
+.hd .hb,.hd .gear,.hd .snd-t,.hd .inst{width:46px;height:46px;margin:0;padding:9px;border:0;border-radius:50%;background:transparent;color:#fff;display:flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box;cursor:pointer}
+.hd .hb svg,.hd .gear svg,.hd .snd-t svg,.hd .inst svg{width:24px;height:24px}
+.hd .hb:active,.hd .gear:active,.hd .snd-t:active,.hd .inst:active{background:rgba(255,255,255,.12)}
+.hd .inst{display:none}.hd .inst span{display:none !important}
+html.fil-talk .hd .snd-t{background:#e5484d}
+/* №884 · боковое меню Фила и разделы (как в приложении Claude) */
+.mnu{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s}.mnu.on{opacity:1;pointer-events:auto}
+.mnu-in{position:absolute;top:0;bottom:0;left:0;width:min(86vw,360px);background:#071339;overflow-y:auto;padding:calc(14px + env(safe-area-inset-top)) 10px calc(18px + env(safe-area-inset-bottom));transform:translateX(-100%);transition:transform .22s;box-sizing:border-box}.mnu.on .mnu-in{transform:none}
+.mnu-hd{display:flex;align-items:center;gap:12px;padding:4px 10px 14px}.mnu-hd img{width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid #2a4fd8}.mnu-hd b{font-size:1.3rem}
+.msrch{display:flex;align-items:center;gap:8px;margin:0 6px 10px;padding:0 12px;border-radius:14px;background:rgba(255,255,255,.08);border:1px solid var(--line)}.msrch svg{width:20px;height:20px;color:var(--sub);flex:none}
+.msrch input{flex:1;min-width:0;background:transparent;border:0;color:#fff;padding:11px 0;font:400 1rem Roboto,sans-serif;outline:0}.msrch input::placeholder{color:rgba(220,232,255,.5)}
+.mi{display:flex;align-items:center;gap:16px;width:100%;padding:13px 14px;border:0;border-radius:12px;background:transparent;color:#fff;font:400 1.02rem Roboto,sans-serif;text-align:left;cursor:pointer}.mi svg{width:24px;height:24px;flex:none;color:#dce8ff}.mi:active,.mi.cur{background:rgba(255,255,255,.1)}
+.mrec{color:var(--sub);font-weight:500;font-size:.9rem;margin:16px 14px 6px;padding-top:12px;border-top:1px solid var(--line)}
+.mi .mt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mi small{color:var(--sub);font-size:.75rem;flex:none}
+.pnl{position:fixed;inset:0;z-index:75;background:#030b2e url(/apps/crm/bg/ice-p.jpg) center/cover no-repeat;display:none;flex-direction:column}.pnl.on{display:flex}
+.pnl-hd{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 10px 10px;background:rgba(6,18,66,.88)}.pnl-hd b{font-size:1.1rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pnl-hd button{width:44px;height:44px;border:0;background:transparent;color:#fff;padding:10px;cursor:pointer;flex:none}.pnl-hd button svg{width:24px;height:24px}
+.pnl-f{display:flex;gap:8px;overflow-x:auto;padding:10px 12px 0}.pnl-f:empty{display:none}
+.pnl-f button{flex:none;border:1px solid var(--line);background:rgba(6,18,66,.6);color:#fff;border-radius:18px;padding:7px 14px;font:400 .88rem Roboto,sans-serif;cursor:pointer}.pnl-f button.on{background:#5fd3ff;color:#06123f;border-color:#5fd3ff}
+.pnl-b{flex:1;overflow-y:auto;padding:12px 12px calc(20px + env(safe-area-inset-bottom))}
+.it{background:rgba(6,18,66,.72);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}.it b{display:block;font-size:1rem}.it .m{color:var(--sub);font-size:.82rem;margin-top:3px}
+.it .p{font-size:.88rem;margin-top:6px;line-height:1.4;color:#dce8ff;white-space:pre-line}.it .a{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.it .a a,.it .a button{border:1px solid rgba(95,211,255,.5);background:transparent;color:var(--acc);border-radius:14px;padding:6px 12px;font:400 .85rem Roboto,sans-serif;text-decoration:none;cursor:pointer}
+.it.click{cursor:pointer}.sec{color:var(--sub);font-size:.9rem;margin:14px 2px 8px}.emp{color:var(--sub);text-align:center;padding:30px 10px;background:rgba(6,18,66,.6);border-radius:14px}
+</style>
+<style>/* №470 · крутилка на заставке Фила */#fsplash .itcFsp{position:absolute;left:50%;bottom:max(40px,6vh);width:34px;height:34px;margin-left:-17px;border-radius:50%;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;animation:itcFspR .9s linear infinite;z-index:3}@keyframes itcFspR{to{transform:rotate(360deg)}}</style>
+</head><body>
+<div class="gate" id="gate" style="display:none"><div><h2>Только для сотрудников ИТК</h2><p>Откройте «Фила» из «Моих приложений» в магазине itcpartner.store под своим рабочим входом.</p><a href="https://itcpartner.store/">Войти</a></div></div>
+<div id="fsplash"><div class="sh"></div><div class="itcFsp"></div><img class="lg" src="itc-logo-w.svg" alt="ИТК"><div class="tx"><div class="nm">Фил</div><div class="rl">виртуальный руководитель <b>ИТК</b></div><ul class="fx"><li>Ставит задачи и составляет планы</li><li>Анализирует сделки, деньги и грузы</li><li>Ищет клиентов и проверяет фабрики</li><li>Следит за сроками и напоминает</li></ul></div></div>
+<script>/* №150 · заставка Фила при открытии (в приложении её показывает само приложение) */
+(function(){ var el = document.getElementById('fsplash'), t0 = Date.now(), skip = false;
+  try { skip = /FilSplash/.test(navigator.userAgent || '') || sessionStorage.getItem('fil_spl') === '1'; sessionStorage.setItem('fil_spl', '1'); } catch(e){}   /* №152: в приложении 2.0.6 и раньше заставку показывает страница, в 2.0.7 — само приложение */
+  if (skip) { el.remove(); return; }
+  function off(){ setTimeout(function(){ el.classList.add('hide'); setTimeout(function(){ el.remove(); }, 400); }, Math.max(0, 1400 - (Date.now() - t0))); }
+  if (document.readyState === 'complete') off(); else window.addEventListener('load', off); setTimeout(off, 6000);
+})();</script>
+<div class="hd"><span class="av" id="hav" onclick="mnuOpen()" title="Меню" style="cursor:pointer"><img src="fil-face-s.jpg?v=4" alt=""></span><small id="hsub" hidden>Виртуальный руководитель ИТК</small><span class="hsp"></span><a class="hb" href="/apps/crm/?from=fil" title="Сделки"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM8 19H4V5h4v14zm6 0h-4V5h4v14zm6 0h-4V5h4v14z"/></svg></a><button class="inst" id="inst" onclick="instFil()" title="Поставить Фила на рабочий стол"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 17H4V5h8V3H4c-1.11 0-2 .89-2 2v12a2 2 0 0 0 2 2h4v2h8v-2h4c1.1 0 2-.9 2-2v-3h-2v3z"/><path d="M17 14l5-5-1.41-1.41L18 10.17V3h-2v7.17l-2.59-2.58L12 9l5 5z"/></svg><span>На рабочий стол</span></button><button class="gear" id="plbtn" onclick="plOpen()" title="Планировщик"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z"/></svg></button><button class="snd-t" data-fil-snd onclick="FilVoice.sndTap()" title="Голос Фила"></button><button class="gear" id="gear" onclick="cfgOpen()" title="Настройки Фила" style="display:none"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54A.48.48 0 0 0 13.92 2h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.73 8.47a.48.48 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.48.48 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></button></div>
+<div class="cfg" id="plan" style="display:none" onclick="if(event.target===this)this.style.display='none'"><div class="cfg-in" id="planIn"></div></div>
+<div class="cfg" id="cfg" style="display:none" onclick="if(event.target===this)this.style.display='none'"><div class="cfg-in" id="cfgIn"></div></div>
+<div class="cfg" id="caps" style="display:none" onclick="if(event.target===this)capsClose()"><div class="cfg-in" id="capsIn"></div></div>
+<div class="feed" id="feed"></div>
+<div class="undo" id="undo"><span id="undoT">Сделано</span><button onclick="undo()">Отменить <span id="undoN">10</span></button></div>
+<div class="bar">
+  <div class="st" id="st">Нажмите микрофон и скажите, что сделать</div>
+  <div class="cmp" id="cmp">
+    <div class="att" id="att"></div>
+    <div class="crow" id="rowIdle">
+      <button class="snd" onclick="addOpen()" title="Добавить фото или файл"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></button>
+      <textarea id="txt" rows="1" placeholder="Скажите или напишите Филу…" autocomplete="off" oninput="txtGrow()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendText()}"></textarea>
+      <input type="file" id="fCam" accept="image/*" capture="environment" hidden onchange="gotFiles(this)">
+      <input type="file" id="fPic" accept="image/*" multiple hidden onchange="gotFiles(this)">
+      <input type="file" id="fAny" accept="image/*,.pdf,.docx,.xlsx,.doc,.xls,.txt,.csv,application/pdf" multiple hidden onchange="gotFiles(this)">
+      <button class="mic" id="mic" title="Нажмите — говорить; нажмите ещё раз — отправить"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg></button>
+      <button class="gosnd" id="go" onclick="sendText()" title="Отправить"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg></button>
+    </div>
+    <div class="crow" id="rowRec" hidden>
+      <button class="snd" onclick="recCancel()" title="Отменить запись"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+      <div class="wave" id="wave"></div>
+      <button class="mic rec" id="recGo" title="Нажмите ещё раз — отправить Филу"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg></button>
+      <button class="snd" onclick="recStop()" title="Остановить и поправить текст"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
+    </div>
+  </div>
+  </div>
+</div>
+<div class="addsh" id="addsh" onclick="if(event.target===this)addClose()"><div class="addin"><div class="addgrip"></div><div class="addhd"><button onclick="addClose()" title="Закрыть"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button><b>Добавить</b><span></span></div><div class="addg"><button onclick="addPick('fCam')"><i><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.2A3.2 3.2 0 1 0 12 8.8a3.2 3.2 0 0 0 0 6.4zM9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z"/></svg></i>Камера</button><button onclick="addPick('fPic')"><i><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></i>Фото</button><button onclick="addPick('fAny')"><i><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 15.01l1.41 1.41L11 14.84V19h2v-4.16l1.59 1.59L16 15.01 12.01 11 8 15.01z"/></svg></i>Файлы</button></div></div></div>
+<div class="mnu" id="mnu" onclick="if(event.target===this)mnuClose()"><div class="mnu-in"><div class="mnu-hd"><img src="fil-face-s.jpg?v=4" alt=""><b>Фил</b></div><div class="msrch"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg><input id="mq" placeholder="Поиск по разговорам и документам" autocomplete="off" onkeydown="if(event.key==='Enter')fmSearch()"></div><button class="mi" onclick="convNew()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg><span>Новый разговор</span></button><button class="mi" onclick="fmDocs()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg><span>Документы</span></button><button class="mi" onclick="fmClients()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Клиенты</span></button><button class="mi" onclick="location.href='/apps/crm/?from=fil'"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM8 19H4V5h4v14zm6 0h-4V5h4v14zm6 0h-4V5h4v14z"/></svg><span>Сделки</span></button><button class="mi" onclick="mnuClose();plOpen()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z"/></svg><span>Планировщик</span></button><button class="mi" onclick="fmFiles()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg><span>Файлы</span></button><button class="mi" id="miCfg" style="display:none" onclick="mnuClose();cfgOpen()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54A.48.48 0 0 0 13.92 2h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.73 8.47a.48.48 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.48.48 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg><span>Настройки</span></button><button class="mi" onclick="mnuClose();capsOpen()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></svg><span>Что умеет Фил</span></button><div class="mrec">Недавние</div><div id="convs"></div></div></div>
+<div class="pnl" id="pnl"><div class="pnl-hd"><button onclick="pnlBack()" title="Назад"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button><b id="pnlT"></b></div><div class="pnl-f" id="pnlF"></div><div class="pnl-b" id="pnlB"></div></div>
+<script src="voice.js?v=21"></script>
+<script>
+(function(){
+  /* пропуск сотрудника — как в «Воронках сделок» */
+  var t = '', PLAN0 = /[?&]plan=[12]/.test(location.search || ''), PLAN_G = /[?&]plan=2/.test(location.search || '');   // №43: из уведомления — сразу планировщик
+  var m = /[?&]t=([^&]+)/.exec(location.search || ''); if (m) { try { t = decodeURIComponent(m[1]); } catch(e){} }
+  if (!t) { try { t = sessionStorage.getItem('eco_t') || ''; } catch(e){} }
+  if (!t) { try { var a = JSON.parse(localStorage.getItem('itc_auth') || 'null'); if (a && a.token && a.auth && a.auth.role === 'itc') t = a.token; } catch(e){} }
+  if (!t && /ITCMini/.test(navigator.userAgent || '')) { location.replace('/?back=' + encodeURIComponent(location.pathname)); }   // №333 · отдельное приложение: сначала вход в аккаунт ИТК
+  if (t) { try { sessionStorage.setItem('eco_t', t); } catch(e){} }
+  if (m && history.replaceState) { try { history.replaceState(null, '', location.pathname); } catch(e){} }
+
+  var API = '/api/flow.php', VOICE = false, UNDO = null, UT = null, BUSY = false;
+  var IC_MIC = document.getElementById('mic').innerHTML, IC_STOP = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>';
+  function $(id){ return document.getElementById(id); }
+  function esc(x){ return String(x == null ? '' : x).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  var TZ = ''; try { TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch(e){}
+  var CONV = 'last'; try { CONV = localStorage.getItem('fil_conv') || 'last'; } catch(e){}
+  function convSet(c){ if (!c) return; CONV = c; try { localStorage.setItem('fil_conv', c); } catch(e){} }
+  function api(a, d){ d = d || {}; d.t = t; if ((a === 'fc_cmd' || a === 'fc_hist') && d.conv === undefined) d.conv = CONV; if (TZ && !d.tz) d.tz = TZ; return fetch(API + '?action=' + a + '&t=' + encodeURIComponent(t), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)}).then(function(r){ return r.json(); }); }
+  function st(x){ $('st').textContent = x; }
+  function hm(s){ s = String(s || ''); return s.length >= 16 ? s.substr(11, 5) : new Date().toTimeString().substr(0, 5); }
+  /* №31 · у каждого сообщения — «послушать»; во время чтения та же кнопка останавливает */
+  var IC_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
+  var IC_STOP2 = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>';
+  /* №36 · готовые КП: в тексте ответа метки [[kp:id|название]] → кнопки «PDF» и «Excel» */
+  function kpSplit(text){
+    var kp = [], ed = []; text = String(text || '').replace(/\n?\[\[kp:([a-z0-9]+)\|([^\]]*)\]\]/g, function(_, id, ti){ kp.push([id, ti]); return ''; });
+    text = text.replace(/\n?\[\[ed:([a-z0-9]+)\|([^\]]*)\]\]/g, function(_, id, ti){ ed.push([id, ti]); return ''; });
+    text = text.replace(/\n?\[\[dr:([^|\]]+)\|([^\]]*)\]\]/g, function(_, q, ti){ ed.push(['dr', ti, q]); return ''; });   // №269 · Рисовалка
+    return {t: text.replace(/\s+$/, ''), kp: kp, ed: ed};
+  }
+  function kpHtml(kp){
+    if (!kp.length) return '';
+    var u = function(id, f){ return API + '?action=kp_dl&id=' + id + '&f=' + f + '&t=' + encodeURIComponent(t); };
+    return '<div class="kpf">' + kp.map(function(k){ return '<div class="kpr"><b>' + esc(k[1]) + '</b><a href="' + u(k[0], 'pdf') + '" download><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3H19v1h1.5V11H19v2h-1.5V7h3v1.5zM9 9.5h1v-1H9v1zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm10 5.5h1v-3h-1v3z"/></svg> PDF</a><a href="' + u(k[0], 'xlsx') + '" download><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 10.02h5V21h-5zM17 21h3c1.1 0 2-.9 2-2v-9h-5v11zm3-18H5c-1.1 0-2 .9-2 2v3h19V5c0-1.1-.9-2-2-2zM3 19c0 1.1.9 2 2 2h3V10H3v9z"/></svg> Excel</a></div>'; }).join('') + '</div>';
+  }
+  /* №42 · правка сайта от Фила: посмотреть «было → станет», применить, отменить, вернуть как было */
+  function edHtml(ed){
+    if (!ed || !ed.length) return '';
+    return ed.map(function(e){ if (e[0] === 'dr') { var q = ''; try { q = decodeURIComponent(e[2]); } catch(_){} return '<div class="edf"><b>' + esc(e[1]) + '</b><div class="edb"><a class="cb" style="text-decoration:none;display:inline-block" href="/apps/draw/?' + esc(q) + '&t=' + encodeURIComponent(t) + '">Открыть в Рисовалке</a></div></div>'; } return '<div class="edf" id="ed' + e[0] + '"><b>Правка сайта: ' + esc(e[1]) + '</b><div class="edv"></div><div class="edb">'
+      + '<button class="cb s" onclick="edView(\'' + e[0] + '\')">Посмотреть</button><button class="cb" onclick="edDo(\'fe_apply\',\'' + e[0] + '\')">Применить</button><button class="cb s" onclick="edDo(\'fe_cancel\',\'' + e[0] + '\')">Отмена</button></div></div>'; }).join('');
+  }
+  function edBtns(id, st){
+    var b = document.querySelector('#ed' + id + ' .edb'); if (!b) return;
+    if (st === 'applied') b.innerHTML = '<span class="eds">Применено</span><button class="cb s" onclick="edDo(\'fe_undo\',\'' + id + '\')">Вернуть как было</button>';
+    else if (st === 'undone') b.innerHTML = '<span class="eds">Возвращено как было</span>';
+    else if (st === 'cancelled') b.innerHTML = '<span class="eds">Отменено</span>';
+  }
+  window.edView = function(id){
+    var v = document.querySelector('#ed' + id + ' .edv'); if (!v) return;
+    if (v.innerHTML) { v.innerHTML = ''; return; }
+    v.innerHTML = '<p>Загрузка…</p>';
+    api('fe_view', {id:id}).then(function(r){
+      if (!r || !r.ok) { v.innerHTML = '<p>' + esc((r && r.error) || 'Ошибка') + '</p>'; return; }
+      v.innerHTML = r.items.map(function(it){ return '<div class="edi"><div class="edn">' + esc(it.file) + (it.why ? ' — ' + esc(it.why) : '') + '</div>'
+        + (it.kind === 'new' ? '<div class="edl">Новый файл:</div><pre class="edp n">' + esc(it.new) + '</pre>' : '<div class="edl">Было:</div><pre class="edp o">' + esc(it.old) + '</pre><div class="edl">Станет:</div><pre class="edp n">' + esc(it.new) + '</pre>') + '</div>'; }).join('');
+      edBtns(id, r.status);
+    });
+  };
+  window.edDo = function(a, id){
+    var b = document.querySelector('#ed' + id + ' .edb'); if (b) b.querySelectorAll('button').forEach(function(x){ x.disabled = true; });
+    st(a === 'fe_apply' ? 'Применяю правку…' : a === 'fe_undo' ? 'Возвращаю как было…' : 'Отменяю…');
+    api(a, {id:id}).then(function(r){
+      if (!r || !r.ok) { st((r && r.error) || 'Ошибка'); if (b) b.querySelectorAll('button').forEach(function(x){ x.disabled = false; }); return; }
+      edBtns(id, a === 'fe_apply' ? 'applied' : a === 'fe_undo' ? 'undone' : 'cancelled'); st(r.say || 'Готово');
+    }).catch(function(){ st('Нет связи — попробуйте ещё раз'); if (b) b.querySelectorAll('button').forEach(function(x){ x.disabled = false; }); });
+  };
+  window.kpSplit = kpSplit; window.kpHtml = kpHtml; window.edHtml = edHtml;
+  function rpBtn(text){ return '<button class="rp" title="Послушать" data-t="' + esc(text) + '" onclick="rpTap(this)">' + IC_PLAY + IC_STOP2 + '</button>'; }
+  window.rpTap = function(b){
+    if (b.classList.contains('on')) { FilVoice.hush(); return; }
+    FilVoice.say(b.getAttribute('data-t'), VOICE, true); b.classList.add('on');
+    var off = function(){ if (!document.documentElement.classList.contains('fil-talk')) { b.classList.remove('on'); } else setTimeout(off, 500); };
+    setTimeout(off, 2500);
+  };
+  function add(who, text, deal, at){
+    var h = $('hint'); if (h) h.remove();
+    var b = document.createElement('div'); b.className = 'b ' + who;
+    if (who === 'fil') { var ks = kpSplit(text); text = ks.t; b.innerHTML = '<img src="fil-face-s.jpg?v=4" alt=""><div>' + esc(text) + kpHtml(ks.kp) + edHtml(ks.ed) + (deal ? '<br><a class="go" href="/apps/crm/?from=fil&d=' + encodeURIComponent(deal) + '">Открыть сделку</a>' : '') + '<small>Фил · ' + hm(at) + (text ? rpBtn(text) : '') + '</small></div>'; $('feed').appendChild(b); $('feed').scrollTop = 1e9; return b; }
+    b.innerHTML = esc(text) + (deal ? '<br><a class="go" href="/apps/crm/?from=fil&d=' + encodeURIComponent(deal) + '">Открыть сделку</a>' : '') + '<small>' + (who === 'me' ? 'Вы' : 'Фил') + ' · ' + hm(at) + (text ? rpBtn(text) : '') + '</small>';
+    $('feed').appendChild(b); $('feed').scrollTop = 1e9; return b;
+  }
+  /* ===== №272 · приветствие по имени и отчеству и «Что умеет Фил» (рассказ голосом) ===== */
+  var IO = '', ROLE = '', ISBOSS = false;
+  function helloText(){ var h = new Date().getHours(); var g = h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер'; return g + (IO ? ', ' + IO : '') + '!'; }
+  function helloLoad(hasHist){
+    api('fil_hello', {}).then(function(r){
+      if (!r || !r.ok) return; IO = String(r.io || '').trim(); ROLE = r.role || ''; ISBOSS = !!r.boss;
+      var hb = document.querySelector('#hint b'); var g = helloText();
+      if (hb) hb.textContent = g + ' Я Фил'; else if (hasHist) add('fil', g + ' Чем помочь?');
+      var k = 'fil_hello_' + new Date().toISOString().slice(0, 10);
+      var said = false; try { said = localStorage.getItem(k) === '1'; localStorage.setItem(k, '1'); } catch(e){}
+      if (!said) setTimeout(function(){ FilVoice.say(g + ' Чем помочь?', VOICE); }, 600);
+    }).catch(function(){});
+  }
+  /* разделы: b — только руководителю; s — только руководителю и бухгалтерии */
+  var CAPS = [
+    {t:'Как со мной разговаривать', p:'Говорите со мной как с живым помощником.', l:[
+      'Нажмите микрофон и скажите, что сделать. Нажмите ещё раз — и я получу поручение.',
+      'Можно написать текстом в строке внизу.',
+      'Пришлите фото документа или файл скрепкой — я сам прочитаю: счёт, договор, визитку, каталог фабрики.',
+      'В одной фразе можно дать несколько поручений — я сделаю их по порядку.',
+      'Если я сделал не то — у сообщения 10 секунд горит кнопка «Отменить», всё вернётся как было.',
+      'Поправьте меня словами, например «нет, речь о SNADI», — я запомню правило и дальше не ошибусь.',
+      'Кнопка со значком звука включает и выключает мой голос. Во время ответа она же меня останавливает.']},
+    {t:'Меню', p:'Меню открывается нажатием на мою фотографию вверху.', l:[
+      'Новый разговор — начать с чистого листа. Прошлые разговоры лежат ниже, в «Недавних».',
+      'Поиск — по всем разговорам и документам.',
+      'Документы — счета, коммерческие предложения и другие файлы, которые я сделал.',
+      'Клиенты — рабочие клиенты с реквизитами и историей.',
+      'Сделки — доска сделок по стадиям, как в Битрикс24.',
+      'Планировщик — задачи и поручения по дням.',
+      'Файлы — всё, что вы мне присылали.']},
+    {t:'Сделки и продажи', p:'Веду сделки за вас — голосом.', l:[
+      'Завести сделку: «Заведи сделку: гостиница Метрополь, полотенца, 500 тысяч».',
+      'Перенести в другую стадию: «Перенеси Метрополь в стадию Переговоры».',
+      'Поставить следующий шаг: «По Метрополю задача на завтра — отправить КП».',
+      'Записать в ленту сделки: «Запиши в Метрополь: клиент просит скидку 5%».',
+      'Сменить сумму и ответственного: «Назначь ответственным Дениса».',
+      'Занести товары в сделку: что, сколько, по какой цене. Сумма сделки посчитается сама.',
+      'Найти сделки и рассказать всё о сделке: стадия, сумма, задачи, что нужно клиенту, поставщики.',
+      'Отчёт по продажам за период: сколько в работе, выиграно и проиграно, конверсия, просроченные шаги.',
+      'Роботы стадий: что происходит само, когда сделка попадает в стадию. Добавлять роботов может руководитель.']},
+    {t:'Клиенты', p:'Держу базу клиентов в порядке.', l:[
+      'Карточка рабочего клиента целиком: реквизиты, контакты и вся история — сделки, КП, счета, договоры, оплаты, заказы в магазине.',
+      'Завести клиента по ИНН — реквизиты подтянутся сами. Дубль не заведу, а дополню существующего.',
+      'Добавить контактное лицо: имя, должность, телефон, почта.',
+      'Найти дубли клиентов. Склеить дубли может только руководитель.',
+      'База потенциальных клиентов для рассылок и КП. Могу найти компании в интернете, прочитать их сайты и занести в базу до 30 за раз.']},
+    {t:'Документы', p:'Делаю документы от имени нашей компании.', l:[
+      'Счёт на оплату — PDF и Excel с нашими реквизитами, номером по порядку и суммой прописью. Файлы сами прикрепятся к сделке.',
+      'Коммерческое предложение по фабрике из базы — PDF и Excel с фото, описанием, моделями и характеристиками.',
+      'Реквизиты наших компаний в России, Кыргызстане и Китае — по просьбе «дай реквизиты».']},
+    {t:'Поставщики и Китай', p:'Знаю нашу базу фабрик и что происходит в Китае.', l:[
+      'Найти поставщика по товару: «Кто делает полотенца?» В базе только прямые производители.',
+      'Посчитать поставщиков: всего, по разделам и городам.',
+      'Занести фабрику из каталога, флаера или визитки — с контактами и исходным файлом.',
+      'Переписка с фабриками в WeCom — последние сообщения в переводе: «Что ответила фабрика Tongxin?»',
+      'Грузы на складе в Китае: что пришло, опознано ли, куда отправить, уехало ли.']},
+    {t:'Планировщик и поручения', p:'Помню дела за вас и за команду.', l:[
+      '«Что у меня на сегодня?» — задачи и сделки, где пора действовать.',
+      'Поставить задачу себе или сотруднику со сроком: «Поручи Полине до пятницы запросить цены».',
+      'Отметить задачу сделанной, перенести, повторять каждую неделю.',
+      'Что вы поручили сотрудникам — кому, что, до какого числа и что ответили.',
+      'Кто из сотрудников сегодня работает и у кого сколько сделок.']},
+    {t:'Магазин и приложения', p:'Слежу за магазином itcpartner.store.', l:[
+      'Заказы магазина за любой период: сколько, на какую сумму, последние заказы.',
+      'Автобаннеры: «обнови баннеры» — нарисую новые с товарами магазина.',
+      'Рисовалка: «нарисуй…», «сделай карточки на товар…» — открою Рисовалку с готовым запросом.',
+      'Отели ИТК: кто заезжает сегодня и завтра, какие брони ждут подтверждения.',
+      'Почта: показать новые письма, прочитать письмо, ответить.']},
+    {t:'Деньги', s:1, p:'Только для руководителя и бухгалтерии.', l:[
+      'Остатки на счетах по последним выпискам.',
+      'Оплаты на согласовании, расходы по статьям, поступления по договорам за месяц.']},
+    {t:'Только для руководителя', b:1, p:'Это видите только вы.', l:[
+      'SMS на китайский номер: «какой код пришёл от Alipay?»',
+      'Яндекс Вебмастер: отправить страницы сайта на переобход, сколько страниц в поиске.',
+      'Правки сайта itcpartner.ru голосом: найти и поправить текст на странице.',
+      'Настройки Фила: на какой модели я думаю, памятка правил ИТК, как обращаться к сотрудникам по имени и отчеству, что я выучил из поправок.',
+      'Памятку можно пополнять голосом: «Фил, запомни: …».']}
+  ];
+  function capsList(){ return CAPS.filter(function(c){ return !(c.b && !ISBOSS) && !(c.s && !ISBOSS && !/accountant|buh|бух/i.test(ROLE)); }); }
+  function capsSpeech(c){ return c.t + '. ' + c.p + ' ' + c.l.map(function(x){ return x.replace(/[«»]/g, ''); }).join(' '); }
+  var CAPSQ = null;
+  var IC_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>', IC_STOP2 = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>';
+  function capsMark(i){ [].forEach.call(document.querySelectorAll('.cps-say'), function(b){ var on = +b.getAttribute('data-i') === i; b.classList.toggle('on', on); b.innerHTML = on ? IC_STOP2 : IC_PLAY; }); var a = $('capsAll'); if (a) a.textContent = (CAPSQ && CAPSQ.all) ? 'Остановить рассказ' : 'Рассказать всё голосом'; }
+  function capsStop(){ if (CAPSQ) { clearInterval(CAPSQ.tm); CAPSQ = null; } try { FilVoice.hush(); } catch(e){} capsMark(-1); }
+  function capsPlay(i, all){
+    var L = capsList(); if (i >= L.length) { capsStop(); return; }
+    if (CAPSQ) clearInterval(CAPSQ.tm);
+    CAPSQ = {i:i, all:all, seen:false, t0:Date.now()}; capsMark(i);
+    var el = document.querySelector('.cps-sec[data-i="' + i + '"]'); if (el && all) try { el.scrollIntoView({behavior:'smooth', block:'start'}); } catch(e){}
+    FilVoice.say(capsSpeech(L[i]), VOICE, true);
+    var q = CAPSQ;
+    q.tm = setInterval(function(){
+      if (CAPSQ !== q) { clearInterval(q.tm); return; }
+      var talk = document.documentElement.classList.contains('fil-talk');
+      if (talk) q.seen = true;
+      if ((q.seen && !talk) || (!q.seen && Date.now() - q.t0 > 20000)) { clearInterval(q.tm); if (q.all) capsPlay(i + 1, true); else capsStop(); }
+    }, 400);
+  }
+  window.capsSay = function(i){ if (CAPSQ && CAPSQ.i === i) { capsStop(); return; } capsPlay(i, false); };
+  window.capsAll = function(){ if (CAPSQ && CAPSQ.all) { capsStop(); return; } capsPlay(0, true); };
+  window.capsClose = function(){ capsStop(); $('caps').style.display = 'none'; };
+  window.capsOpen = function(){
+    var L = capsList();
+    $('capsIn').innerHTML = '<h3>Что умеет Фил</h3><p>' + esc(IO ? IO + ', вот' : 'Вот') + ' всё, что я умею. Нажмите на кнопку у раздела — расскажу голосом, или послушайте всё подряд.</p>'
+      + '<div class="cps-top"><button class="cb" id="capsAll" onclick="capsAll()">Рассказать всё голосом</button><button class="cb s" onclick="capsClose()">Закрыть</button></div>'
+      + L.map(function(c, i){ return '<div class="cps-sec" data-i="' + i + '"><h4><span>' + esc(c.t) + '</span><button class="cps-say" data-i="' + i + '" onclick="capsSay(' + i + ')" title="Рассказать голосом">' + IC_PLAY + '</button></h4><p>' + esc(c.p) + '</p><ul>' + c.l.map(function(x){ return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>'; }).join('');
+    $('caps').style.display = 'flex'; $('capsIn').scrollTop = 0;
+    if (!ROLE) api('fil_hello', {}).then(function(r){ if (r && r.ok) { IO = String(r.io || '').trim(); ROLE = r.role || ''; ISBOSS = !!r.boss; if ($('caps').style.display !== 'none' && !CAPSQ) capsOpen(); } }).catch(function(){});
+  };
+  function hint(){
+    $('feed').innerHTML = '<div class="hint" id="hint"><div class="big"><img src="fil-face.jpg?v=4" alt=""></div><b style="font-size:1.1rem">' + esc(helloText()) + ' Я Фил</b><br>Виртуальный руководитель ИТК. Спрашивайте о чём угодно по работе или пришлите фото документа и файл — я сам посмотрю сделки, клиентов, поставщиков, заказы, деньги, грузы и переписку. Могу и сделать: завести сделку, поставить задачу, перенести, записать.<br><br><b>Например</b><br>«Что горит на сегодня?»<br>«Кто из поставщиков делает полотенца?»<br>«Сколько заказов в магазине за неделю?»<br>«Что ответила фабрика Tongxin?»<br>«Заведи сделку: гостиница Метрополь, полотенца, 500 тысяч»<br>«По Метрополю поставь задачу на завтра — отправить КП»<br>«Запиши в сделку Метрополь: клиент просит скидку 5%»<br>«Перенеси Метрополь в стадию Переговоры»<br>«Назначь ответственным Дениса»<br>«Что у меня на сегодня?»</div>';
+  }
+  function speak(text){ FilVoice.say(kpSplit(text).t, VOICE); }
+  function showUndo(id, text){
+    UNDO = id; var n = 10; $('undoT').textContent = text.length > 28 ? text.substr(0, 26) + '…' : text; $('undoN').textContent = n; $('undo').style.display = 'flex';
+    clearInterval(UT); UT = setInterval(function(){ n--; $('undoN').textContent = n; if (n <= 0) { clearInterval(UT); $('undo').style.display = 'none'; UNDO = null; } }, 1000);
+  }
+  window.undo = function(){
+    if (!UNDO) return; var id = UNDO; UNDO = null; clearInterval(UT); $('undo').style.display = 'none';
+    api('fc_undo', {id:id}).then(function(r){ var s = (r && r.ok) ? 'Отменил — всё как было.' : ((r && r.error) || 'Не получилось отменить'); add('fil', s); speak(s); });
+  };
+  /* ===== №16 · фото и файлы для Фила ===== */
+  var ATT = [];
+  window.pick = function(cam){ $(cam ? 'fCam' : 'fAny').click(); };
+  /* №877 · меню «+» как в Claude: камера, фото, файлы */
+  window.addOpen = function(){ $('addsh').classList.add('on'); };
+  window.addClose = function(){ $('addsh').classList.remove('on'); };
+  window.addPick = function(id){ addClose(); $(id).click(); };
+  /* ===== №884 · боковое меню Фила: разговоры, поиск, документы, клиенты, файлы ===== */
+  var PST = [];   // стек открытых разделов — «Назад» возвращает на шаг
+  var ICS = {chat:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>'};
+  function dt(s){ s = String(s || ''); if (s.length < 10) return ''; var d = s.substr(8, 2) + '.' + s.substr(5, 2) + '.' + s.substr(0, 4), today = new Date().toISOString().substr(0, 10); return s.substr(0, 10) === today ? s.substr(11, 5) : d; }
+  function money(v){ v = +v || 0; return v ? Math.round(v).toLocaleString('ru-RU') + ' ₽' : ''; }
+  function kpU(id, f){ return API + '?action=kp_dl&id=' + id + '&f=' + f + '&t=' + encodeURIComponent(t); }
+  function fileU(id){ return API + '?action=fm_file_dl&id=' + encodeURIComponent(id) + '&t=' + encodeURIComponent(t); }
+  window.mnuOpen = function(){ if ($('gear').style.display !== 'none') $('miCfg').style.display = 'flex'; $('mnu').classList.add('on'); convsLoad(); };
+  window.mnuClose = function(){ $('mnu').classList.remove('on'); };
+  function convsLoad(){
+    api('fm_convs', {}).then(function(r){
+      var it = (r && r.ok && r.items) || [];
+      $('convs').innerHTML = it.length ? it.map(function(c){ return '<button class="mi' + (c.id === CONV ? ' cur' : '') + '" onclick="convOpen(\'' + c.id + '\')">' + ICS.chat + '<span class="mt">' + esc(c.title || 'Разговор') + '</span><small>' + dt(c.updated_at) + '</small></button>'; }).join('')
+        : '<div class="m" style="color:var(--sub);padding:6px 14px">Разговоров пока нет</div>';
+    }).catch(function(){});
+  }
+  window.convOpen = function(c){
+    mnuClose(); pnlCloseAll(); convSet(c); $('feed').innerHTML = ''; st('Загружаю разговор…');
+    api('fc_hist', {conv:c}).then(function(r){ st('Нажмите микрофон и скажите, что сделать'); if (r && r.conv) convSet(r.conv); if (r && r.ok && (r.items || []).length) histDraw(r.items); else hint(); }).catch(function(){ st('Нет связи'); });
+  };
+  window.convNew = function(){ mnuClose(); pnlCloseAll(); convSet('new'); $('feed').innerHTML = ''; hint(); st('Новый разговор. Скажите или напишите, что сделать'); try { $('txt').focus(); } catch(e){} };
+  function pnlShow(title, body, filt){ $('pnlT').textContent = title; $('pnlB').innerHTML = body; $('pnlF').innerHTML = filt || ''; $('pnl').classList.add('on'); $('pnlB').scrollTop = 0; }
+  function pnlGo(fn){ PST.push(fn); mnuClose(); fn(); }
+  window.pnlBack = function(){ PST.pop(); if (PST.length) PST[PST.length - 1](); else $('pnl').classList.remove('on'); };
+  function pnlCloseAll(){ PST = []; $('pnl').classList.remove('on'); }
+  window.pnlIsOpen = function(){ return $('pnl').classList.contains('on'); };
+  window.mnuIsOpen = function(){ return $('mnu').classList.contains('on'); };
+  var LOAD = '<div class="emp">Загрузка…</div>';
+  function docRow(d){
+    var fs = String(d.files || 'pdf').split(','), ki = d.kind === 'full' ? 'Каталог' : (d.kind === 'coop' ? 'КП на сотрудничество' : 'Документ');
+    return '<div class="it"><b>' + esc(d.title) + '</b><div class="m">' + esc(ki) + (d.client ? ' · ' + esc(d.client) : '') + (d.items ? ' · позиций: ' + d.items : '') + ' · ' + dt(d.created_at) + '</div><div class="a">'
+      + (fs.indexOf('pdf') >= 0 ? '<a href="' + kpU(d.id, 'pdf') + '" download>PDF</a>' : '') + (fs.indexOf('xlsx') >= 0 ? '<a href="' + kpU(d.id, 'xlsx') + '" download>Excel</a>' : '')
+      + '<button onclick="askFil(\'Переделай документ «' + esc(String(d.title).replace(/'/g, '')) + '»' + (d.client ? ' для ' + esc(String(d.client).replace(/'/g, '')) : '') + ': \')">Попросить Фила переделать</button></div></div>';
+  }
+  function fileRow(f){
+    return '<div class="it"><b>' + esc(f.name) + '</b><div class="m">' + esc(f.kind || '') + ' · ' + dt(f.created_at) + (f.bytes ? ' · ' + Math.max(1, Math.round(f.bytes / 1024)) + ' КБ' : '') + '</div>'
+      + (f.preview ? '<div class="p">' + esc(String(f.preview).replace(/\s+/g, ' ')) + '…</div>' : '')
+      + '<div class="a">' + (f.path ? '<a href="' + fileU(f.id) + '" target="_blank">Открыть файл</a>' : '') + '<button onclick="fmFileText(\'' + f.id + '\')">Что прочитал Фил</button></div></div>';
+  }
+  function msgRow(m){
+    return '<div class="it click" onclick="convOpen(\'' + (m.conv || 'old') + '\')"><div class="m">' + esc(m.conv_title || 'Разговор') + ' · ' + dt(m.created_at) + '</div><div class="p"><b style="display:inline;font-size:.9rem">Вы:</b> ' + esc(String(m.said || '').substr(0, 200)) + '</div><div class="p"><b style="display:inline;font-size:.9rem">Фил:</b> ' + esc(String(m.reply || '').replace(/\[\[[^\]]*\]\]/g, '').substr(0, 260)) + '</div></div>';
+  }
+  function dealRow(d){ return '<div class="it click" onclick="location.href=\'/apps/crm/?from=fil&d=' + d.id + '\'"><b>' + esc(d.title || 'Сделка') + '</b><div class="m">' + esc(d.stage || '') + (d.client ? (d.stage ? ' · ' : '') + esc(d.client) : '') + (money(d.amount) ? ' · ' + money(d.amount) : '') + ' · ' + dt(d.updated_at) + '</div></div>'; }
+  window.askFil = function(txt){ pnlCloseAll(); mnuClose(); $('txt').value = txt; try { txtGrow(); $('txt').focus(); var n = txt.length; $('txt').setSelectionRange(n, n); } catch(e){} st('Допишите, что изменить, и отправьте'); };
+  var DF = {kind:'', days:0};
+  window.fmDocs = function(){ PST = []; pnlGo(docsDraw); };
+  window.docsF = function(k, v){ DF[k] = DF[k] === v ? (k === 'days' ? 0 : '') : v; docsDraw(); };
+  function docsDraw(){
+    var f = '<button class="' + (!DF.kind && !DF.days ? 'on' : '') + '" onclick="DFall()">Все</button><button class="' + (DF.kind === 'coop' ? 'on' : '') + '" onclick="docsF(\'kind\',\'coop\')">КП</button>'
+      + '<button class="' + (DF.kind === 'full' ? 'on' : '') + '" onclick="docsF(\'kind\',\'full\')">Каталоги</button><button class="' + (DF.days === 7 ? 'on' : '') + '" onclick="docsF(\'days\',7)">За неделю</button><button class="' + (DF.days === 30 ? 'on' : '') + '" onclick="docsF(\'days\',30)">За месяц</button>';
+    pnlShow('Документы', LOAD, f);
+    api('fm_docs', {kind:DF.kind, days:DF.days}).then(function(r){ var it = (r && r.ok && r.items) || [];
+      $('pnlB').innerHTML = it.length ? it.map(docRow).join('') : '<div class="emp">Документов пока нет. Попросите Фила: «Сделай КП для …»</div>'; }).catch(function(){ $('pnlB').innerHTML = '<div class="emp">Нет связи</div>'; });
+  }
+  window.DFall = function(){ DF = {kind:'', days:0}; docsDraw(); };
+  window.fmFiles = function(){ PST = []; pnlGo(filesDraw); };
+  function filesDraw(){
+    pnlShow('Файлы', LOAD);
+    api('fm_files', {}).then(function(r){ var it = (r && r.ok && r.items) || [];
+      $('pnlB').innerHTML = it.length ? it.map(fileRow).join('') : '<div class="emp">Здесь появятся фото и файлы, которые вы присылаете Филу</div>'; }).catch(function(){ $('pnlB').innerHTML = '<div class="emp">Нет связи</div>'; });
+  }
+  window.fmFileText = function(id){ pnlGo(function(){ pnlShow('Что прочитал Фил', LOAD);
+    api('fm_file_text', {id:id}).then(function(r){ if (!r || !r.ok) { $('pnlB').innerHTML = '<div class="emp">' + esc((r && r.error) || 'Ошибка') + '</div>'; return; }
+      $('pnlT').textContent = r.name; $('pnlB').innerHTML = '<div class="it"><div class="m">' + esc(r.kind || '') + '</div><div class="p">' + esc(r.text) + '</div></div>'; }); }); };
+  window.fmClients = function(){ PST = []; pnlGo(clientsDraw); };
+  function clientsDraw(){
+    pnlShow('Клиенты', LOAD);
+    api('fm_clients', {}).then(function(r){ var it = (r && r.ok && r.items) || [];
+      $('pnlB').innerHTML = it.length ? it.map(function(c){ return '<div class="it click" onclick="fmClient(this.dataset.n)" data-n="' + esc(c.name) + '"><b>' + esc(c.name) + '</b><div class="m">'
+        + [c.deals ? 'сделок: ' + c.deals : '', money(c.sum), c.docs ? 'документов: ' + c.docs : '', dt(c.at)].filter(Boolean).join(' · ') + '</div></div>'; }).join('')
+        : '<div class="emp">Клиенты появятся, когда в сделках или документах будет указан клиент</div>'; }).catch(function(){ $('pnlB').innerHTML = '<div class="emp">Нет связи</div>'; });
+  }
+  window.fmClient = function(n){ pnlGo(function(){ pnlShow(n, LOAD);
+    api('fm_client', {name:n}).then(function(r){ if (!r || !r.ok) { $('pnlB').innerHTML = '<div class="emp">' + esc((r && r.error) || 'Ошибка') + '</div>'; return; }
+      var h = '';
+      h += '<div class="sec">Сделки</div>' + (r.deals.length ? r.deals.map(dealRow).join('') : '<div class="emp">Сделок нет</div>');
+      h += '<div class="sec">Документы</div>' + (r.docs.length ? r.docs.map(docRow).join('') : '<div class="emp">Документов нет</div>');
+      if (r.files.length) h += '<div class="sec">Файлы</div>' + r.files.map(fileRow).join('');
+      if (r.msgs.length) h += '<div class="sec">Разговоры с Филом</div>' + r.msgs.map(msgRow).join('');
+      h += '<div class="it"><div class="a"><button onclick="askFil(\'По клиенту ' + esc(String(n).replace(/\'/g, '')) + ': \')">Спросить Фила про этого клиента</button></div></div>';
+      $('pnlB').innerHTML = h; }).catch(function(){ $('pnlB').innerHTML = '<div class="emp">Нет связи</div>'; }); }); };
+  window.fmSearch = function(){
+    var q = $('mq').value.trim(); if (q.length < 2) return; PST = [];
+    pnlGo(function(){ pnlShow('Поиск: ' + q, LOAD);
+      api('fm_search', {q:q}).then(function(r){ if (!r || !r.ok) { $('pnlB').innerHTML = '<div class="emp">' + esc((r && r.error) || 'Ошибка') + '</div>'; return; }
+        var h = '';
+        if (r.deals.length) h += '<div class="sec">Сделки</div>' + r.deals.map(dealRow).join('');
+        if (r.docs.length) h += '<div class="sec">Документы</div>' + r.docs.map(docRow).join('');
+        if (r.msgs.length) h += '<div class="sec">Разговоры</div>' + r.msgs.map(msgRow).join('');
+        if (r.files.length) h += '<div class="sec">Файлы</div>' + r.files.map(fileRow).join('');
+        $('pnlB').innerHTML = h || '<div class="emp">Ничего не нашлось</div>'; }).catch(function(){ $('pnlB').innerHTML = '<div class="emp">Нет связи</div>'; }); });
+  };
+
+  function attRender(){   /* №877 · вложения плитками с предпросмотром, как в Claude */
+    var X = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+    var D = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>';
+    $('att').innerHTML = ATT.map(function(a, i){
+      var ext = ((a.name || '').split('.').pop() || '').toLowerCase(); if (ext === (a.name || '').toLowerCase()) ext = '';
+      var body = a.thumb ? '<img src="' + a.thumb + '" alt="">' : '<div class="doc">' + D + '<span>' + esc(a.name) + '</span></div>';
+      return '<div class="tile' + (a.err ? ' err' : '') + '" title="' + esc(a.name + (a.err ? ' — ' + a.err : '')) + '">' + body +
+        (ext && a.thumb ? '<span class="ext">' + esc(ext) + '</span>' : '') + (a.busy ? '<div class="ld"><i></i></div>' : '') +
+        (a.err ? '<div class="em">' + esc(a.err) + '</div>' : '') + '<button class="x" onclick="attDel(' + i + ')" title="Убрать">' + X + '</button></div>';
+    }).join('');
+    if (window.goState) goState();
+  }
+  function attThumb(a, f){   // предпросмотр: фото — само фото, PDF — первая страница
+    var ext = ((f.name || '').split('.').pop() || '').toLowerCase();
+    if (/^image\//.test(f.type || '') && !/heic|heif/.test(f.type || '')) { try { a.thumb = URL.createObjectURL(f); } catch(e){} return; }
+    if (ext !== 'pdf' && f.type !== 'application/pdf') return;
+    f.arrayBuffer().then(function(buf){ return pdfLib().then(function(L){ return L.getDocument({data:buf}).promise; }); }).then(function(doc){ return doc.getPage(1); }).then(function(pg){
+      var v = pg.getViewport({scale:1}), k = 200 / Math.max(v.width, v.height), vp = pg.getViewport({scale:k}), c = document.createElement('canvas');
+      c.width = Math.round(vp.width); c.height = Math.round(vp.height); c.getContext('2d').fillStyle = '#fff'; c.getContext('2d').fillRect(0, 0, c.width, c.height);
+      return pg.render({canvasContext:c.getContext('2d'), viewport:vp}).promise.then(function(){ a.thumb = c.toDataURL('image/jpeg', 0.8); attRender(); });
+    }).catch(function(){});
+  }
+  window.attDel = function(i){ var a = ATT[i]; if (a && a.thumb && /^blob:/.test(a.thumb)) try { URL.revokeObjectURL(a.thumb); } catch(e){} ATT.splice(i, 1); attRender(); };
+  function b64(buf){ var u8 = new Uint8Array(buf), s = '', CH = 0x8000; for (var i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH)); return btoa(s); }
+  function shrink(file){   // фото → JPEG до 2000 точек, чтобы быстро ушло и хорошо распозналось
+    return new Promise(function(ok, no){
+      var img = new Image(), u = URL.createObjectURL(file);
+      img.onload = function(){ var k = Math.min(1, 2000 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL('image/jpeg', 0.88).split(',')[1]); };
+      img.onerror = function(){ URL.revokeObjectURL(u); no(); }; img.src = u;
+    });
+  }
+  var PDFJS = null;
+  function pdfLib(){
+    if (PDFJS) return PDFJS;
+    PDFJS = new Promise(function(ok, no){ var s = document.createElement('script'); s.src = 'lib/pdf.min.js'; s.onload = function(){ pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js'; ok(pdfjsLib); }; s.onerror = no; document.head.appendChild(s); });
+    return PDFJS;
+  }
+  function pdfText(buf){   // текст PDF читаем прямо в телефоне; если это скан без текста — вернём ''
+    return pdfLib().then(function(L){ return L.getDocument({data:buf}).promise; }).then(function(doc){
+      var n = Math.min(doc.numPages, 40), out = [], p = Promise.resolve();
+      for (var i = 1; i <= n; i++) (function(i){ p = p.then(function(){ return doc.getPage(i).then(function(pg){ return pg.getTextContent(); }).then(function(tc){
+        var last = null, line = ''; tc.items.forEach(function(it){ var y = Math.round(it.transform[5]); if (last !== null && Math.abs(y - last) > 3) { out.push(line); line = ''; } line += (line && !/\s$/.test(line) ? ' ' : '') + it.str; last = y; });
+        out.push(line); out.push('— стр. ' + i + ' —'); }); }); })(i);
+      return p.then(function(){ return out.join('\n').replace(/\n{3,}/g, '\n\n').trim(); });
+    });
+  }
+  function upload(a, file){
+    var name = file.name || ('Фото ' + new Date().toTimeString().substr(0, 5) + '.jpg'), ext = (name.split('.').pop() || '').toLowerCase();
+    var send = function(d){ return api('fc_file', d).then(function(r){ return (!r || !r.ok) && d.data && d.text ? api('fc_file', {name:d.name, text:d.text}) : r; }).then(function(r){ a.busy = false; if (!r || !r.ok) { a.err = (r && r.error) || 'не прочитался'; } else { a.id = r.id; a.kind = r.kind; a.chars = r.chars; } attRender(); return a; }); };
+    if (/^image\//.test(file.type) || /^(jpe?g|png|heic|webp)$/.test(ext)) return shrink(file).then(function(d){ return send({name:name, mime:'image/jpeg', data:d}); }, function(){ return file.arrayBuffer().then(function(b){ return send({name:name, mime:file.type, data:b64(b)}); }); });
+    return file.arrayBuffer().then(function(buf){
+      if (ext === 'pdf') return pdfText(buf.slice(0)).then(function(t){ return t.replace(/— стр\. \d+ —/g, '').trim().length > 40 ? send(buf.byteLength <= 12582912 ? {name:name, text:t, mime:'application/pdf', data:b64(buf)} : {name:name, text:t}) : send({name:name, mime:'application/pdf', data:b64(buf)}); },
+        function(){ return send({name:name, mime:'application/pdf', data:b64(buf)}); });
+      return send({name:name, mime:file.type, data:b64(buf)});
+    });
+  }
+  window.gotFiles = function(inp){
+    var fs = [].slice.call(inp.files || []); inp.value = ''; if (!fs.length) return;
+    var jobs = fs.slice(0, 6).map(function(f){ var a = {name:f.name || 'Фото', busy:true}; ATT.push(a); attThumb(a, f); return upload(a, f).catch(function(){ a.busy = false; a.err = 'не прочитался'; attRender(); }); });
+    attRender(); st('Читаю ' + (fs.length > 1 ? 'файлы' : 'файл') + '…');
+    Promise.all(jobs).then(function(){
+      var ok = ATT.filter(function(a){ return a.id; });
+      if (!ok.length) { st('Не получилось прочитать — попробуйте другое фото или файл'); return; }
+      var q = $('txt').value.trim();
+      if (q) { $('txt').value = ''; run(q); }
+      else st('Прочитал. Скажите или напишите, что сделать, — или нажмите «Отправить», и Фил сам разберёт');
+    });
+  };
+  /* №34 · ход работы «как у Claude»: строка «что делаю сейчас», нажали — раскрылся список шагов */
+  var STPO = {};
+  window.stpHtml = function(key, steps, live, label){
+    steps = steps || []; var cur = steps.length ? steps[steps.length - 1] : null;
+    var head = live ? '<span class="fdots"><i></i><i></i><i></i></span><span>' + esc(cur ? cur.t + '…' : 'Думаю…') + '</span>'
+                    : '<span>' + esc((label || 'Что делал Фил') + ' · шагов: ' + steps.length) + '</span>';
+    var list = steps.map(function(x){ return '<li class="' + (x.run ? 'run' : '') + '">' + esc(x.t) + (x.d ? '<small>' + esc(x.d) + '</small>' : '') + '</li>'; }).join('');
+    return '<div class="stp' + (STPO[key] ? ' open' : '') + '" data-k="' + key + '"><button type="button" class="stp-h">' + head + (steps.length ? '<svg class="chev" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>' : '') + '</button><ol>' + list + '</ol></div>';
+  };
+  document.addEventListener('click', function(e){
+    var h = e.target.closest && e.target.closest('.stp-h'); if (!h) return;
+    var b = h.parentNode; b.classList.toggle('open'); STPO[b.getAttribute('data-k')] = b.classList.contains('open'); if (STPO[b.getAttribute('data-k')]) try { b.scrollIntoView({block:'nearest', behavior:'smooth'}); } catch(e){}
+  });
+  /* №34 · поставить Фила на рабочий стол компьютера (и на экран телефона из браузера) */
+  var INSTEV = null, INAPP = /ITCApp/.test(navigator.userAgent || '');
+  var STANDALONE = false; try { STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch(e){}
+  var DESK = false; try { DESK = matchMedia('(pointer:fine)').matches && !/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || ''); } catch(e){}
+  if (!INAPP && !STANDALONE && DESK) $('inst').style.display = 'inline-flex';      /* №149: на компьютере кнопка видна всегда */
+  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); INSTEV = e; if (!INAPP) $('inst').style.display = 'inline-flex'; });
+  window.addEventListener('appinstalled', function(){ INSTEV = null; $('inst').style.display = 'none'; });
+  window.instFil = function(){
+    if (INSTEV) { INSTEV.prompt(); INSTEV.userChoice.then(function(r){ if (r && r.outcome === 'accepted') { INSTEV = null; $('inst').style.display = 'none'; } }); return; }
+    /* браузер сам не предложил — показываем, как поставить именно в этом браузере, и даём готовый значок */
+    var ua = navigator.userAgent || '', how;
+    if (/YaBrowser/.test(ua)) how = '<li>Справа в адресной строке нажмите значок <b>«Установить»</b> (экран со стрелкой), если он есть.</li><li>Или нажмите <b>три полоски</b> вверху справа → <b>«Дополнительно»</b> → <b>«Установить приложение»</b> (или «Создать ярлык»).</li>';
+    else if (/Edg\//.test(ua)) how = '<li>Нажмите <b>три точки</b> вверху справа → <b>«Приложения»</b> → <b>«Установить этот сайт как приложение»</b>.</li>';
+    else if (/Chrome\//.test(ua)) how = '<li>Нажмите <b>три точки</b> вверху справа → <b>«Трансляция, сохранение и отправка»</b> → <b>«Установить страницу как приложение»</b> (или «Создать ярлык» с галочкой «Открывать в отдельном окне»).</li>';
+    else how = '<li>Откройте Фила в браузере Яндекс, Chrome или Edge — там Фила можно установить как программу.</li>';
+    $('cfgIn').innerHTML = '<b style="font-size:1.05rem">Фил на рабочий стол</b>'
+      + '<p style="opacity:.85;margin:8px 0">Способ 1 — как программа в отдельном окне:</p><ol style="margin:0 0 10px 18px;padding:0;line-height:1.45">' + how + '</ol>'
+      + '<p style="opacity:.85;margin:8px 0">Способ 2 — готовый значок: скачайте файл и перетащите его из «Загрузок» на рабочий стол. Фил откроется в браузере.</p>'
+      + '<button class="inst" style="display:inline-flex" onclick="instUrl()">Скачать значок Фила</button> '
+      + '<button class="inst" style="display:inline-flex" onclick="$(\'cfg\').style.display=\'none\'">Закрыть</button>';
+    $('cfg').style.display = 'flex';
+  };
+  window.instUrl = function(){
+    var body = '[InternetShortcut]\r\nURL=' + location.origin + '/apps/fil/\r\nIconFile=' + location.origin + '/apps/fil/fil.ico\r\nIconIndex=0\r\n';
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], {type:'application/octet-stream'})); a.download = 'Фил.url';
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  };
+  function run(text){
+    text = String(text || '').trim();
+    if (!text && ATT.some(function(a){ return a.id; })) text = 'Посмотри приложенный файл: что это и что с ним сделать';
+    if (!text) { st('Ничего не расслышал — скажите ещё раз'); return; }
+    if (ATT.some(function(a){ return a.busy; })) { st('Подождите — Фил ещё читает файл'); setTimeout(function(){ run(text); }, 1500); return; }
+    add('me', text); BUSY = true; st('Фил думает…'); $('mic').classList.add('busy'); busyMark();
+    var TY = add('fil', ''), RID = Math.random().toString(36).slice(2, 10) + Date.now().toString(36), PK = 'p' + RID, PT = null, LIVE = true;
+    var tyDraw = function(steps){ if (!LIVE) return; var f = $('feed'), low = f.scrollHeight - f.scrollTop - f.clientHeight < 80; TY.querySelector('div').innerHTML = stpHtml(PK, steps, true); if (low) f.scrollTop = 1e9; };
+    var poll = function(){ PT = setTimeout(function(){ api('fc_prog', {rid:RID}).then(function(p){ if (LIVE && p && p.ok) tyDraw(p.steps); }).catch(function(){}).then(function(){ if (LIVE) poll(); }); }, 1300); };
+    tyDraw([]); poll();
+    var fl = ATT.filter(function(a){ return a.id; }).map(function(a){ return a.id; });
+    if (fl.length) { ATT = []; attRender(); }
+    api('fc_cmd', {text:text, files:fl, rid:RID}).then(function(r){
+      LIVE = false; clearTimeout(PT); if (r && r.conv) convSet(r.conv);
+      BUSY = false; $('mic').classList.remove('busy'); st('Нажмите микрофон и скажите, что сделать'); TY.remove(); busyMark();
+      if (!r || !r.ok) { add('fil', (r && r.error) || 'Ошибка'); return; }
+      var stpAdd = function(bb){ if (r.steps && r.steps.length) { var w = document.createElement('div'); w.innerHTML = stpHtml(PK, r.steps, false); var d = bb.querySelector('div'); d.insertBefore(w.firstChild, d.firstChild); } };
+      if (r.do === 'task' && r.task) { var bt = add('fil', r.say); stpAdd(bt); taskAttach(bt, r.task); speak(r.say); return; }
+      var src = {yandex:'Яндекс Вебмастер', companies:'наши компании', web:'интернет', page:'сайты', deals:'сделки', deal:'карточку сделки', clients:'клиентов', suppliers:'поставщиков', orders:'заказы магазина', money:'деньги', cargo:'грузы в Китае', team:'сотрудников', chats:'переписку с фабриками'};
+      var lk = (r.looked || []).filter(function(x, i, z){ return z.indexOf(x) === i; }).map(function(x){ return src[x] || x; });
+      var fb = add('fil', r.say + (lk.length && !(r.steps && r.steps.length) ? '\n(Посмотрел: ' + lk.join(', ') + ')' : ''), r.deal); stpAdd(fb); speak(r.say);
+      if (r.undo) showUndo(r.undo, r.say);
+    }).catch(function(){
+      /* №160 · долгий ответ: связь оборвалась, а Фил на сервере продолжает — ждём его ответ в истории */
+      st('Фил ещё работает — ответ появится здесь');
+      var t0 = Date.now(), want = String(text).replace(/\s+/g, ' ').trim();
+      var fin = function(msg){ LIVE = false; clearTimeout(PT); BUSY = false; TY.remove(); busyMark(); $('mic').classList.remove('busy'); st(msg); };
+      var wait = function(){ setTimeout(function(){
+        api('fc_hist', {conv: CONV === 'new' ? 'last' : CONV}).then(function(r){
+          if (r && r.conv) convSet(r.conv);
+          var it = (r && r.ok && r.items) || [], last = it[it.length - 1];
+          if (last && String(last.said || '').replace(/\s+/g, ' ').trim() === want) { fin('Нажмите микрофон и скажите, что сделать'); histDraw(it); speak(last.reply); return; }
+          if (Date.now() - t0 > 600000) { fin('Фил не ответил — попробуйте ещё раз'); return; }
+          wait();
+        }).catch(function(){ if (Date.now() - t0 > 600000) fin('Нет связи — попробуйте ещё раз'); else wait(); });
+      }, 6000); };
+      wait();
+    });
+  }
+  function histDraw(items){ TK = {}; $('feed').innerHTML = '';
+    items.forEach(function(x){ if (x.kind === 'task_done') { add('fil', 'Закончил задачу «' + String(x.said || '').replace(/^Задача: /, '') + '».\n' + x.reply, '', x.created_at); return; } add('me', x.said, '', x.created_at); add('fil', x.reply, x.deal_id, x.created_at); });
+    tasksLoad(); }
+  /* ===== №24 · большие задачи Фил делает в фоне: здесь виден ход работы ===== */
+  var TK = {}, TKT = null;
+  function busyMark(){ var w = BUSY || Object.keys(TK).some(function(id){ return TK[id].st === 'work'; }); document.documentElement.classList.toggle('fil-busy', w); $('hsub').textContent = w ? (BUSY ? 'Думает…' : 'Работает над задачей…') : 'Виртуальный руководитель ИТК'; }
+  var TKS = {work:'В работе', done:'Готово', stop:'Остановлено', fail:'Не получилось'};
+  function taskHtml(k){
+    var info = TKS[k.status] + (k.steps ? ' · шагов: ' + k.steps : '') + (k.added ? ' · занесено клиентов: ' + k.added : '');
+    return '<b>' + esc(k.title) + '</b><div class="tk-s">' + (k.status === 'work' ? '<span class="fdots"><i></i><i></i><i></i></span>' : '<i></i>') + esc(info) + '</div>' + (k.status === 'work' ? '<div class="fbar"></div>' : '')
+      + ((k.prog || []).length ? stpHtml('t' + k.id, k.prog.map(function(x, i, z){ return {t: x.at + ' · ' + x.t, run: k.status === 'work' && i === z.length - 1}; }), k.status === 'work', 'Ход работы') : (k.status === 'work' ? '<ul>' + (k.plan || []).slice(0, 4).map(function(x){ return '<li>План: ' + esc(x) + '</li>'; }).join('') + '</ul>' : ''))
+      + (k.status === 'work' ? '<button onclick="taskStop(\'' + k.id + '\')">Остановить</button>' : '')
+      + (k.result ? '<div class="tk-r">' + esc(kpSplit(k.result).t) + '</div>' + kpHtml(kpSplit(k.result).kp) + edHtml(kpSplit(k.result).ed) : '')
+      + (k.status !== 'work' && k.added ? '<button onclick="location.href=\'/apps/eco/\'">Открыть клиентов в Экосистеме</button>' : '');
+  }
+  function taskAttach(bubble, k){
+    var box = document.createElement('div'); box.className = 'tk ' + k.status; box.innerHTML = taskHtml(k);
+    (bubble.querySelector('div') || bubble).appendChild(box); TK[k.id] = {el:box, st:k.status}; $('feed').scrollTop = 1e9; busyMark(); taskPoll();
+  }
+  function taskPoll(){
+    clearTimeout(TKT);
+    var ids = Object.keys(TK).filter(function(id){ return TK[id].st === 'work'; }); if (!ids.length) return;
+    TKT = setTimeout(function(){
+      ids.forEach(function(id){ api('ft_get', {id:id}).then(function(r){
+        if (!r || !r.ok || !TK[id]) return; var k = r.task, was = TK[id].st;
+        TK[id].st = k.status; TK[id].el.className = 'tk ' + k.status; TK[id].el.innerHTML = taskHtml(k);
+        if (was === 'work' && k.status !== 'work') { busyMark(); if (k.result) speak(k.result); }
+      }).catch(function(){}).then(taskPoll); });
+    }, 6000);
+  }
+  window.taskStop = function(id){ api('ft_stop', {id:id}).then(function(r){ if (r && r.ok && TK[id]) { TK[id].st = r.task.status; TK[id].el.className = 'tk ' + r.task.status; TK[id].el.innerHTML = taskHtml(r.task); busyMark(); } }); };
+  function tasksLoad(){
+    var want = (location.search.match(/[?&]task=([\w]+)/) || [])[1] || '';
+    api('ft_list', {}).then(function(r){
+      if (!r || !r.ok) return;
+      (r.items || []).filter(function(k){ return k.status === 'work' || k.id === want; }).reverse().forEach(function(k){ if (!TK[k.id]) taskAttach(add('fil', k.status === 'work' ? 'Работаю над задачей:' : 'Задача:', '', k.at), k); });
+    }).catch(function(){});
+  }
+  /* №29 · вставить скриншот или файл прямо в строку: Ctrl+V / «Вставить» */
+  document.addEventListener('paste', function(e){
+    var cd = e.clipboardData || window.clipboardData; if (!cd) return;
+    var fs = [].slice.call(cd.files || []);
+    if (!fs.length && cd.items) [].forEach.call(cd.items, function(it){ if (it.kind === 'file') { var f = it.getAsFile(); if (f) fs.push(f); } });
+    if (!fs.length) return;                      // обычный текст вставится как обычно
+    e.preventDefault();
+    fs = fs.map(function(f, i){ return f.name && f.name !== 'image.png' ? f : new File([f], 'Скриншот ' + new Date().toTimeString().substr(0, 5) + (fs.length > 1 ? ' (' + (i + 1) + ')' : '') + '.' + ((f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')), {type: f.type}); });
+    gotFiles({files: fs, value: ''});
+  });
+  /* перетащить файл в окно на компьютере */
+  document.addEventListener('dragover', function(e){ e.preventDefault(); });
+  document.addEventListener('drop', function(e){ e.preventDefault(); var fs = [].slice.call((e.dataTransfer && e.dataTransfer.files) || []); if (fs.length) gotFiles({files: fs, value: ''}); });
+  window.sendText = function(){ if (BUSY) return; var v = $('txt').value; $('txt').value = ''; txtGrow(); run(v); };
+  /* №239 · панель ввода «как у Claude»: поле растёт по тексту, стрелка горит, когда есть что отправить */
+  window.txtGrow = function(){ var t = $('txt'); t.style.height = 'auto'; t.style.height = Math.min(140, t.scrollHeight) + 'px'; goState(); };
+  function goState(){ var has = $('txt').value.trim() !== '' || ATT.some(function(a){ return a.id || a.busy; }); $('go').classList.toggle('on', has); }
+  window.goState = goState;
+
+  /* слушать: телефон сам распознаёт (в приложении ИТК) или запись → Яндекс */
+  FilVoice.init(api); FilVoice.syncBtns();
+  /* №239 · микрофон «как у Claude»:
+     нажали — пошла запись: внизу «отменить», волна, «стоп» (текст в поле, можно поправить) и «отправить»;
+     зажали и держите — говорите, отпустили — сразу отправилось; сам замолчал надолго — тоже отправится */
+  var RM = 'send', HOLD = false, HT = 0, WV = [];
+  function waveInit(native){ var w = $('wave'); w.className = 'wave' + (native ? ' auto' : ''); var h = ''; for (var i = 0; i < 28; i++) h += '<i' + (native ? ' style="animation-delay:' + ((i * 97) % 1000) + 'ms"' : '') + '></i>'; w.innerHTML = h; WV = [].slice.call(w.children); }
+  function waveLevel(l){ if (!WV.length) return; for (var i = 0; i < WV.length - 1; i++) WV[i].style.height = WV[i + 1].style.height; WV[WV.length - 1].style.height = Math.max(4, Math.min(36, Math.round(l * 900))) + 'px'; }
+  function recUi(on){ $('rowRec').hidden = !on; $('rowIdle').hidden = on; }
+  function micReset(){ document.documentElement.classList.remove('fil-listen'); $('hsub').textContent = 'Виртуальный руководитель ИТК'; $('mic').classList.remove('rec', 'hold'); recUi(false); }
+  function micGo(){
+    if (BUSY || FilVoice.listening()) return;
+    RM = 'send';
+    FilVoice.listen({
+      keep:true,
+      start:function(mode){ document.documentElement.classList.add('fil-listen'); $('hsub').textContent = 'Слушает…'; waveInit(mode === 'native'); if (!HOLD) recUi(true); st('Говорите сколько нужно. Нажмите красную кнопку ещё раз — и Фил получит'); },
+      level:function(l){ waveLevel(l); },
+      partial:function(t){ st('«' + t + '»'); },
+      busy:function(){ micReset(); st('Распознаю…'); },
+      final:function(t){ micReset(); if (RM === 'cancel') { st('Запись отменена'); return; }
+        if (!t) { st('Ничего не расслышал — нажмите и скажите ещё раз'); return; }
+        if (RM === 'field') { var x = $('txt'); x.value = (x.value.trim() ? x.value.trim() + ' ' : '') + t; txtGrow(); try { x.focus(); } catch(e){} st('Поправьте текст и нажмите стрелку'); return; }
+        var pre = $('txt').value.trim(); $('txt').value = ''; txtGrow(); run(pre ? pre + ' ' + t : t); },
+      error:function(m){ micReset(); if (RM !== 'cancel') st(m); }
+    });
+  }
+  window.recCancel = function(){ RM = 'cancel'; FilVoice.cancel(); micReset(); st('Запись отменена'); };
+  window.recStop = function(){ RM = 'field'; FilVoice.stop(); };
+  window.recSend = function(){ RM = 'send'; FilVoice.stop(); };
+  window.micTap = function(){ if (FilVoice.listening()) { recSend(); return; } HOLD = false; micGo(); };
+  /* №303 · микрофон: нажали один раз — говорите сколько нужно (держать не надо), нажали ещё раз — ушло Филу */
+  (function(){
+    var m = $('mic'), last = 0;
+    var tap = function(e){ if (e) e.preventDefault(); var t = Date.now(); if (t - last < 450) return; last = t;
+      if (BUSY) return; if (FilVoice.listening()) { recSend(); return; } HOLD = false; micGo(); };
+    m.addEventListener('click', tap);
+    m.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+    var r = $('recGo'); if (r) r.addEventListener('click', function(e){ e.preventDefault(); var t = Date.now(); if (t - last < 450) return; last = t; recSend(); });
+  })();
+  /* ===== №18 · настройки Фила (руководитель): модель, памятка, сравнение моделей ===== */
+  var CFG = null;
+  function cfgRender(){
+    var c = CFG;
+    $('cfgIn').innerHTML = '<h3>Настройки Фила</h3>'
+      + '<div class="r" style="margin:-4px 0 6px"><button class="cb s" onclick="$(\'cfg\').style.display=\'none\';capsOpen()">Что умеет Фил — рассказать голосом</button></div>'
+      + dsBlock(c)
+      + '<h4>Модель — «мозги» Фила</h4><p>На какой модели думает Фил. Если выбранная не ответит, Фил сам перейдёт на запасную. Сравнить модели можно внизу.</p>'
+      + '<select id="cfM">' + c.models.map(function(m){ return '<option value="' + esc(m.id) + '"' + (m.id === c.model ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select>'
+      + '<div class="r"><button class="cb" onclick="cfgSave(\'model\')">Сохранить модель</button></div>'
+      + '<h4>Как Фил обращается к людям</h4><p>Впишите имя и отчество — Фил будет обращаться так к сотруднику и так называть его в поручениях. Вас Фил называет «Босс», а при сотрудниках — по имени и отчеству.</p>'
+      + (c.staff || []).map(function(s, i){ return '<div class="nmr"><span>' + esc(s.name) + (s.role === 'boss' ? ' (вы)' : '') + '</span><input data-ph="' + esc(s.phone) + '" class="nmi" placeholder="Имя Отчество" value="' + esc(s.io && s.io !== s.name ? s.io : '') + '"></div>'; }).join('')
+      + '<div class="r"><button class="cb" onclick="cfgSave(\'names\')">Сохранить</button></div>'
+      + '<h4>Памятка руководителя</h4><p>Правила ИТК, которые Фил читает перед каждым ответом. Можно править здесь или сказать Филу: «Фил, запомни: …».</p>'
+      + '<textarea id="cfMemo">' + esc(c.memo) + '</textarea>'
+      + '<div class="r"><button class="cb" onclick="cfgSave(\'memo\')">Сохранить памятку</button><button class="cb s" onclick="cfgSave(\'reset\')">Вернуть исходную</button></div>'
+      + '<h4>Что Фил выучил из поправок</h4><p>Когда вы поправляете Фила («нет, я имел в виду SNADI»), он сам записывает правило сюда и дальше не ошибается. Лишнее можно стереть.</p>'
+      + '<textarea id="cfLearn" placeholder="Пока ничего — Фил запишет сюда, когда его поправят">' + esc(c.learn || '') + '</textarea>'
+      + '<div class="r"><button class="cb" onclick="cfgSave(\'learn\')">Сохранить</button></div>'
+      + '<h4>Сравнить модели</h4><p>Один и тот же вопрос — нескольким моделям. Действия при сравнении не выполняются, только ответы.</p>'
+      + '<input id="cfQ" placeholder="Например: что у нас есть для гостиницы на 200 номеров?">'
+      + '<div class="mc">' + c.models.map(function(m, i){ return '<label><input type="checkbox" value="' + esc(m.id) + '"' + (i < 2 ? ' checked' : '') + '> ' + esc(m.name) + '</label>'; }).join('') + '</div>'
+      + '<div class="r"><button class="cb" id="cfGo" onclick="cfgCompare()">Сравнить</button></div><div id="cfRes"></div>'
+      + '<h4>Работа в фоне</h4><p>Чтобы Фил доделывал большие задачи, даже когда приложение закрыто, сервер раз в минуту будит его по особому адресу. Адрес вставляется один раз в планировщик хостинга.</p>'
+      + '<div class="r"><button class="cb" onclick="cronShow()">Показать адрес для планировщика</button></div><div id="cfCron"></div>';
+  }
+  /* №40 · DeepSeek напрямую: ключ вводит руководитель, назад сервер его не показывает */
+  function dsBlock(c){
+    var d = c.ds || {}, b = d.bal || null, h = '<h4>DeepSeek напрямую</h4>';
+    if (!d.has) return h + '<p>Полная модель DeepSeek, счёт компании Jinjia. Создайте ключ на platform.deepseek.com (раздел API keys) и вставьте сюда. Ключ сохранится на сервере и больше нигде не будет показан.</p>'
+      + '<input id="cfDs" type="password" autocomplete="off" placeholder="Ключ DeepSeek (начинается с sk-)">'
+      + '<div class="r"><button class="cb" onclick="dsSave()">Сохранить ключ</button></div>';
+    return h + '<p style="color:#bbed21">Ключ сохранён, Фил думает через DeepSeek.</p>'
+      + (b ? (b.err ? '<p>' + esc(b.err) + '</p>' : '<p>Баланс: <b>' + esc(b.sum) + ' ' + (b.cur === 'CNY' ? '¥' : esc(b.cur)) + '</b> · проверено ' + esc(b.at) + (parseFloat(b.sum) < 10 ? ' · мало, пора пополнить' : '') + '</p>') : '')
+      + '<div class="r"><button class="cb s" onclick="dsFresh()">Обновить баланс</button><button class="cb s" onclick="dsDel()">Убрать ключ</button></div>';
+  }
+  window.dsSave = function(){
+    var k = ($('cfDs').value || '').trim(); if (!k) { st('Вставьте ключ'); return; }
+    st('Проверяю ключ у DeepSeek…');
+    api('fil_cfg', {ds_key:k}).then(function(r){ if (r && r.ok) { CFG = r; cfgRender(); st('Ключ принят, Фил думает через DeepSeek'); } else st((r && r.error) || 'Ошибка'); });
+  };
+  window.dsFresh = function(){ api('fil_cfg', {ds_fresh:1}).then(function(r){ if (r && r.ok) { CFG = r; cfgRender(); st('Баланс обновлён'); } }); };
+  window.dsDel = function(){ api('fil_cfg', {ds_key:'-'}).then(function(r){ if (r && r.ok) { CFG = r; cfgRender(); st('Ключ убран, Фил вернулся на модели Яндекса'); } }); };
+  /* №43 · планировщик: свои задачи + шаги из сделок, напоминания на телефон */
+  var PL = null, PL_ALL = false, PL_G = false;
+  var PIC = {ok:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>', snz:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.88 3.39 6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM12 4a9 9 0 1 0 .001 18.001A9 9 0 0 0 12 4zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7zM9 11h3.63L9 15.2V17h6v-2h-3.63L15 10.8V9H9v2z"/></svg>', del:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>', go:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>', rep:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>'};
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function ymd(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function plDayName(day){
+    var t = new Date(), td = ymd(t), tm = new Date(t.getTime() + 864e5), tmd = ymd(tm);
+    if (day === td) return 'Сегодня'; if (day === tmd) return 'Завтра';
+    var d = new Date(day + 'T12:00:00'), wd = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'], mn = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+    return d.getDate() + ' ' + mn[d.getMonth()] + ', ' + wd[d.getDay()];
+  }
+  window.plOpen = function(g){ if (g !== undefined) PL_G = !!g; $('plan').style.display = 'flex'; if (!PL) $('planIn').innerHTML = '<h3>Планировщик</h3><p>Загрузка…</p>'; else plDraw(); plLoad(); };
+  function plLoad(){ api('pl_list', {all: PL_ALL ? 1 : 0, given: PL_G ? 1 : 0}).then(function(r){ if (r && r.ok) { PL = r; plDraw(); } else $('planIn').innerHTML = '<h3>Планировщик</h3><p>' + esc((r && r.error) || 'Ошибка') + '</p>'; }).catch(function(){ $('planIn').innerHTML = '<h3>Планировщик</h3><p>Нет связи</p>'; }); }
+  function plDraw(){
+    var r = PL, now = new Date(), d0 = ymd(now), t0 = pad2(now.getHours() + 1 > 23 ? 23 : now.getHours() + 1) + ':00';
+    var rep = Object.keys(r.repeat || {}).map(function(k){ return '<option value="' + k + '">' + esc(r.repeat[k]) + '</option>'; }).join('');
+    var who = (r.staff || []).length ? '<select id="plFor" class="w"><option value="">Себе</option>' + r.staff.map(function(s){ return '<option value="' + esc(s.phone) + '">' + esc(s.name) + '</option>'; }).join('') + '</select>' : '';
+    var tabs = '<div class="pl-tabs"><button class="' + (PL_G ? '' : 'on') + '" onclick="PL_G=false;plLoad()">Мои задачи</button><button class="' + (PL_G ? 'on' : '') + '" onclick="PL_G=true;plLoad()">Мои поручения</button></div>';
+    if (PL_G) { $('planIn').innerHTML = '<h3>Планировщик</h3>' + tabs + plGiven(r); return; }
+    var h = '<h3>Планировщик</h3>' + tabs + '<p>Свои задачи и шаги по сделкам. Можно просто сказать Филу: «напомни в четверг в 11:00 позвонить в банк» или «поручи бухгалтеру прислать документы».</p>'
+      + '<div class="pl-add"><input id="plT" class="w" placeholder="Что сделать"><input id="plD" type="date" value="' + d0 + '"><input id="plH" type="time" value="' + t0 + '">'
+      + '<select id="plR"><option value="0">Напомнить в срок</option><option value="15" selected>За 15 минут</option><option value="30">За 30 минут</option><option value="60">За час</option><option value="1440">За день</option><option value="-1">Без напоминания</option></select>'
+      + '<select id="plP">' + rep + '</select>' + who + '<button class="cb w" onclick="plAdd()">Добавить</button></div>'
+      + ((r.staff || []).length ? '<label class="pl-tg"><input type="checkbox" ' + (PL_ALL ? 'checked' : '') + ' onchange="PL_ALL=this.checked;plLoad()"> Показать задачи всех сотрудников</label>' : '');
+    var it = r.items || [], last = '';
+    if (!it.length) h += '<p style="margin-top:14px">Пока ничего не запланировано.</p>';
+    it.forEach(function(x){
+      var g = x.late && x.day < d0 ? 'late' : x.day;
+      if (g !== last) { h += '<div class="pl-day' + (g === 'late' ? ' late' : '') + '">' + (g === 'late' ? 'Просрочено' : plDayName(x.day)) + '</div>'; last = g; }
+      var bt = x.kind === 'deal' ? '<a href="/apps/crm/?from=fil&d=' + encodeURIComponent(x.deal) + '" title="Открыть сделку">' + PIC.go + '</a>'
+        : '<button title="Сделано" onclick="' + (x.from ? 'plReply(\'' + x.id + '\')' : 'plDo(\'pl_done\',\'' + x.id + '\')') + '">' + PIC.ok + '</button><button title="Отложить на час" onclick="plDo(\'pl_snooze\',\'' + x.id + '\')">' + PIC.snz + '</button><button title="Удалить" onclick="plDo(\'pl_del\',\'' + x.id + '\')">' + PIC.del + '</button>';
+      h += '<div class="pl-it' + (x.late ? ' late' : '') + '"><div class="pl-tm">' + esc(x.time || (x.kind === 'deal' ? 'день' : 'весь день')) + '</div><div class="pl-tx"><b>' + esc(x.title) + '</b>'
+        + (x.from ? '<small class="pl-from">Поручение от ' + esc(x.from) + '</small>' : '')
+        + (x.kind === 'deal' ? '<small>Сделка: ' + esc(x.note) + '</small>' : (x.note ? '<small>' + esc(x.note) + '</small>' : ''))
+        + ((x.rep || x.who && PL_ALL) ? '<small>' + (x.rep ? esc((r.repeat || {})[x.rep] || '') : '') + (x.rep && x.who && PL_ALL ? ' · ' : '') + (x.who && PL_ALL ? esc(x.who) : '') + '</small>' : '')
+        + '<div class="pl-rp" id="rp' + x.id + '"></div></div><div class="pl-bt">' + bt + '</div></div>';
+    });
+    $('planIn').innerHTML = h;
+  }
+  function plGiven(r){
+    var it = r.items || [];
+    if (!it.length) return '<p style="margin-top:14px">Поручений пока нет. Скажите Филу, например: «поручи бухгалтеру прислать копии документов на Джинью до пятницы».</p>';
+    return it.map(function(x){
+      var stt = x.done ? '<span class="pl-ok">Выполнено ' + esc(x.done_at) + '</span>' : (x.late ? '<span class="pl-late">Просрочено</span>' : '<span class="pl-wait">В работе</span>');
+      return '<div class="pl-it' + (x.late ? ' late' : '') + '"><div class="pl-tx"><b>' + esc(x.title) + '</b><small>' + esc(x.who) + ' · срок ' + esc(plDayName(x.day)) + (x.time ? ' ' + esc(x.time) : '') + ' · ' + stt + '</small>'
+        + (x.note ? '<small>' + esc(x.note) + '</small>' : '') + (x.reply ? '<small class="pl-from">Ответ: ' + esc(x.reply) + '</small>' : '') + '</div><div class="pl-bt">'
+        + (x.deal ? '<a href="/apps/crm/?from=fil&d=' + encodeURIComponent(x.deal) + '" title="Открыть сделку">' + PIC.go + '</a>' : '')
+        + (x.done ? '' : '<button title="Удалить" onclick="plDo(\'pl_del\',\'' + x.id + '\')">' + PIC.del + '</button>') + '</div></div>';
+    }).join('');
+  }
+  window.plReply = function(id){
+    var b = $('rp' + id); if (!b) return;
+    if (b.innerHTML) { b.innerHTML = ''; return; }
+    b.innerHTML = '<input id="rpi' + id + '" placeholder="Ответ руководителю (можно пусто)"><button class="cb" onclick="plDoneR(\'' + id + '\')">Готово</button>';
+    var i = $('rpi' + id); if (i) i.focus();
+  };
+  window.plDoneR = function(id){ var i = $('rpi' + id); api('pl_done', {id:id, reply: i ? i.value : ''}).then(function(r){ if (r && r.ok) { st('Готово, руководитель получит уведомление'); plLoad(); } else st((r && r.error) || 'Ошибка'); }); };
+  window.plAdd = function(){
+    var ti = ($('plT').value || '').trim(); if (!ti) { st('Напишите, что сделать'); return; }
+    var d = {title:ti, at:$('plD').value + ($('plH').value ? ' ' + $('plH').value : ''), remind:+$('plR').value, rep:$('plP').value};
+    if ($('plFor')) d['for'] = $('plFor').value;
+    api('pl_add', d).then(function(r){ if (r && r.ok) { st('Поставил: ' + r.when); plLoad(); } else st((r && r.error) || 'Ошибка'); });
+  };
+  window.plDo = function(a, id){ api(a, {id:id, min:60}).then(function(r){ if (r && r.ok) { st(a === 'pl_done' ? (r.next ? 'Готово, следующий раз ' + r.next : 'Готово') : a === 'pl_snooze' ? 'Отложено до ' + r.when : 'Удалено'); plLoad(); } else st((r && r.error) || 'Ошибка'); }); };
+  if (PLAN0) setTimeout(function(){ if (t) plOpen(PLAN_G); }, 400);
+  window.cronShow = function(){
+    api('ft_cron_url', {}).then(function(r){
+      if (!r || !r.ok) { $('cfCron').innerHTML = '<p>' + esc((r && r.error) || 'Ошибка') + '</p>'; return; }
+      $('cfCron').innerHTML = '<p style="word-break:break-all;user-select:all;background:rgba(0,0,0,.25);padding:8px;border-radius:8px">' + esc(r.url) + '</p>'
+        + '<div class="r"><button class="cb" onclick="navigator.clipboard&&navigator.clipboard.writeText(\'' + esc(r.url) + '\').then(function(){st(\'Адрес скопирован\')})">Скопировать</button></div>'
+        + '<p>' + (r.seen ? 'Планировщик работает: последний вызов ' + esc(r.seen) : 'Планировщик ещё ни разу не вызывал Фила') + '</p>';
+    });
+  };
+  window.cfgOpen = function(){ $('cfg').style.display = 'flex'; if (CFG) cfgRender(); else $('cfgIn').innerHTML = '<h3>Настройки Фила</h3><p>Загрузка…</p>'; api('fil_cfg', {}).then(function(r){ if (r && r.ok) { CFG = r; cfgRender(); } }); };
+  window.cfgSave = function(w){
+    if (w === 'names') { var nm = {}; document.querySelectorAll('.nmi').forEach(function(x){ nm[x.getAttribute('data-ph')] = x.value; }); api('fil_cfg', {names:nm}).then(function(r){ if (r && r.ok) { CFG = r; cfgRender(); st('Сохранено'); } else st((r && r.error) || 'Ошибка'); }); return; }
+    var d = w === 'model' ? {model:$('cfM').value} : w === 'memo' ? {memo:$('cfMemo').value} : w === 'learn' ? {learn:$('cfLearn').value} : {memo_reset:1};
+    api('fil_cfg', d).then(function(r){ if (r && r.ok) { CFG = r; cfgRender(); st(w === 'model' ? 'Модель сохранена' : w === 'learn' ? 'Сохранено' : 'Памятка сохранена'); } else st((r && r.error) || 'Ошибка'); });
+  };
+  window.cfgCompare = function(){
+    var q = $('cfQ').value.trim(); if (!q) { $('cfQ').focus(); return; }
+    var ms = [].slice.call(document.querySelectorAll('.mc input:checked')).map(function(x){ return x.value; });
+    if (!ms.length) return; $('cfGo').disabled = true; $('cfRes').innerHTML = '<p>Модели думают… это может занять минуту.</p>';
+    api('fil_compare', {text:q, models:ms}).then(function(r){
+      $('cfGo').disabled = false;
+      if (!r || !r.ok) { $('cfRes').innerHTML = '<p>' + esc((r && r.error) || 'Ошибка') + '</p>'; return; }
+      $('cfRes').innerHTML = r.items.map(function(x){ return '<div class="ans"><b>' + esc(x.name) + (x.real && x.real !== x.name ? ' (ответила ' + esc(x.real) + ')' : '') + '</b>' + esc(x.say) + '<small>' + x.sec + ' сек.' + (x.looked && x.looked.length ? ' · смотрела: ' + esc(x.looked.join(', ')) : '') + '</small></div>'; }).join('');
+    }).catch(function(){ $('cfGo').disabled = false; $('cfRes').innerHTML = '<p>Нет связи</p>'; });
+  };
+  api('fil_cfg', {}).then(function(r){ if (r && r.ok) { CFG = r; $('gear').style.display = 'flex'; } }).catch(function(){});
+  if (!t) { $('gate').style.display = 'flex'; return; }
+  hint();
+  api('fc_hist', {}).then(function(r){
+    if (r && r.conv) convSet(r.conv);
+    if (!r || !r.ok) { if (r && /доступ|вход|сотрудник/i.test(r.error || '')) $('gate').style.display = 'flex'; return; }
+    VOICE = !!r.voice;
+    helloLoad(!!(r.items || []).length);
+    if ((r.items || []).length) { $('feed').innerHTML = ''; r.items.forEach(function(x){ if (x.kind === 'task_done') { add('fil', 'Закончил задачу «' + String(x.said || '').replace(/^Задача: /, '') + '».\n' + x.reply, '', x.created_at); return; } add('me', x.said, '', x.created_at); add('fil', x.reply, x.deal_id, x.created_at); }); }
+    tasksLoad();
+  }).catch(function(){ st('Нет связи'); });
+  /* №28 · вернулись в приложение — подтягиваем ответы и ход задач, сделанные, пока оно было свёрнуто */
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState !== 'visible' || BUSY) return;
+    api('fc_hist', {}).then(function(r){ if (!r || !r.ok || !(r.items || []).length) return; TK = {}; $('feed').innerHTML = '';
+      r.items.forEach(function(x){ if (x.kind === 'task_done') { add('fil', 'Закончил задачу «' + String(x.said || '').replace(/^Задача: /, '') + '».\n' + x.reply, '', x.created_at); return; } add('me', x.said, '', x.created_at); add('fil', x.reply, x.deal_id, x.created_at); });
+      tasksLoad(); }).catch(function(){});
+  });
+  if ('serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js'); } catch(e){} }
+})();
+</script>
+<script>
+/* №880 · системная «Назад» в приложении ИТК: сначала закрываем открытые окна Фила;
+   на главном экране — открыт своим значком: сворачиваемся; открыт из магазина: в магазин */
+/* №881 · «открыт своим значком» запоминаем при первом запуске: после перехода в Сделки и обратно
+   приложение уже не считает Фила открытым со значка, и «Назад» уводило в магазин */
+(function(){ try { if (window.AndroidApp && AndroidApp.fromIcon()) sessionStorage.setItem('fil_icon', '1'); else { var rf = document.referrer || ''; if (rf && !/\/apps\//.test(rf)) sessionStorage.removeItem('fil_icon'); } } catch(e){} })();
+function filFromIcon(){ try { if (window.AndroidApp && AndroidApp.fromIcon()) return true; } catch(e){} try { return sessionStorage.getItem('fil_icon') === '1'; } catch(e){ return false; } }
+window.itcNativeBack = function(){
+  var sh = document.getElementById('addsh'); if (sh && sh.classList.contains('on')) { sh.classList.remove('on'); return true; }
+  try { if (window.pnlIsOpen && pnlIsOpen()) { pnlBack(); return true; } if (window.mnuIsOpen && mnuIsOpen()) { mnuClose(); return true; } } catch(e){}
+  var ids = ['caps', 'plan', 'cfg']; for (var i = 0; i < ids.length; i++) { var e = document.getElementById(ids[i]); if (e && e.style.display && e.style.display !== 'none') { if (ids[i] === 'caps' && window.capsClose) capsClose(); else e.style.display = 'none'; return true; } }
+  /* №883 · в приложении ИТК Фил — отдельное окно: на главном экране «Назад» закрывает окно Фила */
+  try { if (window.AndroidApp && AndroidApp.close && (/ITCApp/.test(navigator.userAgent || '') || filFromIcon())) { AndroidApp.close(); return true; } } catch(e){}
+  location.href = 'https://itcpartner.store/'; return true;
+};
+</script>
+<script src="/apps/install.js" defer></script>
+<script src="/ptr.js" defer></script>
+</body></html>

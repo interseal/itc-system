@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#112C93">
+<title>Космос · ИТК</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<style>
+:root{--navy:#112C93;--navy2:#2a46b8;--ink:#1d2433;--sub:#667085;--line:#e3e7ef;--bg:#f4f6fb;--card:#fff;--soft:#eaf0ff;--ok:#1f8a4c;--err:#c0392b;--warn:#a86400;--r:12px}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:400 15px/1.5 Roboto,system-ui,-apple-system,"Segoe UI",sans-serif}
+button{font:inherit;cursor:pointer}
+input,textarea,select{font:inherit;color:inherit}
+svg{display:block}
+.ic{width:22px;height:22px;fill:currentColor;flex:none}
+.app{display:flex;height:100%;overflow:hidden}
+/* боковая панель */
+.side{width:280px;flex:none;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.side-h{display:flex;align-items:center;gap:10px;padding:14px 14px 10px}
+.logo{width:34px;height:34px;border-radius:10px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
+.brand b{display:block;font-size:17px;letter-spacing:.2px}
+.brand small{display:block;color:var(--sub);font-size:12px;line-height:1.2}
+.newbtn{margin:4px 12px 10px;display:flex;align-items:center;justify-content:center;gap:8px;border:0;background:var(--navy);color:#fff;border-radius:10px;padding:10px;font-weight:500}
+.newbtn:hover{background:var(--navy2)}
+.search{margin:0 12px 8px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--bg);outline:none}
+.search:focus{border-color:var(--navy2);background:#fff}
+.threads{flex:1;overflow-y:auto;padding:0 6px 10px}
+.th{display:flex;align-items:center;gap:4px;border-radius:9px;padding:9px 8px 9px 10px;cursor:pointer;color:var(--ink)}
+.th:hover{background:var(--bg)}
+.th.on{background:var(--soft);color:var(--navy);font-weight:500}
+.th span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.th .tb{display:none;border:0;background:none;color:var(--sub);padding:3px;border-radius:6px}
+.th:hover .tb,.th.on .tb{display:block}
+.th .tb:hover{background:#fff;color:var(--ink)}
+.th .tb .ic{width:17px;height:17px}
+.side-f{border-top:1px solid var(--line);padding:8px 8px 10px;display:flex;flex-direction:column;gap:2px}
+.sbtn{display:flex;align-items:center;gap:10px;border:0;background:none;border-radius:9px;padding:9px 10px;color:var(--ink);text-align:left}
+.sbtn:hover{background:var(--bg)}
+.sbtn .ic{color:var(--sub)}
+.who{padding:6px 10px 0;color:var(--sub);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* основная часть */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.top{display:none;align-items:center;gap:8px;padding:8px 10px;background:#fff;border-bottom:1px solid var(--line)}
+.top b{flex:1;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ibtn{border:0;background:none;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.ibtn:hover{background:var(--bg)}
+.banner{margin:10px auto 0;max-width:820px;width:calc(100% - 24px);border-radius:10px;padding:10px 14px;font-size:14px;display:flex;gap:10px;align-items:center}
+.banner.warn{background:#fff6e5;color:#6b4500;border:1px solid #f3d9a4}
+.banner button{margin-left:auto;border:0;background:var(--navy);color:#fff;border-radius:8px;padding:6px 12px;white-space:nowrap}
+.scroll{flex:1;overflow-y:auto;padding:16px 12px 8px}
+.feed{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.m{display:flex;flex-direction:column;max-width:100%}
+.m.u{align-items:flex-end}
+.m.u .bub{background:var(--soft);border-radius:16px 16px 4px 16px;padding:10px 14px;white-space:pre-wrap;word-wrap:break-word;max-width:86%}
+.m.a .bub{background:var(--card);border:1px solid var(--line);border-radius:4px 16px 16px 16px;padding:12px 16px;max-width:100%;overflow-x:auto}
+.m .meta{font-size:11.5px;color:var(--sub);margin:3px 6px 0;display:flex;gap:8px;align-items:center}
+.m .meta button{border:0;background:none;color:var(--sub);padding:2px;border-radius:5px;display:flex}
+.m .meta button:hover{color:var(--ink);background:#fff}
+.m .meta .ic{width:15px;height:15px}
+.bub.err{border-color:#f0c4be;background:#fff6f5;color:var(--err)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;background:#eef8f1;color:#17663a;border-radius:20px;padding:3px 10px}
+.chip .ic{width:14px;height:14px}
+.task{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fafbff}
+.task .tt{display:flex;align-items:center;gap:8px;font-weight:500;font-size:14px}
+.task .tt .ic{width:18px;height:18px;color:var(--navy)}
+.task .tg{color:var(--sub);font-size:13px;margin-top:2px}
+.task .st{font-size:12.5px;color:var(--sub);margin-top:6px;border-left:2px solid var(--line);padding-left:8px}
+.task.run .tt .ic{animation:spin 1.6s linear infinite}
+.task.done .tt .ic{color:var(--ok)}
+.task.error .tt .ic{color:var(--err)}
+.task .tc{margin-left:auto;border:1px solid var(--line);background:#fff;border-radius:7px;padding:3px 9px;font-size:12.5px;color:var(--sub)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.dots::after{content:'';display:inline-block;width:1.2em;text-align:left;animation:dots 1.2s steps(4) infinite}
+@keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+/* текст ответа */
+.md>*:first-child{margin-top:0}.md>*:last-child{margin-bottom:0}
+.md p{margin:0 0 .7em}
+.md h1,.md h2,.md h3,.md h4{margin:1em 0 .45em;line-height:1.3}
+.md h1{font-size:1.25em}.md h2{font-size:1.15em}.md h3,.md h4{font-size:1.04em}
+.md ul,.md ol{margin:0 0 .7em;padding-left:1.4em}
+.md li{margin:.15em 0}
+.md code{background:#f1f3f8;border-radius:5px;padding:1px 5px;font:13px/1.4 ui-monospace,Consolas,monospace}
+.md pre{background:#101828;color:#e6e9f0;border-radius:9px;padding:12px;overflow-x:auto;margin:0 0 .8em}
+.md pre code{background:none;color:inherit;padding:0}
+.md table{border-collapse:collapse;margin:0 0 .8em;font-size:14px}
+.md th,.md td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+.md th{background:#f6f8fc;font-weight:500}
+.md blockquote{margin:0 0 .7em;border-left:3px solid var(--line);padding:2px 0 2px 12px;color:var(--sub)}
+.md a{color:var(--navy2)}
+.md hr{border:0;border-top:1px solid var(--line);margin:1em 0}
+/* пустой экран */
+.hello{max-width:640px;margin:8vh auto 0;text-align:center;padding:0 10px}
+.hello .logo{width:56px;height:56px;border-radius:16px;margin:0 auto 14px}
+.hello h1{margin:0 0 6px;font-size:24px}
+.hello p{margin:0 0 18px;color:var(--sub)}
+.ideas{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left}
+.idea{border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px 14px;font-size:14px;color:var(--ink)}
+.idea:hover{border-color:var(--navy2);background:#fbfcff}
+/* поле ввода */
+.composer{padding:8px 12px 12px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.box{max-width:820px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:16px;padding:8px 8px 8px 14px;box-shadow:0 2px 10px rgba(17,44,147,.05)}
+.box:focus-within{border-color:#b9c5ef}
+.box textarea{width:100%;border:0;outline:none;resize:none;max-height:220px;min-height:24px;padding:6px 0;background:none;line-height:1.45}
+.bar{display:flex;align-items:center;gap:8px}
+.tog{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:20px;padding:5px 11px;font-size:13px;color:var(--sub)}
+.tog .ic{width:16px;height:16px}
+.tog.on{background:var(--soft);border-color:#b9c5ef;color:var(--navy)}
+.hint{font-size:12px;color:var(--sub);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.send{width:40px;height:40px;border:0;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+.send:disabled{background:#c5cbe0;cursor:default}
+.send .ic{width:20px;height:20px}
+/* окна */
+.modal{position:fixed;inset:0;background:rgba(16,24,40,.45);display:none;align-items:flex-start;justify-content:center;padding:4vh 10px;overflow-y:auto;z-index:50}
+.modal.on{display:flex}
+.win{background:#fff;border-radius:14px;width:100%;max-width:760px;box-shadow:0 20px 50px rgba(16,24,40,.25);display:flex;flex-direction:column;max-height:92vh}
+.win-h{display:flex;align-items:center;gap:8px;padding:12px 12px 0 18px}
+.win-h b{flex:1;font-size:17px}
+body.adm .app{visibility:hidden}
+body.adm .modal.on{visibility:visible}
+.tabs{display:flex;gap:2px;padding:8px 14px 0;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{border:0;background:none;padding:9px 12px;color:var(--sub);border-bottom:2px solid transparent;white-space:nowrap}
+.tab.on{color:var(--navy);border-bottom-color:var(--navy);font-weight:500}
+.win-b{padding:14px 18px 18px;overflow-y:auto}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.inp{border:1px solid #cdd3df;border-radius:9px;padding:9px 11px;outline:none;min-width:0;background:#fff}
+.inp:focus{border-color:var(--navy2)}
+.btn{border:0;background:var(--navy);color:#fff;border-radius:9px;padding:9px 14px;font-weight:500;white-space:nowrap}
+.btn:hover{background:var(--navy2)}
+.btn.sec{background:#fff;color:var(--ink);border:1px solid #cdd3df;font-weight:400}
+.btn.sec:hover{background:var(--bg)}
+.btn.red{background:#fff;color:var(--err);border:1px solid #efc2bc;font-weight:400}
+.btn.sm{padding:5px 10px;font-size:13px}
+.note{font-size:13px;color:var(--sub);margin:0 0 12px}
+.card{border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:9px}
+.card.act{border-color:#9fb1ec;background:#f7f9ff}
+.kh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.kh b{font-weight:500}
+.tag{font-size:12px;border-radius:20px;padding:2px 9px;background:#eef1f6;color:var(--sub)}
+.tag.ok{background:#e8f6ee;color:var(--ok)}.tag.err{background:#fdeeee;color:var(--err)}.tag.act{background:var(--navy);color:#fff}
+.kb{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.ks{font-size:12.5px;color:var(--sub);margin-top:4px}
+table.t{width:100%;border-collapse:collapse;font-size:13.5px}
+table.t th,table.t td{border-bottom:1px solid var(--line);padding:7px 6px;text-align:left}
+table.t th{color:var(--sub);font-weight:500}
+table.t td.n{text-align:right;font-variant-numeric:tabular-nums}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#101828;color:#fff;border-radius:10px;padding:9px 16px;font-size:14px;z-index:80;max-width:90vw;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+.full{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center}
+.full .in{max-width:440px}
+.full .logo{width:56px;height:56px;border-radius:16px;margin:0 auto 14px}
+.full h2{margin:0 0 8px;font-size:21px}
+.full p{color:var(--sub);margin:0 0 16px}
+.shade{display:none}
+@media (max-width:900px){
+  .side{position:fixed;left:0;top:0;bottom:0;z-index:40;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 30px rgba(0,0,0,.2)}
+  .app.drawer .side{transform:none}
+  .app.drawer .shade{display:block;position:fixed;inset:0;background:rgba(16,24,40,.35);z-index:39}
+  .top{display:flex}
+  .ideas{grid-template-columns:1fr}
+  .hint{display:none}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></symbol>
+  <symbol id="i-add" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.47.47 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.48.48 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></symbol>
+  <symbol id="i-del" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
+  <symbol id="i-mem" viewBox="0 0 24 24"><path d="M17 3H7a2 2 0 0 0-1.99 2L5 21l7-3 7 3V5a2 2 0 0 0-2-2z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+  <symbol id="i-hour" viewBox="0 0 24 24"><path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5-4-4V4h8v3.5l-4 4z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="i-err" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></symbol>
+  <symbol id="i-orbit" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><ellipse cx="12" cy="12" rx="10.2" ry="3.4" transform="rotate(-28 12 12)" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="20.4" cy="5.3" r="1.3"/></symbol>
+</svg>
+
+<div class="app" id="app">
+  <div class="shade" onclick="drawer(false)"></div>
+  <aside class="side">
+    <div class="side-h">
+      <div class="logo"><svg class="ic"><use href="#i-orbit"/></svg></div>
+      <div class="brand"><b>Космос</b><small>Помощник ИТК на Claude</small></div>
+    </div>
+    <button class="newbtn" onclick="newChat()"><svg class="ic"><use href="#i-add"/></svg>Новый разговор</button>
+    <input class="search" id="q" placeholder="Поиск по разговорам" oninput="renderThreads()">
+    <div class="threads" id="threads"></div>
+    <div class="side-f">
+      <button class="sbtn" onclick="openMem()"><svg class="ic"><use href="#i-mem"/></svg>Память</button>
+      <button class="sbtn" id="setBtn" style="display:none" onclick="openSet()"><svg class="ic"><use href="#i-gear"/></svg>Настройки</button>
+      <div class="who" id="who"></div>
+    </div>
+  </aside>
+  <main class="main" id="main">
+    <div class="top">
+      <button class="ibtn" onclick="drawer(true)" aria-label="Разговоры"><svg class="ic"><use href="#i-menu"/></svg></button>
+      <b id="topTitle">Космос</b>
+      <button class="ibtn" onclick="newChat()" aria-label="Новый разговор"><svg class="ic"><use href="#i-add"/></svg></button>
+    </div>
+    <div id="banner"></div>
+    <div class="scroll" id="scroll"><div class="feed" id="feed"></div></div>
+    <div class="composer">
+      <div class="box">
+        <textarea id="ta" rows="1" placeholder="Напишите задачу или вопрос" oninput="autosize()" onkeydown="taKey(event)"></textarea>
+        <div class="bar">
+          <button class="tog" id="deepBtn" onclick="toggleDeep()" title="Сразу отдать задачу на глубокую работу: результат придёт сюда же"><svg class="ic"><use href="#i-hour"/></svg>Долгая задача</button>
+          <span class="hint" id="hint">Enter — отправить, Shift+Enter — новая строка</span>
+          <button class="send" id="sendBtn" onclick="send()" aria-label="Отправить"><svg class="ic"><use href="#i-send"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="memModal" onclick="if(event.target===this)closeModal('memModal')">
+  <div class="win">
+    <div class="win-h"><b>Память «Космоса»</b><button class="ibtn" onclick="closeModal('memModal')" aria-label="Закрыть"><svg class="ic"><use href="#i-close"/></svg></button></div>
+    <div class="win-b" id="memBody"></div>
+  </div>
+</div>
+
+<div class="modal" id="setModal" onclick="if(event.target===this)closeModal('setModal')">
+  <div class="win">
+    <div class="win-h"><b>Настройки «Космоса»</b><button class="ibtn" onclick="closeModal('setModal')" aria-label="Закрыть"><svg class="ic"><use href="#i-close"/></svg></button></div>
+    <div class="tabs" id="setTabs">
+      <button class="tab on" data-t="keys" onclick="setTab('keys')">Ключи Claude</button>
+      <button class="tab" data-t="models" onclick="setTab('models')">Модели</button>
+      <button class="tab" data-t="users" onclick="setTab('users')">Сотрудники</button>
+      <button class="tab" data-t="memory" onclick="setTab('memory')">Память компании</button>
+      <button class="tab" data-t="usage" onclick="setTab('usage')">Расход</button>
+    </div>
+    <div class="win-b" id="setBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+var EMBED_ORIGINS = ['https://itcpartner.store', 'https://www.itcpartner.store'];
+var ECO_URL = 'https://itcpartner.store/apps/kosmos/';
+var S = { t: '', me: null, ready: false, keyName: '', threads: [], cur: '', msgs: [], tasks: {}, lastId: 0, busy: false, deep: false, pollT: 0 };
+
+function $(id){ return document.getElementById(id); }
+function esc(x){ return String(x == null ? '' : x).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function icon(n, cls){ return '<svg class="ic' + (cls ? ' ' + cls : '') + '"><use href="#i-' + n + '"/></svg>'; }
+function toast(t){ var e = $('toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(function(){ e.classList.remove('on'); }, 2400); }
+function hm(s){ s = String(s || ''); return s.length >= 16 ? s.substr(11, 5) : s; }
+function dmy(s){ s = String(s || ''); if (s.length < 10) return s; var p = s.substr(0, 10).split('-'); return p[2] + '.' + p[1] + '.' + p[0]; }
+function num(n){ return (+n || 0).toLocaleString('ru-RU'); }
+function isWide(){ return window.matchMedia('(min-width: 901px)').matches; }
+
+/* ---------- пропуск Экосистемы ---------- */
+/* 0.2.0 · из «Космоса» в Экосистеме открываются только настройки (#t=…&set=keys): закрыли — окно сообщает странице */
+var ADMIN = (location.hash.match(/(?:^|[#&])set=([a-z]+)/) || [])[1] || '';
+function takeToken(){
+  var t = '';
+  var h = location.hash.replace(/^#/, ''), m = h.match(/(?:^|&)t=([^&]+)/);
+  if (m) t = decodeURIComponent(m[1]);
+  var q = location.search.match(/[?&]t=([^&]+)/);
+  if (!t && q) t = decodeURIComponent(q[1]);
+  if (t) { try { localStorage.setItem('kosmos_t', t); } catch (e) {} history.replaceState(null, '', location.pathname); }
+  if (!t) { try { t = localStorage.getItem('kosmos_t') || ''; } catch (e) {} }
+  S.t = t;
+}
+window.addEventListener('message', function(e){
+  if (EMBED_ORIGINS.indexOf(e.origin) < 0 || !e.data || e.data.type !== 'kosmos-token' || !e.data.t) return;
+  var fresh = e.data.t !== S.t;
+  S.t = String(e.data.t); try { localStorage.setItem('kosmos_t', S.t); } catch (x) {}
+  if (fresh) start();
+});
+
+function api(a, data){
+  return fetch('api.php?a=' + a, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Eco-Token': S.t }, body: JSON.stringify(data || {}) })
+    .then(function(r){ return r.json().catch(function(){ return { ok: false, error: 'Сервер «Космоса» ответил непонятно (' + r.status + ')' }; }).then(function(j){ j._code = r.status; return j; }); })
+    .catch(function(){ return { ok: false, error: 'Нет связи с сервером «Космоса»', _code: 0 }; });
+}
+
+/* ---------- запуск ---------- */
+function full(title, text, btn){
+  $('main').innerHTML = '<div class="full"><div class="in"><div class="logo">' + icon('orbit') + '</div><h2>' + esc(title) + '</h2><p>' + esc(text) + '</p>' + (btn || '') + '</div></div>';
+  document.querySelector('.side').style.display = 'none';
+}
+function start(){
+  if (!S.mainHtml) S.mainHtml = $('main').innerHTML;
+  else { $('main').innerHTML = S.mainHtml; document.querySelector('.side').style.display = ''; }
+  if (!S.t) { full('Откройте «Космос» из Экосистемы', 'Вход — тем же пропуском, что в Экосистеме ИТК.', '<a class="btn" style="text-decoration:none;display:inline-block" href="' + ECO_URL + '">Открыть Экосистему</a>'); return; }
+  api('me').then(function(d){
+    if (!d.ok) {
+      if (d._code === 401) { try { localStorage.removeItem('kosmos_t'); } catch (e) {} full('Нужно войти заново', d.error || 'Пропуск устарел.', '<a class="btn" style="text-decoration:none;display:inline-block" href="' + ECO_URL + '">Открыть Экосистему</a>'); }
+      else full('«Космос» сейчас недоступен', d.error || 'Попробуйте через минуту.', '<button class="btn" onclick="location.reload()">Обновить</button>');
+      return;
+    }
+    S.me = d.me; S.ready = d.ready; S.keyName = d.key_name;
+    if (!d.me.allowed) { full('Доступ выдаёт руководитель', 'Просьба о доступе уже видна руководителю в настройках «Космоса». Как только доступ откроют, обновите страницу.', '<button class="btn" onclick="location.reload()">Обновить</button>'); return; }
+    $('who').textContent = (d.me.name || 'Сотрудник') + (d.me.boss ? ' · руководитель' : '');
+    $('setBtn').style.display = d.me.boss ? '' : 'none';
+    if (ADMIN) { if (!d.me.boss) { full('Только руководитель', 'Настройки «Космоса» открывает руководитель.', ''); return; } document.body.classList.add('adm'); openSet(ADMIN); return; }
+    banner();
+    loadThreads().then(function(){
+      var last = ''; try { last = sessionStorage.getItem('kosmos_cur') || ''; } catch (e) {}
+      if (last && S.threads.some(function(t){ return t.id === last; })) openThread(last); else hello();
+    });
+  });
+  if (!isWide()) $('hint').style.display = 'none';
+}
+function banner(){
+  var b = $('banner');
+  if (S.ready) { b.innerHTML = ''; return; }
+  b.innerHTML = '<div class="banner warn">' + icon('err') + '<span>Ключ Claude ещё не добавлен — «Космос» не сможет отвечать.' + (S.me && S.me.boss ? '' : ' Ключ добавляет руководитель.') + '</span>'
+    + (S.me && S.me.boss ? '<button onclick="openSet(\'keys\')">Добавить ключ</button>' : '') + '</div>';
+}
+
+/* ---------- разговоры ---------- */
+function loadThreads(){
+  return api('threads').then(function(d){ if (d.ok) { S.threads = d.threads; renderThreads(); } });
+}
+function renderThreads(){
+  var q = ($('q').value || '').trim().toLowerCase();
+  var list = S.threads.filter(function(t){ return !q || t.title.toLowerCase().indexOf(q) >= 0; });
+  $('threads').innerHTML = list.length ? list.map(function(t){
+    return '<div class="th' + (t.id === S.cur ? ' on' : '') + '" onclick="openThread(\'' + t.id + '\')"><span title="' + esc(t.title) + '">' + esc(t.title) + '</span>'
+      + '<button class="tb" title="Переименовать" onclick="event.stopPropagation();renThread(\'' + t.id + '\')">' + icon('edit') + '</button>'
+      + '<button class="tb" title="Удалить" onclick="event.stopPropagation();delThread(\'' + t.id + '\')">' + icon('del') + '</button></div>';
+  }).join('') : '<div style="color:var(--sub);font-size:13px;padding:10px">' + (q ? 'Ничего не нашлось' : 'Разговоров пока нет') + '</div>';
+}
+function newChat(){ S.cur = ''; S.msgs = []; S.tasks = {}; S.lastId = 0; try { sessionStorage.removeItem('kosmos_cur'); } catch (e) {} renderThreads(); hello(); drawer(false); $('ta').focus(); }
+function openThread(id){
+  S.cur = id; S.msgs = []; S.tasks = {}; S.lastId = 0;
+  try { sessionStorage.setItem('kosmos_cur', id); } catch (e) {}
+  renderThreads(); drawer(false);
+  $('feed').innerHTML = '<div style="color:var(--sub);text-align:center;padding:30px">Загружаю…</div>';
+  api('messages', { thread_id: id }).then(function(d){
+    if (!d.ok) { $('feed').innerHTML = ''; toast(d.error || 'Не открылось'); return; }
+    $('topTitle').textContent = d.thread.title;
+    S.msgs = d.messages; S.lastId = S.msgs.length ? S.msgs[S.msgs.length - 1].id : 0;
+    d.tasks.forEach(function(t){ S.tasks[t.id] = t; });
+    renderFeed(true); pollLater();
+  });
+}
+function renThread(id){
+  var t = S.threads.filter(function(x){ return x.id === id; })[0]; if (!t) return;
+  var title = prompt('Название разговора', t.title); if (title == null || !title.trim()) return;
+  api('thread_rename', { id: id, title: title.trim() }).then(function(d){ if (d.ok) { t.title = title.trim(); renderThreads(); if (id === S.cur) $('topTitle').textContent = t.title; } else toast(d.error); });
+}
+function delThread(id){
+  if (!confirm('Удалить разговор? Память «Космоса» останется.')) return;
+  api('thread_delete', { id: id }).then(function(d){ if (!d.ok) { toast(d.error); return; } S.threads = S.threads.filter(function(t){ return t.id !== id; }); if (id === S.cur) newChat(); else renderThreads(); });
+}
+function hello(){
+  $('topTitle').textContent = 'Космос';
+  var ideas = ['Составь письмо фабрике: запрос цены и сроков на партию товара', 'Сделай план закупки на месяц по шагам', 'Проверь текст коммерческого предложения и предложи, как усилить', 'Запомни: отчёты мне нужны коротко, сначала цифры'];
+  $('feed').innerHTML = '<div class="hello"><div class="logo">' + icon('orbit') + '</div><h1>Чем заняться?</h1><p>Космос помнит прошлые разговоры и договорённости. Простое — ответит сразу, долгую работу сделает в фоне и пришлёт результат сюда.</p>'
+    + '<div class="ideas">' + ideas.map(function(i){ return '<button class="idea" onclick="useIdea(this)">' + esc(i) + '</button>'; }).join('') + '</div></div>';
+}
+function useIdea(b){ $('ta').value = b.textContent; autosize(); $('ta').focus(); }
+function drawer(on){ $('app').classList.toggle('drawer', !!on); }
+
+/* ---------- лента сообщений ---------- */
+function msgHtml(m, showTask){
+  if (m.role === 'user') return '<div class="m u"><div class="bub">' + esc(m.text) + '</div><div class="meta">' + hm(m.created_at) + '</div></div>';
+  var h = '<div class="m a" data-id="' + m.id + '"><div class="bub' + (m.error ? ' err' : '') + '">';
+  h += m.error ? esc(m.error) : (m.text ? '<div class="md">' + md(m.text) + '</div>' : (m.streaming ? '<span class="dots" style="color:var(--sub)">Думаю</span>' : ''));
+  if (m.notes && m.notes.length) h += '<div class="chips">' + m.notes.map(function(n){ return '<span class="chip">' + icon('check') + esc(n) + '</span>'; }).join('') + '</div>';
+  if (showTask && m.task_id && S.tasks[m.task_id]) h += taskHtml(S.tasks[m.task_id]);
+  h += '</div>';
+  if (!m.streaming && !m.error && m.text) h += '<div class="meta">' + hm(m.created_at) + (m.model ? ' · ' + esc(modelName(m.model)) : '') + '<button title="Скопировать" onclick="copyMsg(' + m.id + ')">' + icon('copy') + '</button></div>';
+  return h + '</div>';
+}
+function modelName(id){ var m = String(id).match(/claude-([a-z]+)-(\d+)-(\d+)/); return m ? m[1].charAt(0).toUpperCase() + m[1].slice(1) + ' ' + m[2] + '.' + m[3] : id; }
+var TS = { queued: ['Задача в очереди', 'hour'], running: ['Задача в работе', 'hour'], done: ['Задача выполнена', 'check'], error: ['Задача не выполнена', 'err'], cancelled: ['Задача отменена', 'close'] };
+function taskHtml(t){
+  var s = TS[t.status] || [t.status, 'hour'];
+  var steps = (t.steps || []).slice(-4);
+  return '<div class="task ' + (t.status === 'running' || t.status === 'queued' ? 'run' : t.status) + '" data-task="' + t.id + '"><div class="tt">' + icon(s[1]) + esc(s[0])
+    + (t.status === 'queued' ? '<button class="tc" onclick="cancelTask(\'' + t.id + '\')">Отменить</button>' : '') + '</div>'
+    + '<div class="tg">' + esc(t.goal) + '</div>'
+    + (t.status === 'done' ? '<div class="st">Результат — в сообщении ниже</div>' : '')
+    + (t.error ? '<div class="st" style="color:var(--err)">' + esc(t.error) + '</div>' : '')
+    + (t.status !== 'done' && steps.length ? '<div class="st">' + steps.map(function(x){ return esc(x.at + ' — ' + x.note); }).join('<br>') + '</div>' : '') + '</div>';
+}
+function renderFeed(toEnd){
+  if (!S.msgs.length) { hello(); return; }
+  var seen = {};
+  $('feed').innerHTML = S.msgs.map(function(m){ var show = !!m.task_id && !seen[m.task_id]; if (m.task_id) seen[m.task_id] = 1; return msgHtml(m, show); }).join('');
+  if (toEnd) scrollEnd();
+}
+function nearEnd(){ var s = $('scroll'); return s.scrollHeight - s.scrollTop - s.clientHeight < 140; }
+function scrollEnd(){ var s = $('scroll'); s.scrollTop = s.scrollHeight; }
+function copyMsg(id){
+  var m = S.msgs.filter(function(x){ return x.id === id; })[0]; if (!m) return;
+  (navigator.clipboard ? navigator.clipboard.writeText(m.text) : Promise.reject()).then(function(){ toast('Скопировано'); }, function(){
+    var ta = document.createElement('textarea'); ta.value = m.text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('Скопировано'); } catch (e) {} ta.remove();
+  });
+}
+function cancelTask(id){ api('task_cancel', { id: id }).then(function(d){ if (!d.ok) { toast(d.error); return; } S.tasks[id].status = 'cancelled'; renderFeed(false); }); }
+
+/* ---------- отправка и поток ---------- */
+function autosize(){ var t = $('ta'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 220) + 'px'; }
+function taKey(e){ if (e.key === 'Enter' && !e.shiftKey && isWide() && !e.isComposing) { e.preventDefault(); send(); } }
+function toggleDeep(){ S.deep = !S.deep; $('deepBtn').classList.toggle('on', S.deep); }
+function setBusy(b){ S.busy = b; $('sendBtn').disabled = b; }
+function send(){
+  var text = $('ta').value.trim();
+  if (!text || S.busy) return;
+  if (!S.ready && !S.deep) { banner(); }
+  setBusy(true); $('ta').value = ''; autosize();
+  var deep = S.deep; if (deep) toggleDeep();
+  if (!S.msgs.length) $('feed').innerHTML = '';
+  var d0 = new Date(), z = function(n){ return (n < 10 ? '0' : '') + n; };
+  var now = d0.getFullYear() + '-' + z(d0.getMonth() + 1) + '-' + z(d0.getDate()) + ' ' + z(d0.getHours()) + ':' + z(d0.getMinutes()) + ':' + z(d0.getSeconds());
+  var um = { id: -1, role: 'user', text: text, created_at: now }, am = { id: -2, role: 'assistant', text: '', notes: [], streaming: true, created_at: now };
+  S.msgs.push(um, am); renderFeed(true);
+  var raf = 0;
+  function redraw(){ raf = 0; var stick = nearEnd(); var el = document.querySelector('.m.a[data-id="-2"]'); if (el) el.outerHTML = msgHtml(am, true); if (stick) scrollEnd(); }
+  function later(){ if (!raf) raf = requestAnimationFrame(redraw); }
+  fetch('api.php?a=send', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Eco-Token': S.t }, body: JSON.stringify({ thread_id: S.cur, text: text, deep: deep }) })
+    .then(function(r){
+      var ct = r.headers.get('content-type') || '';
+      if (ct.indexOf('event-stream') < 0) return r.json().catch(function(){ return { error: 'Сервер ответил непонятно (' + r.status + ')' }; }).then(function(j){ am.error = j.error || 'Не отправилось'; am.streaming = false; redraw(); });
+      var rd = r.body.getReader(), dec = new TextDecoder(), buf = '';
+      function pump(){
+        return rd.read().then(function(x){
+          if (x.done) return;
+          buf += dec.decode(x.value, { stream: true });
+          var p;
+          while ((p = buf.indexOf('\n\n')) >= 0) {
+            var chunk = buf.slice(0, p); buf = buf.slice(p + 2);
+            chunk.split('\n').forEach(function(line){ if (line.indexOf('data: ') === 0) { try { onEv(JSON.parse(line.slice(6))); } catch (e) {} } });
+          }
+          return pump();
+        });
+      }
+      function onEv(ev){
+        if (ev.t === 'start') {
+          if (!S.cur) { S.cur = ev.thread_id; try { sessionStorage.setItem('kosmos_cur', S.cur); } catch (e) {} S.threads.unshift({ id: ev.thread_id, title: ev.title, updated_at: now }); renderThreads(); $('topTitle').textContent = ev.title; }
+        } else if (ev.t === 'delta') { am.text += ev.text; later(); }
+        else if (ev.t === 'note') { am.notes.push(ev.text); later(); }
+        else if (ev.t === 'task') { S.tasks[ev.task.id] = ev.task; am.task_id = ev.task.id; later(); }
+        else if (ev.t === 'error') { am.error = ev.error; later(); }
+      }
+      return pump();
+    })
+    .catch(function(){ am.error = am.text ? '' : 'Связь прервалась — проверьте интернет и отправьте ещё раз'; })
+    .then(function(){
+      am.streaming = false; setBusy(false);
+      if (!S.cur) { redraw(); return; }
+      api('messages', { thread_id: S.cur }).then(function(d){
+        if (!d.ok) { redraw(); return; }
+        var errMsg = am.error;
+        S.msgs = d.messages; S.lastId = S.msgs.length ? S.msgs[S.msgs.length - 1].id : 0;
+        d.tasks.forEach(function(t){ S.tasks[t.id] = t; });
+        if (errMsg) S.msgs.push({ id: -3, role: 'assistant', error: errMsg, created_at: now });
+        else if (!S.ready) refreshMe();
+        renderFeed(true); pollLater(); bumpThread();
+      });
+    });
+}
+function bumpThread(){ var i = -1; S.threads.forEach(function(t, k){ if (t.id === S.cur) i = k; }); if (i > 0) { S.threads.unshift(S.threads.splice(i, 1)[0]); renderThreads(); } }
+
+/* фоновые задачи: пока что-то в работе — раз в 3 секунды смотрим новые сообщения */
+function pollLater(){
+  clearTimeout(S.pollT);
+  var open = Object.keys(S.tasks).some(function(k){ var t = S.tasks[k]; return t.thread_id === S.cur && (t.status === 'queued' || t.status === 'running'); });
+  if (!open) return;
+  S.pollT = setTimeout(function(){
+    var cur = S.cur;
+    api('messages', { thread_id: cur, after: S.lastId }).then(function(d){
+      if (!d.ok || cur !== S.cur) return;
+      d.tasks.forEach(function(t){ S.tasks[t.id] = t; });
+      var stick = nearEnd();
+      if (d.messages.length) { S.msgs = S.msgs.filter(function(m){ return m.id > 0; }).concat(d.messages); S.lastId = d.messages[d.messages.length - 1].id; }
+      if (!S.busy) { renderFeed(false); if (stick) scrollEnd(); }
+      pollLater();
+    });
+  }, 3000);
+}
+
+/* ---------- разметка ответа (markdown, безопасно) ---------- */
+function inl(s){
+  s = esc(s);
+  var codes = [];
+  s = s.replace(/`([^`]+)`/g, function(_, c){ codes.push(c); return '\u0000' + (codes.length - 1) + '\u0000'; });
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<i>$2</i>');
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/(^|[\s(])(https?:\/\/[^\s<]+[^\s<.,;:!?)])/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  return s.replace(/\u0000(\d+)\u0000/g, function(_, i){ return '<code>' + codes[+i] + '</code>'; });
+}
+function md(src){
+  var lines = String(src).replace(/\r/g, '').split('\n'), out = [], i = 0;
+  function isTable(k){ return /^\s*\|.*\|\s*$/.test(lines[k] || '') && /^\s*\|?\s*:?-{2,}/.test(lines[k + 1] || ''); }
+  function cells(l){ return l.trim().replace(/^\||\|$/g, '').split('|').map(function(c){ return c.trim(); }); }
+  while (i < lines.length) {
+    var l = lines[i];
+    if (/^```/.test(l)) { var code = []; i++; while (i < lines.length && !/^```/.test(lines[i])) code.push(lines[i++]); i++; out.push('<pre><code>' + esc(code.join('\n')) + '</code></pre>'); continue; }
+    var h = l.match(/^(#{1,4})\s+(.*)$/); if (h) { out.push('<h' + h[1].length + '>' + inl(h[2]) + '</h' + h[1].length + '>'); i++; continue; }
+    if (/^\s*(-{3,}|\*{3,})\s*$/.test(l)) { out.push('<hr>'); i++; continue; }
+    if (isTable(i)) {
+      var head = cells(l); i += 2; var rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) rows.push(cells(lines[i++]));
+      out.push('<table><tr>' + head.map(function(c){ return '<th>' + inl(c) + '</th>'; }).join('') + '</tr>' + rows.map(function(r){ return '<tr>' + r.map(function(c){ return '<td>' + inl(c) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>');
+      continue;
+    }
+    if (/^\s*([-*•])\s+/.test(l) || /^\s*\d+[.)]\s+/.test(l)) {
+      var ol = /^\s*\d+[.)]\s+/.test(l), items = [];
+      while (i < lines.length && (ol ? /^\s*\d+[.)]\s+/ : /^\s*([-*•])\s+/).test(lines[i])) { items.push(lines[i].replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '')); i++; }
+      out.push((ol ? '<ol>' : '<ul>') + items.map(function(x){ return '<li>' + inl(x) + '</li>'; }).join('') + (ol ? '</ol>' : '</ul>'));
+      continue;
+    }
+    if (/^>\s?/.test(l)) { var q = []; while (i < lines.length && /^>\s?/.test(lines[i])) q.push(lines[i++].replace(/^>\s?/, '')); out.push('<blockquote>' + inl(q.join(' ')) + '</blockquote>'); continue; }
+    if (!l.trim()) { i++; continue; }
+    var p = [];
+    while (i < lines.length && lines[i].trim() && !/^(```|#{1,4}\s|>\s?|\s*([-*•])\s+|\s*\d+[.)]\s+)/.test(lines[i]) && !isTable(i)) p.push(inl(lines[i++]));
+    if (!p.length) { p.push(inl(lines[i++])); }
+    out.push('<p>' + p.join('<br>') + '</p>');
+  }
+  return out.join('');
+}
+
+/* ---------- память ---------- */
+function closeModal(id){ $(id).classList.remove('on'); if (ADMIN && id === 'setModal') { try { parent.postMessage({ type: 'kosmos-close' }, '*'); } catch (e) {} } }
+function openMem(){ drawer(false); $('memModal').classList.add('on'); loadMem(); }
+function loadMem(){
+  $('memBody').innerHTML = '<div class="note">Загружаю…</div>';
+  api('memory').then(function(d){
+    if (!d.ok) { $('memBody').innerHTML = '<div class="note">' + esc(d.error) + '</div>'; return; }
+    var comp = d.items.filter(function(x){ return x.scope === 'company'; }), mine = d.items.filter(function(x){ return x.scope === 'user'; });
+    function list(arr, canDel){ return arr.length ? arr.map(function(x){ return '<div class="card"><div class="kh"><span style="flex:1">' + esc(x.text) + '</span>' + (canDel ? '<button class="btn red sm" onclick="memDel(' + x.id + ')">Забыть</button>' : '') + '</div><div class="ks">№' + x.id + ' · ' + dmy(x.created_at) + (x.source === 'kosmos' ? ' · записал «Космос»' : '') + '</div></div>'; }).join('') : '<div class="note">Пока пусто</div>'; }
+    $('memBody').innerHTML = '<p class="note">«Космос» помнит это при любом ключе Claude. Можно попросить в разговоре: «запомни…» или «забудь…».</p>'
+      + '<h4 style="margin:6px 0 8px">Обо мне</h4>' + list(mine, true)
+      + '<div class="row"><input class="inp" id="memNew" style="flex:1" placeholder="Что запомнить о работе со мной"><button class="btn" onclick="memAdd(\'user\', \'memNew\')">Запомнить</button></div>'
+      + '<h4 style="margin:16px 0 8px">О компании</h4>' + list(comp, S.me.boss)
+      + (S.me.boss ? '<div class="row"><input class="inp" id="memNewC" style="flex:1" placeholder="Общее знание о компании для всех сотрудников"><button class="btn" onclick="memAdd(\'company\', \'memNewC\')">Запомнить</button></div>' : '<div class="note">Общее о компании записывает руководитель.</div>');
+  });
+}
+function memAdd(scope, inp, after){
+  var v = $(inp).value.trim(); if (!v) return;
+  api('memory_add', { scope: scope, text: v }).then(function(d){ if (!d.ok) { toast(d.error); return; } toast('Записано'); (after || loadMem)(); });
+}
+function memDel(id, after){ if (!confirm('Забыть эту запись?')) return; api('memory_del', { id: id }).then(function(d){ if (!d.ok) { toast(d.error); return; } (after || loadMem)(); }); }
+
+/* ---------- настройки руководителя ---------- */
+var SET = { tab: 'keys' };
+function openSet(tab){ drawer(false); $('setModal').classList.add('on'); setTab(tab || SET.tab); }
+function setTab(t){
+  SET.tab = t;
+  Array.prototype.forEach.call(document.querySelectorAll('#setTabs .tab'), function(b){ b.classList.toggle('on', b.getAttribute('data-t') === t); });
+  $('setBody').innerHTML = '<div class="note">Загружаю…</div>';
+  ({ keys: setKeys, models: setModels, users: setUsers, memory: setMemory, usage: setUsage })[t]();
+}
+function keyStatus(k){ if (!k.status) return '<span class="tag">не проверен</span>'; return k.status === 'ok' ? '<span class="tag ok">работает</span>' : '<span class="tag err">' + esc(k.status) + '</span>'; }
+function setKeys(){
+  api('keys').then(function(d){
+    if (!d.ok) { $('setBody').innerHTML = '<div class="note">' + esc(d.error) + '</div>'; return; }
+    SET.auto = d.auto_switch !== false;
+    renderKeys(d.keys);
+  });
+}
+function renderKeys(keys){
+  var h = '<p class="note">Ключи Claude от любых аккаунтов, сколько угодно. Работает один — активный, остальные запасные. Память и переписка хранятся на сервере «Космоса», поэтому после смены ключа всё продолжается с того же места. Сам ключ хранится зашифрованным и обратно не показывается.</p>';
+  h += keys.length ? keys.map(function(k){
+    var u = k.usage30 || {};
+    return '<div class="card' + (k.active ? ' act' : '') + '"><div class="kh"><b>' + esc(k.name) + '</b><span class="tag">…' + esc(k.last4) + '</span>' + (k.active ? '<span class="tag act">активный</span>' : '') + keyStatus(k) + '</div>'
+      + '<div class="ks">Добавлен ' + dmy(k.created_at) + (k.checked_at ? ' · проверен ' + dmy(k.checked_at) + ' ' + hm(k.checked_at) : '') + ' · за 30 дней: ' + num(u.c) + ' запросов, ' + num((+u.ti || 0) + (+u.tout || 0)) + ' токенов</div>'
+      + (k.ws ? '<div class="ks">Рабочая область: <b>' + esc(k.ws_name || 'без названия') + '</b> · ' + esc(k.ws) + '</div>' : '')
+      + '<div class="kb">' + (k.active ? '' : '<button class="btn sm" onclick="keyDo(\'key_activate\',' + k.id + ')">Сделать активным</button>')
+      + '<button class="btn sec sm" onclick="keyDo(\'key_test\',' + k.id + ')">Проверить</button>'
+      + (k.ws || k.ws_issue ? '<button class="btn ' + (k.ws_issue ? '' : 'sec ') + 'sm" onclick="keyWs(' + k.id + ')">Рабочая область</button>' : '')
+      + '<button class="btn sec sm" onclick="keyRen(' + k.id + ',' + esc(JSON.stringify(k.name)) + ')">Переименовать</button>'
+      + '<button class="btn red sm" onclick="keyDel(' + k.id + ',' + (k.active ? 1 : 0) + ')">Удалить</button></div><div id="ws' + k.id + '"></div></div>';
+  }).join('') : '<div class="note">Ключей пока нет.</div>';
+  h += '<label class="row" style="gap:8px;margin-top:6px"><input type="checkbox" id="kAuto"' + (SET.auto !== false ? ' checked' : '') + ' onchange="autoSwitch(this.checked)"> Если активный ключ перестал работать — сам переключаться на следующий рабочий</label>';
+  h += '<h4 style="margin:16px 0 8px">' + (keys.length ? '+ Добавить ещё ключ' : 'Добавить ключ') + '</h4><div class="row"><input class="inp" id="kName" style="width:200px" placeholder="Название, например «Аккаунт 2»">'
+    + '<input class="inp" id="kVal" type="text" name="kosmos-claude-k" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" style="flex:1;min-width:200px;-webkit-text-security:disc;text-security:disc" placeholder="sk-ant-…"><button class="btn" id="kAdd" onclick="keyAdd()">Добавить и проверить</button></div>'
+    + '<p class="note">Ключ создаётся в консоли Claude (platform.claude.com → API Keys). Подходит и личный ключ без рабочей области — её «Космос» подберёт сам. Копию ключа сохраните в сейф Bitwarden.</p>';
+  $('setBody').innerHTML = h;
+  var need = keys.filter(function(k){ return k.ws_issue; })[0];   // ключу нужна рабочая область — сразу показываем выбор
+  if (need) keyWs(need.id);
+}
+/* 0.2.1 · рабочая область (workspace) личного ключа */
+function keyWs(id){
+  var box = $('ws' + id); if (!box) return;
+  box.innerHTML = '<div class="note" style="margin-top:8px">Смотрю рабочие области ключа…</div>';
+  api('key_ws_list', { id: id }).then(function(d){
+    if (!d.ok) { box.innerHTML = '<div class="note" style="margin-top:8px">' + esc(d.error) + '</div>'; return; }
+    var h = '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #e3e6ee"><p class="note">Ключ личный (создан без рабочей области), поэтому Claude просит в каждом запросе указывать рабочую область — workspace. Её выбирают один раз, дальше «Космос» подставляет её сам.</p>';
+    if (d.list.length) h += '<div class="row"><select class="inp" id="wsSel' + id + '" style="flex:1;min-width:220px">' + d.list.map(function(w){ return '<option value="' + esc(w.id) + '" data-n="' + esc(w.name) + '"' + (w.id === d.ws ? ' selected' : '') + '>' + esc(w.name || w.id) + ' — ' + esc(w.id) + '</option>'; }).join('') + '</select><button class="btn sm" onclick="keyWsSave(' + id + ',1)">Выбрать и проверить</button></div>';
+    else if (d.error) h += '<p class="note">' + esc(d.error) + '</p>';
+    h += '<div class="row"><input class="inp" id="wsMan' + id + '" style="flex:1;min-width:220px" placeholder="или ID вручную: wrkspc_…" autocomplete="off" spellcheck="false"><button class="btn sec sm" onclick="keyWsSave(' + id + ',0)">Сохранить и проверить</button>'
+      + (d.ws ? '<button class="btn sec sm" onclick="keyWsSave(' + id + ',-1)">Без рабочей области</button>' : '') + '</div>'
+      + '<p class="note">ID рабочей области видно в консоли Claude: platform.claude.com → Settings → Workspaces, столбец ID.</p></div>';
+    box.innerHTML = h;
+  });
+}
+function keyWsSave(id, how){
+  var ws = '', name = '';
+  if (how === 1) { var s = $('wsSel' + id); ws = s.value; name = s.options[s.selectedIndex].getAttribute('data-n') || ''; }
+  else if (how === 0) { ws = $('wsMan' + id).value.trim(); if (!ws) { toast('Вставьте ID рабочей области'); return; } }
+  toast('Проверяю…');
+  api('key_ws_set', { id: id, ws: ws, name: name }).then(function(d){
+    if (!d.ok) { toast(d.error); return; }
+    toast(d.test.ok ? 'Ключ работает' : d.test.status);
+    renderKeys(d.keys); refreshMe();
+  });
+}
+function wsNote(t){ return t && t.ws_auto ? ' Рабочую область «' + t.ws_auto + '» «Космос» выбрал сам.' : ''; }
+function autoSwitch(on){ api('settings_set', { auto_switch: on ? 1 : 0 }).then(function(d){ if (!d.ok) { toast(d.error); return; } SET.auto = on; toast(on ? 'Автопереключение включено' : 'Автопереключение выключено'); }); }
+function keyAdd(){
+  var name = $('kName').value.trim(), key = $('kVal').value.trim(); if (!key) { toast('Вставьте ключ'); return; }
+  $('kAdd').disabled = true; $('kAdd').textContent = 'Проверяю…';
+  api('key_add', { name: name, key: key }).then(function(d){
+    if (!d.ok) { toast(d.error); $('kAdd').disabled = false; $('kAdd').textContent = 'Добавить и проверить'; return; }
+    toast(d.test.ok ? 'Ключ добавлен и работает.' + wsNote(d.test) : 'Ключ добавлен, но проверка не прошла: ' + d.test.status);
+    refreshMe(); setKeys();
+  });
+}
+function keyDo(a, id){ api(a, { id: id }).then(function(d){ if (!d.ok) { toast(d.error); return; } if (a === 'key_test') toast(d.test.ok ? 'Ключ работает.' + wsNote(d.test) : d.test.status); if (a === 'key_activate') toast('Теперь работает этот ключ'); renderKeys(d.keys); refreshMe(); }); }
+function keyRen(id, old){ var n = prompt('Название ключа', old); if (n == null || !n.trim()) return; api('key_rename', { id: id, name: n.trim() }).then(function(d){ if (d.ok) renderKeys(d.keys); else toast(d.error); }); }
+function keyDel(id, active){ if (!confirm(active ? 'Это активный ключ. После удаления «Космос» не будет отвечать, пока не выбран другой ключ. Удалить?' : 'Удалить ключ? Память «Космоса» не пострадает.')) return; api('key_delete', { id: id }).then(function(d){ if (d.ok) { renderKeys(d.keys); refreshMe(); } else toast(d.error); }); }
+function refreshMe(){ api('me').then(function(d){ if (d.ok) { S.ready = d.ready; S.keyName = d.key_name; banner(); } }); }
+function setModels(){
+  api('settings').then(function(d){
+    if (!d.ok) { $('setBody').innerHTML = '<div class="note">' + esc(d.error) + '</div>'; return; }
+    var s = d.settings;
+    function sel(id, val){ var known = d.model_list.some(function(m){ return m.id === val; }); return '<select class="inp" id="' + id + '" style="flex:1;min-width:240px">' + d.model_list.map(function(m){ return '<option value="' + esc(m.id) + '"' + (m.id === val ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + (known ? '' : '<option value="' + esc(val) + '" selected>' + esc(val) + '</option>') + '</select>'; }
+    $('setBody').innerHTML = '<p class="note">Быстрая модель отвечает сразу и решает, что отдать на долгую работу. Модель для задач работает в фоне и присылает готовый результат.</p>'
+      + '<div class="row"><span style="width:170px">Быстрые ответы</span>' + sel('mFast', s.model_fast) + '</div>'
+      + '<div class="row"><span style="width:170px">Долгие задачи</span>' + sel('mDeep', s.model_deep) + '</div>'
+      + '<div class="row"><span style="width:170px">Другая модель (по названию в API)</span><input class="inp" id="mCustom" style="flex:1" placeholder="например, claude-sonnet-5-5"><select class="inp" id="mFor"><option value="model_fast">для быстрых</option><option value="model_deep">для задач</option></select></div>'
+      + '<button class="btn" onclick="saveModels()">Сохранить</button>';
+  });
+}
+function saveModels(){
+  var data = { model_fast: $('mFast').value, model_deep: $('mDeep').value }, c = $('mCustom').value.trim();
+  if (c) data[$('mFor').value] = c;
+  api('settings_set', data).then(function(d){ if (!d.ok) { toast(d.error); return; } toast('Сохранено'); setModels(); });
+}
+function setUsers(){
+  Promise.all([api('settings'), api('users')]).then(function(r){
+    var s = r[0], u = r[1];
+    if (!s.ok || !u.ok) { $('setBody').innerHTML = '<div class="note">' + esc(s.error || u.error) + '</div>'; return; }
+    var st = s.settings, whDeny = st.deny_roles.split(',').indexOf('warehouse') >= 0;
+    var h = '<div class="row"><span style="width:190px">Кто пользуется «Космосом»</span><select class="inp" id="aMode"><option value="all"' + (st.access_mode === 'all' ? ' selected' : '') + '>все сотрудники</option><option value="list"' + (st.access_mode === 'list' ? ' selected' : '') + '>только отмеченные ниже</option></select></div>'
+      + '<div class="row"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="aWh"' + (whDeny ? ' checked' : '') + '> Склад — без доступа (кроме отмеченных)</label></div>'
+      + '<div class="row"><span style="width:190px">Сообщений в день на сотрудника</span><input class="inp" id="aLim" type="number" min="0" style="width:110px" value="' + st.daily_limit + '"><span class="note" style="margin:0">0 — без ограничения</span></div>'
+      + '<button class="btn" onclick="saveAccess()">Сохранить</button>'
+      + '<p class="note" style="margin-top:14px">Claude доступен не во всех странах. Доступ лучше давать сотрудникам, которые работают из поддерживаемых стран (Кыргызстан и другие).</p>'
+      + '<h4 style="margin:6px 0 8px">Сотрудники, открывавшие «Космос»</h4>';
+    h += u.users.length ? '<table class="t"><tr><th>Сотрудник</th><th>Роль</th><th>Был</th><th class="n">Запросов за 30 дней</th><th>Доступ</th></tr>' + u.users.map(function(x){
+      return '<tr><td>' + esc(x.name || x.phone) + '<div class="ks">' + esc(x.phone) + '</div></td><td>' + esc(x.boss ? 'руководитель' : (x.role || '—')) + '</td><td>' + dmy(x.last_at) + '</td><td class="n">' + num(x.msgs30) + '</td><td>'
+        + (x.boss ? '<span class="tag ok">всегда</span>' : '<select class="inp" style="padding:5px" onchange="allowUser(' + esc(JSON.stringify(x.phone)) + ', this.value)"><option value=""' + (x.allow === '' ? ' selected' : '') + '>по общему правилу (' + (x.allowed && x.allow === '' ? 'есть' : x.allow === '' ? 'нет' : '…') + ')</option><option value="yes"' + (x.allow === 'yes' ? ' selected' : '') + '>разрешён</option><option value="no"' + (x.allow === 'no' ? ' selected' : '') + '>закрыт</option></select>') + '</td></tr>';
+    }).join('') + '</table>' : '<div class="note">Пока никто не открывал.</div>';
+    $('setBody').innerHTML = h;
+  });
+}
+function saveAccess(){
+  api('settings_set', { access_mode: $('aMode').value, deny_roles: $('aWh').checked ? 'warehouse' : '', daily_limit: +$('aLim').value || 0 }).then(function(d){ if (!d.ok) { toast(d.error); return; } toast('Сохранено'); setUsers(); });
+}
+function allowUser(phone, v){ api('user_allow', { phone: phone, allow: v }).then(function(d){ if (!d.ok) toast(d.error); else { toast('Сохранено'); setUsers(); } }); }
+function setMemory(){
+  api('memory', { all: 1 }).then(function(d){
+    if (!d.ok) { $('setBody').innerHTML = '<div class="note">' + esc(d.error) + '</div>'; return; }
+    var h = '<p class="note">Общее знание о компании «Космос» учитывает в разговорах со всеми сотрудниками. Личную память каждого видит только сам сотрудник и руководитель.</p>'
+      + '<div class="row"><input class="inp" id="memSetC" style="flex:1" placeholder="Например: «Оплата фабрикам — только после согласования руководителя»"><button class="btn" onclick="memAdd(\'company\', \'memSetC\', setMemory)">Запомнить</button></div>';
+    var groups = {};
+    d.items.forEach(function(x){ var g = x.scope === 'company' ? 'О компании' : 'Личное: ' + (x.name || x.phone); (groups[g] = groups[g] || []).push(x); });
+    Object.keys(groups).forEach(function(g){
+      h += '<h4 style="margin:14px 0 8px">' + esc(g) + '</h4>' + groups[g].map(function(x){ return '<div class="card"><div class="kh"><span style="flex:1">' + esc(x.text) + '</span><button class="btn red sm" onclick="memDel(' + x.id + ', setMemory)">Забыть</button></div><div class="ks">№' + x.id + ' · ' + dmy(x.created_at) + '</div></div>'; }).join('');
+    });
+    if (!d.items.length) h += '<div class="note">Память пока пуста.</div>';
+    $('setBody').innerHTML = h;
+  });
+}
+function setUsage(){
+  api('usage').then(function(d){
+    if (!d.ok) { $('setBody').innerHTML = '<div class="note">' + esc(d.error) + '</div>'; return; }
+    var by = {};
+    d.rows.forEach(function(r){ var k = (r.key_name || 'удалённый ключ') + ' · ' + modelName(r.model); var x = by[k] = by[k] || { calls: 0, tin: 0, tout: 0, cr: 0 }; x.calls += +r.calls; x.tin += +r.tokens_in; x.tout += +r.tokens_out; x.cr += +r.cache_read; });
+    var h = '<p class="note">Расход за 30 дней по ключам и моделям. Деньги списываются в аккаунте того ключа, которым сделан запрос.</p>';
+    h += Object.keys(by).length ? '<table class="t"><tr><th>Ключ и модель</th><th class="n">Запросов</th><th class="n">Токенов на входе</th><th class="n">Из кеша</th><th class="n">На выходе</th></tr>' + Object.keys(by).map(function(k){ var x = by[k]; return '<tr><td>' + esc(k) + '</td><td class="n">' + num(x.calls) + '</td><td class="n">' + num(x.tin) + '</td><td class="n">' + num(x.cr) + '</td><td class="n">' + num(x.tout) + '</td></tr>'; }).join('') + '</table>' : '<div class="note">Запросов ещё не было.</div>';
+    $('setBody').innerHTML = h;
+  });
+}
+
+takeToken();
+start();
+</script>
+</body>
+</html>

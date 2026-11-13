@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>ИТК Навигатор</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f2229">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="fav-64.png">
+<style>
+@font-face{font-family:'Roboto';font-weight:400;font-display:swap;src:url(/fonts/roboto-cyrillic-400-normal.woff2) format('woff2');unicode-range:U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Roboto';font-weight:400;font-display:swap;src:url(/fonts/roboto-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+2000-206F,U+2212}
+@font-face{font-family:'Roboto';font-weight:500;font-display:swap;src:url(/fonts/roboto-cyrillic-500-normal.woff2) format('woff2');unicode-range:U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Roboto';font-weight:500;font-display:swap;src:url(/fonts/roboto-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+2000-206F,U+2212}
+@font-face{font-family:'Roboto';font-weight:700;font-display:swap;src:url(/fonts/roboto-cyrillic-700-normal.woff2) format('woff2');unicode-range:U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Roboto';font-weight:700;font-display:swap;src:url(/fonts/roboto-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+2000-206F,U+2212}
+/* светлая тема */
+:root{--sea:#009C9C;--sead:#008080;--navy:#112C93;--ink:#16181d;--mute:#6b7280;--line:#e3e6ec;--bg:#fff;--soft:#f0f2f6;--btn:#fff;--btnink:#1f2229;--sh:0 2px 12px rgba(0,0,0,.2)}
+/* тёмная тема — как у Яндекс Навигатора ночью */
+body.dark{--ink:#f2f3f5;--mute:#9aa0aa;--line:#353a44;--bg:#22252c;--soft:#2e323b;--btn:#22252c;--btnink:#f2f3f5;--sh:0 2px 14px rgba(0,0,0,.5)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;font-family:Roboto,'Noto Sans SC',sans-serif;color:var(--ink);background:#2a2e36}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input{font:inherit;color:inherit}
+.mi{width:24px;height:24px;fill:currentColor;flex:none;display:block}
+.hidden{display:none!important}
+#map{position:fixed;inset:0}
+/* круглые кнопки на карте */
+.rb{position:fixed;z-index:9;width:54px;height:54px;border-radius:50%;background:var(--btn);color:var(--btnink);box-shadow:var(--sh);display:flex;align-items:center;justify-content:center}
+.rb:active{transform:scale(.94)}
+.rb .mi{width:28px;height:28px}
+#bSet{right:14px;top:calc(env(safe-area-inset-top) + 14px)}
+#bMenu{left:14px;top:calc(env(safe-area-inset-top) + 14px)}
+#mnu{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.45)}
+#mnu .in{position:absolute;left:0;top:0;bottom:0;width:min(86vw,360px);background:var(--bg);padding:calc(env(safe-area-inset-top) + 16px) 14px calc(16px + env(safe-area-inset-bottom));overflow-y:auto;box-shadow:4px 0 20px rgba(0,0,0,.35)}
+#mnu h3{margin:0 0 6px;font-size:20px}
+#mnu .mi2{display:flex;align-items:center;gap:12px;width:100%;padding:13px 4px;font-size:16px;border-bottom:1px solid var(--line);text-align:left}
+#mnu .mi2 .mi{color:var(--sea)}
+.rt-m{font-size:12px;color:var(--sea);margin-top:2px}
+#bZin{right:14px;top:42%}
+#bZout{right:14px;top:calc(42% + 64px)}
+#bCmp{right:14px;top:calc(42% + 150px)}
+#bMe{right:14px;top:calc(42% + 214px)}
+#bVoice{left:14px;top:calc(42% + 64px);width:60px;height:60px;background:var(--sea);color:#fff}
+#bVoice .mi{width:30px;height:30px}
+#bVoice.rec{animation:pl 1.2s infinite;background:#e53935}
+@keyframes pl{0%{box-shadow:0 0 0 0 rgba(229,57,53,.55)}100%{box-shadow:0 0 0 18px rgba(229,57,53,0)}}
+#bCmp svg{transition:transform .2s}
+/* нижняя панель поиска */
+#panel{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--bg);border-radius:22px 22px 0 0;box-shadow:0 -2px 16px rgba(0,0,0,.28);padding:8px 14px calc(12px + env(safe-area-inset-bottom));max-height:86vh;display:flex;flex-direction:column}
+#panel.open{top:calc(env(safe-area-inset-top) + 40px)}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:2px auto 10px;flex:none}
+.srow{display:flex;gap:10px;flex:none}
+.sbox{flex:1;display:flex;align-items:center;gap:8px;background:var(--soft);border-radius:16px;padding:0 6px 0 14px;min-width:0}
+.sbox input{flex:1;min-width:0;border:0;outline:0;font-size:17px;height:52px;background:transparent}
+.sbox input::placeholder{color:var(--mute)}
+.sq{width:56px;height:52px;border-radius:16px;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--mute);flex:none}
+.ib{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--mute)}
+.chips{display:flex;gap:6px;overflow-x:auto;margin-top:12px;padding-bottom:2px;flex:none;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;width:72px;font-size:12.5px;color:var(--ink)}
+.cgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 6px;padding:6px 2px 14px}.cgrid .chip{width:auto;text-align:center;line-height:1.2}
+.ri .e{color:var(--sea);font-size:14px;margin-top:2px}
+.chip i{width:50px;height:50px;border-radius:16px;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--sea)}
+#res{overflow-y:auto;margin-top:10px;flex:1;min-height:0}
+.ri{display:flex;gap:10px;align-items:flex-start;padding:12px 2px;border-bottom:1px solid var(--line);width:100%;text-align:left}
+.ri:last-child{border-bottom:0}
+.ri .ic{width:36px;height:36px;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--sea);flex:none}
+.ri .x{flex:1;min-width:0}
+.ri .n{font-weight:500;font-size:16px}
+.ri .z{color:var(--mute);font-size:14px;margin-top:2px}
+.ri .a{color:var(--mute);font-size:13px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ri .d{font-size:13px;color:var(--mute);white-space:nowrap;text-align:right;line-height:1.5}.ri .d b{color:var(--sea);font-weight:500}
+.rmodes{position:sticky;top:0;z-index:2;background:var(--bg);margin:6px 0 4px;padding:4px 0}
+.hint{padding:14px 2px;color:var(--mute);font-size:14px;line-height:1.4}
+.sec{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:14px 2px 2px}
+.spin{width:20px;height:20px;border:3px solid var(--line);border-top-color:var(--sea);border-radius:50%;animation:sp .8s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* карточка места */
+#sheet .grab{width:48px;height:6px;margin:4px auto 12px}#sheet .grabz{padding:6px 0 2px;margin:-8px -16px 0;cursor:grab;touch-action:none}
+#sheet.mini .modes,#sheet.mini .steps,#sheet.mini #favAs{display:none}
+#sheet{display:flex;flex-direction:column;overflow:hidden!important}#sheet>*{flex:none}#sheet .steps{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.dn2{font-size:14px;color:var(--mute);margin-top:1px}
+#sheet.drag{transition:none!important}#sheet{transition:transform .22s ease}
+.dz span{display:block}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--bg);border-radius:22px 22px 0 0;box-shadow:0 -2px 16px rgba(0,0,0,.28);padding:8px 16px calc(14px + env(safe-area-inset-bottom));max-height:62vh;overflow-y:auto}
+.dh{display:flex;gap:10px;align-items:flex-start}
+.dh .x{flex:1;min-width:0}
+.dn{font-size:20px;font-weight:700}
+.dz{font-size:15px;color:var(--mute);margin-top:2px}
+.modes{display:flex;gap:8px;margin:12px 0}
+.modes button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:12px;background:var(--soft);font-size:13px}
+.modes button.on{background:var(--sea);color:#fff}
+.sum{display:flex;align-items:baseline;gap:10px;margin:4px 0 10px}
+.sum b{font-size:24px}
+.sum span{color:var(--mute)}
+.row{display:flex;gap:8px}
+.btn{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border-radius:16px;background:var(--sea);color:#fff;font-weight:500;font-size:16px}
+.btn:active{background:var(--sead)}
+.btn.g{background:var(--soft);color:var(--ink)}
+.favrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.favrow button{border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:14px}
+.steps{margin-top:12px}#sheet.hidden{display:none!important}
+.st{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);font-size:15px}
+.st .ar{width:34px;height:34px;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--sea)}
+.st .t{flex:1}
+.st .m{color:var(--mute);font-size:13px;white-space:nowrap}
+/* настройки */
+#set{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-radius:22px 22px 0 0;box-shadow:0 -2px 16px rgba(0,0,0,.35);padding:8px 16px calc(16px + env(safe-area-inset-bottom));max-height:88vh;overflow-y:auto}
+#set h3{margin:4px 0 12px;font-size:20px;text-align:center}
+.sl{font-size:17px;margin:16px 0 10px}
+.seg{display:flex;background:var(--soft);border-radius:16px;padding:4px;gap:4px}
+.seg button{flex:1;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--mute)}
+.seg button.on{background:var(--bg);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.seg button .mi{width:26px;height:26px}
+.snote{text-align:center;color:var(--mute);font-size:15px;margin-top:10px}
+.tg{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-top:1px solid var(--line);font-size:17px}
+.sw{width:52px;height:30px;border-radius:15px;background:var(--line);position:relative;flex:none;transition:background .2s}
+.sw:after{content:'';position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw.on{background:var(--sea)}.sw.on:after{left:25px}
+/* ведение */
+#nb{position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 10px);z-index:11;background:var(--navy);color:#fff;border-radius:18px;padding:12px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 3px 14px rgba(0,0,0,.3)}
+#nb .ar{width:56px;height:56px;flex:none;display:flex;align-items:center;justify-content:center}
+#nb .ar .mi{width:52px;height:52px}
+#nb .dd{font-size:30px;font-weight:700;line-height:1}
+#nb .tt{font-size:17px;margin-top:4px;line-height:1.25}
+#nb .nx{font-size:13px;opacity:.75;margin-top:3px}
+#nf{position:fixed;left:0;right:0;bottom:0;z-index:11;background:var(--bg);border-radius:22px 22px 0 0;box-shadow:0 -2px 14px rgba(0,0,0,.25);padding:12px 14px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px}
+#nf .x{flex:1}
+#nf .x b{font-size:22px}
+#nf .x div{color:var(--mute);font-size:14px}
+.cb{width:50px;height:50px;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center}
+.cb.red{background:#e53935;color:#fff}
+#off{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 130px);z-index:12;background:#e53935;color:#fff;padding:8px 14px;border-radius:14px;font-size:14px}
+/* таксисту */
+#taxi{position:fixed;inset:0;z-index:30;background:#fff;color:#16181d;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+#taxi .zh{font-size:44px;font-weight:700;line-height:1.25;word-break:break-all}
+#taxi .ad{font-size:24px;margin-top:16px;color:#333;word-break:break-all}
+#taxi .ru{font-size:16px;color:#6b7280;margin-top:18px}
+#taxi .ph{font-size:20px;margin-top:22px;color:var(--navy)}
+#toast{position:fixed;left:50%;bottom:calc(220px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#333;color:#fff;padding:11px 16px;border-radius:12px;font-size:15px;z-index:40;max-width:88vw;text-align:center}
+#boot{position:fixed;inset:0;z-index:50;background:#22252c;color:#9aa0aa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+#boot img{width:84px;height:84px;border-radius:20px}
+/* русские подписи метро на карте */
+.ml{display:flex;align-items:center;gap:4px;white-space:nowrap;font:500 12.5px/1.15 Roboto,sans-serif;color:#1f2229;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;transform:translate(-11px,-11px)}
+body.dark .ml{color:#e9ecf1;text-shadow:0 0 3px #1b1e24,0 0 3px #1b1e24,0 0 2px #1b1e24}
+.ml b{width:22px;height:22px;border-radius:6px;background:#1a73e8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;text-shadow:none;flex:none}
+.ml.e b{width:18px;height:18px;font-size:11px;border-radius:5px}
+.ml span{max-width:170px;overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+<!-- №470 · своя заставка приложения --><style id="itcSplCss">#itcSpl{position:fixed;inset:0;z-index:2147483000;background:#cfe9ef url(/apps/splash/nav.jpg?v=1) 50% 50%/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:max(64px,9vh);box-sizing:border-box;transition:opacity .35s;font-family:Roboto,Arial,sans-serif}#itcSpl:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.72) 100%)}#itcSpl .nm{position:relative;color:#fff;font-size:30px;font-weight:700;letter-spacing:.3px;text-shadow:0 2px 12px rgba(0,0,0,.45);margin-bottom:22px;text-align:center;padding:0 20px}#itcSpl .sp{position:relative;width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;animation:itcSplR .9s linear infinite}@keyframes itcSplR{to{transform:rotate(360deg)}}#itcSpl.off{opacity:0;pointer-events:none}</style><div id="itcSpl"><div class="nm">Навигатор</div><div class="sp"></div></div><script>(function(){var s=document.getElementById("itcSpl");if(!s)return;var u=navigator.userAgent||"",sa=false;try{sa=matchMedia("(display-mode: standalone)").matches||navigator.standalone}catch(e){}if(!/ITCMini|ITCWindow|ITCSklad/.test(u)&&!sa){s.parentNode.removeChild(s);return}var t0=Date.now(),d=0;function h(){if(d)return;d=1;setTimeout(function(){s.className="off";setTimeout(function(){if(s.parentNode)s.parentNode.removeChild(s)},450)},Math.max(0,1000-(Date.now()-t0)))}if(document.readyState==="complete")h();else addEventListener("load",h);setTimeout(h,6000)})()</script>
+<div id="map"></div>
+<div id="boot"><img src="icon-192.png" alt=""><div><span class="spin"></span>Загружаю карту…</div></div>
+
+<!-- кнопки на карте -->
+<button class="rb" id="bMenu" aria-label="Меню"><svg class="mi" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
+<button class="rb" id="bSet" aria-label="Настройки"><svg class="mi" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></button>
+<button class="rb" id="bZin" aria-label="Крупнее"><svg class="mi" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></button>
+<button class="rb" id="bZout" aria-label="Мельче"><svg class="mi" viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg></button>
+<button class="rb" id="bCmp" aria-label="Север"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M12 2 7.5 12h9z" fill="#e53935"/><path d="M12 22l4.5-10h-9z" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="var(--btn)"/></svg></button>
+<button class="rb" id="bMe" aria-label="Где я"><svg class="mi" viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></button>
+<button class="rb" id="bVoice" aria-label="Сказать, куда ехать"><svg class="mi" viewBox="0 0 24 24"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg></button>
+
+<!-- нижняя панель: поиск, закладки, быстрые кнопки -->
+<div id="panel">
+  <div class="grab" id="grab"></div>
+  <div class="srow">
+    <div class="sbox">
+      <input id="q" type="search" placeholder="Поиск мест и адресов" autocomplete="off" enterkeyhint="search">
+      <button class="ib hidden" id="qx" aria-label="Очистить"><svg class="mi" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+    <button class="sq" id="bFav" aria-label="Мои места"><svg class="mi" viewBox="0 0 24 24"><path d="M15 7v12.97l-4.21-1.81-.79-.34-.79.34L5 19.97V7h10m4-6H8.99C7.89 1 7 1.9 7 3h10c1.1 0 2 .9 2 2v13l2 1V3c0-1.1-.9-2-2-2zm-4 4H5c-1.1 0-2 .9-2 2v16l7-3 7 3V7c0-1.1-.9-2-2-2z"/></svg></button>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div id="res" class="hidden"></div>
+</div>
+
+<div id="mnu" class="hidden"><div class="in"><h3>ИТК Навигатор</h3><div class="hint" style="padding:0 0 8px">Последние маршруты, мои места и настройки</div>
+  <div class="sec">Последние маршруты</div><div id="mnuR"></div>
+  <div class="sec">Ещё</div>
+  <button class="mi2" data-mn="fav"><svg class="mi" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>Мои места</button>
+  <button class="mi2" data-mn="set"><svg class="mi" viewBox="0 0 24 24"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>Настройки</button>
+  <button class="mi2" data-mn="clr"><svg class="mi" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Очистить последние маршруты</button>
+</div></div>
+
+<!-- карточка места и маршрут -->
+<div id="sheet" class="hidden">
+  <div class="grabz" id="sGrab"><div class="grab"></div></div>
+  <div class="dh"><div class="x"><div class="dn" id="dn"></div><div class="dz" id="dz"></div></div>
+    <button class="ib" id="star" aria-label="В мои места"></button></div>
+  <div class="favrow hidden" id="favAs"><button data-k="Дом">Дом</button><button data-k="Офис">Офис</button><button data-k="Склад">Склад</button><button data-k="">Под своим названием</button></div>
+  <div class="modes" id="modes">
+    <button data-m="walk"><svg class="mi" viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9 7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>Пешком</button>
+    <button data-m="car"><svg class="mi" viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>На машине</button>
+    <button data-m="bike"><svg class="mi" viewBox="0 0 24 24"><path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10 2.4-2.4.8.8c1.3 1.3 3 2.1 5.1 2.1V9c-1.5 0-2.7-.6-3.6-1.5l-1.9-1.9c-.5-.4-1-.6-1.6-.6s-1.1.2-1.4.6L7.8 8.4c-.4.4-.6.9-.6 1.4 0 .6.2 1.1.6 1.4L11 14v5h2v-6.2l-2.2-2.3zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"/></svg>Велосипед</button>
+  </div>
+  <div id="rinfo"></div>
+  <div class="row" id="acts">
+    <button class="btn" id="go"><svg class="mi" viewBox="0 0 24 24"><path d="M12 2 4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>Поехали</button>
+    <button class="btn g" id="taxiB"><svg class="mi" viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5H15V3H9v2H6.5c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>Таксисту</button>
+  </div>
+  <div class="steps" id="steps"></div>
+</div>
+
+<!-- настройки -->
+<div id="set" class="hidden">
+  <div class="grab"></div>
+  <h3>Настройки</h3>
+  <div class="snote" style="margin:-4px 0 8px">Версия 13 · «Назад» закрывает навигатор</div>
+  <div class="sl">Звуковое сопровождение</div>
+  <div class="seg" id="sSnd">
+    <button data-v="0" aria-label="Без звука"><svg class="mi" viewBox="0 0 24 24"><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z"/></svg></button>
+    <button data-v="1" aria-label="Только важное"><svg class="mi" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13-2h2v6h-2zm0 8h2v2h-2z"/></svg></button>
+    <button data-v="2" aria-label="Повороты"><svg class="mi" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg></button>
+    <button data-v="3" aria-label="Все подсказки"><svg class="mi" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
+  </div>
+  <div class="snote" id="sSndN"></div>
+  <div class="sl">Громкость</div>
+  <div class="seg" id="sVol"><button data-v="1">Низкая</button><button data-v="2">Средняя</button><button data-v="3">Высокая</button></div>
+  <div class="sl">Тема</div>
+  <div class="seg" id="sTheme"><button data-v="auto">Авто</button><button data-v="light">Светлая</button><button data-v="dark">Тёмная</button></div>
+  <div class="sl">Курсор</div>
+  <div class="seg" id="sCur"><button data-v="arrow">Жёлтая стрелка</button><button data-v="dot">Синяя точка</button></div>
+  <div style="height:10px"></div>
+  <div class="tg" id="tToll"><span>Избегать платных дорог</span><span class="sw" id="swToll"></span></div>
+  <div class="tg" id="tMetro"><span>Русские названия метро на карте</span><span class="sw" id="swMetro"></span></div>
+  <div style="height:8px"></div>
+  <button class="btn g" id="setX" style="width:100%">Готово</button>
+</div>
+
+<div id="nb" class="hidden"><div class="ar" id="nbA"></div><div style="flex:1;min-width:0"><div class="dd" id="nbD"></div><div class="tt" id="nbT"></div><div class="nx" id="nbN"></div></div></div>
+<div id="off" class="hidden">Вы ушли с маршрута — перестраиваю…</div>
+<div id="nf" class="hidden">
+  <div class="x"><b id="nfD"></b><div id="nfT"></div></div>
+  <button class="cb" id="nfS" aria-label="Звук"></button>
+  <button class="cb red" id="nfX" aria-label="Закончить"><svg class="mi" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+</div>
+<div id="taxi" class="hidden"><div class="zh" id="txZ"></div><div class="ad" id="txA"></div><div class="ph">请送我到这里，谢谢！</div><div class="ru" id="txR"></div><div class="ru">Покажите этот экран водителю. Нажмите, чтобы закрыть.</div></div>
+<div id="toast" class="hidden"></div>
+
+<script>
+window._AMapSecurityConfig = { securityJsCode: '0e0303a78ace94371783d315ea80922c' };
+</script>
+<script src="https://webapi.amap.com/maps?v=2.0&key=3f1805c084df9b6bdb593bc23af4bb0b&plugin=AMap.PlaceSearch,AMap.Walking,AMap.Driving,AMap.Riding,AMap.Geolocation,AMap.Scale"></script>
+<script>
+'use strict';
+/* ==== ИТК Навигатор · v2 · 02.11.2026 · в стиле Яндекс Навигатора ====
+   Карта во весь экран (ночью тёмная), круглые кнопки по краям, жёлтая стрелка «я» поворачивается по ходу
+   движения, при ведении карта крутится по направлению. Снизу — панель поиска, мои места и быстрые кнопки
+   (метро, рынки, аптека…). Слева — большая голосовая кнопка: сказали «Южный вокзал» — сразу маршрут.
+   Русские названия станций и входов метро поверх китайской карты. Настройки: звук (4 уровня), громкость,
+   тема, курсор, «избегать платных дорог». Поиск по-русски — DeepSeek переводит запрос в китайское название. */
+var $ = function (id) { return document.getElementById(id); };
+var API = 'api.php';
+var AS = window.AndroidSpeech || null;
+function ls(k, v) { try { if (v === undefined) { var s = localStorage.getItem('nv_' + k); return s ? JSON.parse(s) : null; } localStorage.setItem('nv_' + k, JSON.stringify(v)); } catch (e) { return null; } }
+var DEV = ls('dev'); if (!DEV) { var a = new Uint8Array(12); crypto.getRandomValues(a); DEV = Array.prototype.map.call(a, function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); ls('dev', DEV); }
+var S = Object.assign({ mode: 'walk', snd: 3, vol: 3, theme: 'auto', cur: 'arrow', noToll: false, metro: true, fav: [] }, ls('s') || {});
+if (S.sound === false && S.snd === 3) S.snd = 0; delete S.sound;
+function saveS() { ls('s', S); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+var tT; function toast(m, ms) { var t = $('toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(tT); tT = setTimeout(function () { t.classList.add('hidden'); }, ms || 2800); }
+function post(a, body, ms) {
+  var ctl = window.AbortController ? new AbortController() : null; var tm = setTimeout(function () { if (ctl) ctl.abort(); }, ms || 25000);
+  return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ a: a, d: DEV }, body)), signal: ctl ? ctl.signal : undefined })
+    .then(function (r) { return r.json(); }).then(function (j) { clearTimeout(tm); if (!j.ok) throw { msg: j.msg || 'Не получилось' }; return j; }, function (e) { clearTimeout(tm); throw (e && e.msg) ? e : { msg: 'Нет связи с сервером' }; });
+}
+var hasHan = function (s) { return /[一-鿿]/.test(s); };
+function fmtD(m) { m = Math.max(0, Math.round(m)); if (m < 1000) return (m < 100 ? Math.round(m / 10) * 10 : Math.round(m / 50) * 50) + ' м'; return (m / 1000).toFixed(m < 10000 ? 1 : 0).replace('.', ',') + ' км'; }
+function fmtT(s) { var m = Math.round(s / 60); if (m < 60) return m + ' мин'; return Math.floor(m / 60) + ' ч ' + (m % 60) + ' мин'; }
+function sayD(m) { m = Math.round(m); if (m >= 1000) return 'через ' + (m / 1000).toFixed(1).replace('.', ',').replace(',0', '') + ' километра'; return 'через ' + (m >= 100 ? Math.round(m / 50) * 50 : Math.round(m / 10) * 10) + ' метров'; }
+function capital(t) { return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
+
+/* ---------- тема: днём светлая, ночью тёмная ---------- */
+function isDark() { if (S.theme === 'dark') return true; if (S.theme === 'light') return false; var h = new Date().getHours(); return h >= 19 || h < 7; }
+var curDark = null;
+function applyTheme() {
+  var d = isDark(); if (d === curDark) return; curDark = d;
+  document.body.classList.toggle('dark', d);
+  try { document.querySelector('meta[name=theme-color]').setAttribute('content', d ? '#1f2229' : '#ffffff'); } catch (e) {}
+  if (map) try { map.setMapStyle(d ? 'amap://styles/dark' : 'amap://styles/normal'); } catch (e) {}
+}
+setInterval(applyTheme, 60000);
+
+/* ---------- голос ---------- */
+var VOICES = []; try { VOICES = speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = function () { VOICES = speechSynthesis.getVoices(); }; } catch (e) {}
+// lvl: 1 — важное (прибытие, ушли с маршрута), 2 — повороты рядом, 3 — все подсказки
+function say(t, lvl) {
+  if (!t || S.snd < (lvl || 3)) return;
+  if (AS && AS.say) { try { AS.say(t, 'ru'); } catch (e) {} return; }
+  try { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(t); u.lang = 'ru-RU'; u.rate = 1.05; u.volume = [0, .45, .75, 1][S.vol] || 1; var v = VOICES.filter(function (x) { return /^ru/i.test(x.lang); })[0]; if (v) u.voice = v; speechSynthesis.speak(u); } catch (e) {}
+}
+function shutUp() { try { if (AS) AS.stopSay(); else speechSynthesis.cancel(); } catch (e) {} }
+var listening = false, REC = null, voiceGo = false;
+function micStop() { listening = false; $('bVoice').classList.remove('rec'); try { if (AS && AS.stopListen) AS.stopListen(); } catch (e) {} try { if (REC) REC.abort(); } catch (e) {} REC = null; }
+function listen(auto) {
+  if (listening) { micStop(); return; }
+  voiceGo = !!auto;
+  var done = function (t) { micStop(); t = (t || '').trim(); if (t) { $('q').value = t; qChanged(); search(); } };
+  if (AS && AS.canListen && AS.canListen()) {
+    listening = true; $('bVoice').classList.add('rec'); toast('Говорите, куда ехать', 2000);
+    window.itcSpeechPartial = function (t) { $('q').value = t; qChanged(); };
+    window.itcSpeechResult = done; window.itcSpeechError = function (m) { micStop(); if (m) toast(m); };
+    AS.listen('ru'); return;
+  }
+  var R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!R) { toast('Голос здесь недоступен — нажмите микрофон на клавиатуре'); $('q').focus(); return; }
+  REC = new R(); REC.lang = 'ru-RU'; REC.interimResults = true; var fin = '', part = '';
+  REC.onresult = function (e) { part = ''; for (var i = e.resultIndex; i < e.results.length; i++) { if (e.results[i].isFinal) fin += e.results[i][0].transcript; else part += e.results[i][0].transcript; } $('q').value = fin + part; qChanged(); };
+  REC.onend = function () { done(fin || part); }; REC.onerror = function () {};
+  listening = true; $('bVoice').classList.add('rec'); toast('Говорите, куда ехать', 2000); try { REC.start(); } catch (e) { micStop(); }
+}
+$('bVoice').onclick = function () { listen(true); };
+
+/* ---------- карта, где я, стрелка ---------- */
+var map, geo, ME = null, CITY = '', meMarker = null, HEAD = 0, FOLLOW = false, watchId = null, lastFixPos = null;
+function toGcj(lng, lat) {   // GPS телефона (WGS-84) → координаты карт Китая (GCJ-02)
+  var a = 6378245.0, ee = 0.00669342162296594323, PI = Math.PI;
+  function tLat(x, y) { var r = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x)); r += (20 * Math.sin(6 * x * PI) + 20 * Math.sin(2 * x * PI)) * 2 / 3; r += (20 * Math.sin(y * PI) + 40 * Math.sin(y / 3 * PI)) * 2 / 3; r += (160 * Math.sin(y / 12 * PI) + 320 * Math.sin(y * PI / 30)) * 2 / 3; return r; }
+  function tLng(x, y) { var r = 300 + x + 2 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x)); r += (20 * Math.sin(6 * x * PI) + 20 * Math.sin(2 * x * PI)) * 2 / 3; r += (20 * Math.sin(x * PI) + 40 * Math.sin(x / 3 * PI)) * 2 / 3; r += (150 * Math.sin(x / 12 * PI) + 300 * Math.sin(x / 30 * PI)) * 2 / 3; return r; }
+  if (lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271) return [lng, lat];
+  var dLat = tLat(lng - 105, lat - 35), dLng = tLng(lng - 105, lat - 35), rad = lat / 180 * PI, m = Math.sin(rad); m = 1 - ee * m * m; var sm = Math.sqrt(m);
+  dLat = (dLat * 180) / ((a * (1 - ee)) / (m * sm) * PI); dLng = (dLng * 180) / (a / sm * Math.cos(rad) * PI);
+  return [lng + dLng, lat + dLat];
+}
+var ARROW = '<svg width="54" height="54" viewBox="0 0 54 54" style="display:block;filter:drop-shadow(0 3px 4px rgba(0,0,0,.45))"><defs><linearGradient id="ga" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE27A"/><stop offset="1" stop-color="#F5B700"/></linearGradient></defs><path d="M27 5 45 47 27 38 9 47z" fill="url(#ga)" stroke="#E0A100" stroke-width="1.5" stroke-linejoin="round"/><path d="M27 5 27 38 9 47z" fill="#000" opacity=".08"/></svg>';
+var DOT = '<div style="width:20px;height:20px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 7px rgba(26,115,232,.25)"></div>';
+function meDot(p) {
+  if (!meMarker) meMarker = new AMap.Marker({ position: p, zIndex: 200, anchor: 'center', offset: new AMap.Pixel(0, 0) });
+  if (meMarker._cur !== S.cur) { meMarker._cur = S.cur; meMarker.setContent(S.cur === 'dot' ? DOT : '<div id="meArr" style="width:54px;height:54px;will-change:transform">' + ARROW + '</div>'); HC.da = null; }
+  meMarker.setPosition(p); try { meMarker.setAngle(0); } catch (e) {} headRot();
+  if (!meMarker.getMap()) meMarker.setMap(map);
+}
+function locate(cb) {
+  geo.getCurrentPosition(function (st, r) {
+    if (st === 'complete') { ME = r.position; CITY = (r.addressComponent && (r.addressComponent.city || r.addressComponent.province)) || CITY; ls('city', CITY); meDot(ME); if (cb) cb(true); }
+    else { if (cb) cb(false); toast('Не удалось определить, где вы. Разрешите доступ к местоположению.'); }
+  });
+}
+// направление: по движению (GPS), а стоя — по компасу телефона
+function bearing(a, b) { var la1 = a.lat * Math.PI / 180, la2 = b.lat * Math.PI / 180, dl = (b.lng - a.lng) * Math.PI / 180; var y = Math.sin(dl) * Math.cos(la2), x = Math.cos(la1) * Math.sin(la2) - Math.sin(la1) * Math.cos(la2) * Math.cos(dl); return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; }
+var moving = false;
+/* v2 · СТРЕЛКА КАК В «МОЁМ ГУАНЧЖОУ»: направление с учётом наклона телефона, сглаживание без рывков,
+   поворот кратчайшим путём (без оборота через 360°), не чаще кадра; в приложении ИТК — компас самого
+   телефона (window.itcCompass); в режиме «по ходу» крутится карта, а стрелка смотрит носом вверх. */
+var HC = { sx: null, sy: null, raf: 0, da: null, mr: null, src: '', at: 0 };
+function cmpHead(a, b, g) { var R = Math.PI / 180, sA = Math.sin(a * R), cA = Math.cos(a * R), sB = Math.sin(b * R), cB = Math.cos(b * R), sG = Math.sin(g * R), cG = Math.cos(g * R);
+  var E = -sA * cB + (-sG * cA - cG * sB * sA), N = cA * cB + (-sG * sA + cG * sB * cA); if (Math.abs(E) + Math.abs(N) < 1e-6) return null; return (Math.atan2(E, N) / R + 360) % 360; }
+function headSet(h, hard) {
+  var R = Math.PI / 180, k = hard ? 1 : 0.22;
+  if (HC.sx == null || hard) { HC.sx = Math.sin(h * R); HC.sy = Math.cos(h * R); } else { HC.sx += k * (Math.sin(h * R) - HC.sx); HC.sy += k * (Math.cos(h * R) - HC.sy); }
+  HEAD = (Math.atan2(HC.sx, HC.sy) / R + 360) % 360; headRot();
+}
+/* v14 · ПЕШКОМ КАРТА НЕ КРУТИТСЯ ОТ КОМПАСА: компас поворачивает только вашу стрелку (куда смотрит телефон),
+   а карта в ведении поворачивается только по маршруту — плавно, на поворотах дороги. Компас сбит — подсказка «восьмёркой». */
+var ARR = null, AR = { sx: null, sy: null, at: 0, buf: [], warn: 0, bad: 0 };
+function arrSet(h, acc) {
+  var Rr = Math.PI / 180, t = Date.now();
+  if (AR.sx == null || t - AR.at > 3000) { AR.sx = Math.sin(h * Rr); AR.sy = Math.cos(h * Rr); } else { AR.sx += 0.25 * (Math.sin(h * Rr) - AR.sx); AR.sy += 0.25 * (Math.cos(h * Rr) - AR.sy); }
+  ARR = (Math.atan2(AR.sx, AR.sy) / Rr + 360) % 360; AR.at = t;
+  AR.buf.push([t, h]); while (AR.buf.length && t - AR.buf[0][0] > 4000) AR.buf.shift();
+  var absC = (HC.absAt && t - HC.absAt < 3000) || (HC.src === 'app' && t - HC.at < 3000) || acc != null;   // относительный (гироскоп) не проверяем — вы просто поворачиваетесь
+  if (absC && AR.buf.length >= 10 && !moving) { var ss = 0, cc = 0; AR.buf.forEach(function (x) { ss += Math.sin(x[1] * Rr); cc += Math.cos(x[1] * Rr); });
+    var rb = Math.sqrt(ss * ss + cc * cc) / AR.buf.length; AR.bad = rb < 0.55 ? (AR.bad || t) : 0; }   // разброс больше ~60° дольше 5 секунд, хотя вы стоите
+  if ((acc != null && (acc < 0 || acc > 35)) || (AR.bad && t - AR.bad > 5000)) { if (t - AR.warn > 120000) { AR.warn = t; AR.bad = 0; toast('Компас телефона сбился: покрутите телефон в воздухе восьмёркой 2–3 раза'); } }
+  headRot();
+}
+function arrHead() { return ARR != null && Date.now() - AR.at < 2500 ? ARR : HEAD; }
+function headRot() { if (!HC.raf) HC.raf = (window.requestAnimationFrame || function (f) { return setTimeout(f, 16); })(headDraw); }
+/* v10 · ПЛАВНЫЙ ПОВОРОТ БЕЗ ТОРМОЗОВ: раньше карта прыгала рывком раз в секунду (по точке GPS) и каждый раз
+   заново пересчитывала положение стрелки в 4 шага. Теперь карта поворачивается плавно, кадр за кадром,
+   а сдвиг «стрелка внизу» считается один раз (расстояние вперёд по земле) и дальше просто откладывается от вас. */
+var AN = { raf: 0, D: null, z: null };
+function aheadOf(p, b, d) { var R = Math.PI / 180, lat = p.lat + d * Math.cos(b * R) / 111320, lng = p.lng + d * Math.sin(b * R) / (111320 * Math.cos(p.lat * R)); return new AMap.LngLat(lng, lat); }
+function navCalib() {   // сколько метров вперёд от вас должен быть центр карты, чтобы вы стояли на нужной высоте экрана
+  var P = (NAV && NAV.view) || ME; if (!P || !map) return; navCenter(P); try { AN.D = AMap.GeometryUtil.distance(P, map.getCenter()); AN.z = map.getZoom(); } catch (e) { AN.D = null; }
+}
+function navBack() { if (!NAV) return; FOLLOW = true; headUp = true; try { if ((map.getPitch() || 0) < 30) map.setPitch(45); } catch (e) {} rotateTo(HEAD); AN.D = null; navPlace(); }
+function navPlace() {   // поставить карту: вы — на своей высоте экрана, «вперёд» — вверх
+  var P = (NAV && NAV.view) || ME; if (!P || !FOLLOW) return;
+  if (NAV && headUp) { try { if ((map.getPitch() || 0) < 30) { map.setPitch(45, true); AN.D = null; } } catch (e) {} }
+  if (AN.D == null || Math.abs((map.getZoom() || 0) - (AN.z || 0)) > 0.05) navCalib();
+  else { var r = 0; try { r = map.getRotation() || 0; } catch (e) {} try { map.setCenter(aheadOf(P, -r, AN.D), true); } catch (e) {} }
+}
+function animStep() {
+  AN.raf = 0; if (!map) return;
+  if (NAV && headUp) {
+    var tgt = -HEAD, cur = HC.mr == null ? (map.getRotation() || 0) : HC.mr, dd = ((tgt - cur + 540) % 360) - 180;
+    if (Math.abs(dd) > 0.4) { var st = dd * 0.16; if (Math.abs(st) < 0.4) st = dd > 0 ? 0.4 : -0.4; HC.mr = cur + st;
+      try { map.setRotation(((HC.mr % 360) + 360) % 360, true); } catch (e) {} paintCmp(true); navPlace(); headArrow();
+      AN.raf = (window.requestAnimationFrame || function (f) { return setTimeout(f, 16); })(animStep); return; }
+    HC.mr = cur + dd;
+  }
+  headArrow();
+}
+function headDraw() {
+  HC.raf = 0; if (!map) return;
+  if (NAV && headUp) { if (!AN.raf) animStep(); return; }
+  HC.mr = null; headArrow();
+}
+function headArrow() {
+  var el = document.getElementById('meArr'); if (!el) return;
+  var r = 0; try { r = map.getRotation() || 0; } catch (e) {}
+  var want = arrHead() + r, prev = HC.da == null ? want : HC.da, diff = ((want - prev + 540) % 360) - 180; HC.da = prev + diff;
+  el.style.transform = 'rotate(' + HC.da.toFixed(1) + 'deg)';
+}
+/* v13 · КАК В ЯНДЕКСЕ: в ведении пешком (и когда стоите) стрелка и карта поворачиваются по компасу телефона —
+   куда смотрите, туда и карта. На машине на остановке направление по-прежнему держит маршрут. */
+function cmpOk() { return !NAV ? !moving : (!ROUTE || ROUTE.mode !== 'car'); }   // v14: пешком стрелка всегда по компасу; карта — по маршруту
+function onOrient(e) {
+  if (!cmpOk()) return;   // едем — направление даёт GPS; на машине в ведении — сам маршрут
+  var h = null, t = Date.now();
+  if (e.webkitCompassHeading != null) h = e.webkitCompassHeading;
+  else if ((e.type === 'deviceorientationabsolute' || e.absolute === true) && e.alpha != null && e.beta != null) { if (HC.src === 'app' && t - HC.at < 3000) return; h = cmpHead(e.alpha, e.beta, e.gamma || 0); HC.absAt = t; }
+  /* v15 · ТЕЛЕФОН БЕЗ «СЕВЕРА»: берём относительный поворот (гироскоп) — стрелка сразу поворачивается вместе с вами,
+     а «где север» подгоняем: в ведении — по маршруту при старте, дальше — по направлению шагов (GPS) */
+  else if (e.alpha != null && e.beta != null) {
+    if ((HC.src === 'app' && t - HC.at < 3000) || (HC.absAt && t - HC.absAt < 3000)) return;
+    var rel = cmpHead(e.alpha, e.beta, e.gamma || 0); if (rel == null) return; AR.rel = rel;
+    if (AR.off == null) { if (!NAV) return; AR.off = ((HEAD - rel) % 360 + 360) % 360; }
+    h = (rel + AR.off) % 360;
+  }
+  if (h == null || isNaN(h)) return;
+  var sc = (screen.orientation && screen.orientation.angle) || window.orientation || 0; h = (h + sc + 360) % 360;
+  HC.src = 'web'; arrSet(h, e.webkitCompassAccuracy != null ? e.webkitCompassAccuracy : null);
+}
+window.itcCompass = function (deg) { deg = +deg; if (isNaN(deg) || !cmpOk()) return; HC.src = 'app'; HC.at = Date.now(); arrSet(((deg % 360) + 360) % 360); };
+function appCompass(on) { try { if (window.AndroidApp) { if (on && AndroidApp.compassStart) AndroidApp.compassStart(); if (!on && AndroidApp.compassStop) AndroidApp.compassStop(); } } catch (e) {} }
+appCompass(true);
+document.addEventListener('visibilitychange', function () { appCompass(document.visibilityState === 'visible'); });
+(function () { try { if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') { var ask = function () { document.removeEventListener('click', ask, true); DeviceOrientationEvent.requestPermission().then(function (st) { if (st === 'granted') window.addEventListener('deviceorientation', onOrient); }).catch(function () {}); }; document.addEventListener('click', ask, true); return; } } catch (e) {}
+  window.addEventListener('deviceorientationabsolute', onOrient); window.addEventListener('deviceorientation', onOrient); })();
+function startWatch() {
+  if (watchId != null || !navigator.geolocation) return;
+  watchId = navigator.geolocation.watchPosition(onFix, function () { if (NAV) toast('Нет сигнала GPS'); }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+}
+function onFix(p) {
+  var g = toGcj(p.coords.longitude, p.coords.latitude), pos = new AMap.LngLat(g[0], g[1]);
+  /* v11 · GPS В ПОМЕЩЕНИИ ПРЫГАЕТ на 20–30 м. Прыжок на месте — не движение: движением считаем скорость
+     от 1,2 м/с (у GPS) или сдвиг больше, чем погрешность точки; плохие точки (погрешность > 60 м) в ведении пропускаем */
+  var sp = p.coords.speed || 0, acc = p.coords.accuracy || 30;
+  if (NAV && acc > 60 && ME) return;
+  var gh = null, dmv = lastFixPos ? AMap.GeometryUtil.distance(lastFixPos, pos) : 0;
+  if (p.coords.heading != null && !isNaN(p.coords.heading) && sp > 1.2) { gh = p.coords.heading; moving = true; }
+  else if (lastFixPos && dmv > Math.max(12, acc) && sp > 0.5) { gh = bearing(lastFixPos, pos); moving = true; }
+  else if (sp < 0.5) moving = false;
+  if (gh != null) { if (NAV) NAV.gpsH = gh; else headSet(gh);
+    if (AR.rel != null) { var o = ((gh - AR.rel) % 360 + 360) % 360; if (AR.off == null) AR.off = o; else { var dd = ((o - AR.off + 540) % 360) - 180; AR.off = (AR.off + dd * 0.15 + 360) % 360; } } }
+  if (!lastFixPos || dmv > Math.max(12, acc)) lastFixPos = pos;
+  ME = pos;
+  if (NAV) { navFix(pos, acc); return; }
+  meDot(pos);
+  if (FOLLOW) map.setCenter(pos);
+}
+/* v7 · в ведении стрелка стоит внизу экрана (на 3/4 высоты) — впереди видно больше дороги, как в навигаторах */
+var NAV_Y = 0.68;   // v9: стрелка на 68% высоты экрана, как у Яндекс Навигатора (точно, с поправкой на наклон карты)
+function navCenter(pos) {
+  if (!pos || !map) return;
+  try { map.setCenter(pos, true); var sz = map.getSize(), w = sz.width || sz.getWidth(), h = sz.height || sz.getHeight(), ty = h * NAV_Y;
+    /* при наклоне 45° сдвиг на экране не равен сдвигу на земле — подгоняем за 2–3 шага, меряя, где стрелка оказалась */
+    for (var k = 0; k < 4; k++) { var p = map.lngLatToContainer(pos), dy = p.y - ty, dx = p.x - w / 2; if (Math.abs(dy) < 3 && Math.abs(dx) < 3) break;
+      var c = map.containerToLngLat(new AMap.Pixel(w / 2 + dx, h / 2 + dy)); if (!c) break; map.setCenter(c, true); }
+  } catch (e) { try { map.setCenter(pos); } catch (_) {} }
+}
+function rotateTo(h) { HC.mr = -h; try { map.setRotation((360 - h) % 360, true); } catch (e) {} paintCmp(); }
+function paintCmp(noArr) { var r = 0; try { r = map.getRotation() || 0; } catch (e) {} $('bCmp').firstChild.style.transform = 'rotate(' + r + 'deg)'; if (!noArr) headArrow(); }
+var headUp = true;
+$('bCmp').onclick = function () {
+  if (NAV) { headUp = !headUp; if (headUp) { rotateTo(HEAD); try { map.setPitch(45); } catch (e) {} toast('Карта по направлению движения'); } else { rotateTo(0); try { map.setPitch(0); } catch (e) {} toast('Север вверху'); } return; }
+  rotateTo(0); try { map.setPitch(0); } catch (e) {}
+};
+$('bZin').onclick = function () { map.zoomIn(); };
+$('bZout').onclick = function () { map.zoomOut(); };
+$('bMe').onclick = function () { FOLLOW = true; if (NAV) { AN.D = null; navPlace(); return; } if (ME) map.setZoomAndCenter(17, ME); locate(function (ok) { if (ok) map.setZoomAndCenter(17, ME); }); };
+
+function boot() {
+  if (!window.AMap) { $('boot').innerHTML = '<div style="padding:24px;text-align:center">Карта не загрузилась. Проверьте интернет и откройте снова.</div>'; return; }
+  map = new AMap.Map('map', { zoom: 15, lang: 'en', resizeEnable: true, viewMode: '3D', rotateEnable: true, pitchEnable: true, center: [113.3245, 23.1065], mapStyle: isDark() ? 'amap://styles/dark' : 'amap://styles/normal' });
+  map.addControl(new AMap.Scale({ position: 'LT' }));
+  curDark = null; applyTheme();
+  geo = new AMap.Geolocation({ enableHighAccuracy: true, timeout: 12000, needAddress: true, convert: true, showMarker: false, showCircle: false, panToLocation: false });
+  CITY = ls('city') || '';
+  $('boot').classList.add('hidden');
+  map.on('dragstart', function () { FOLLOW = false; if (NAV) { clearTimeout(AN.back); AN.back = setTimeout(navBack, 8000); } });
+  map.on('rotatechange', paintCmp);
+  map.on('moveend', metroLater); map.on('zoomend', metroLater);
+  startWatch();
+  // из «Мой Гуанчжоу»: ?to=lng,lat&zh=…&ru=… — сразу место назначения и маршрут
+  var qs = new URLSearchParams(location.search), to = (qs.get('to') || '').split(',');
+  if (to.length === 2 && !isNaN(+to[0]) && !isNaN(+to[1])) {
+    var zh = qs.get('zh') || '', ru = qs.get('ru') || '';
+    history.replaceState({ s: 'home' }, '', location.pathname);
+    locate(function () { pick({ name: zh || ru || 'Место назначения', ru: ru, addr: '', pos: new AMap.LngLat(+to[0], +to[1]) }); });
+    return;
+  }
+  locate(function (ok) { if (ok) { FOLLOW = true; map.setZoomAndCenter(16, ME); } metroLater(); });
+}
+window.addEventListener('load', boot);
+
+/* ---------- русские названия метро на карте ---------- */
+var MT = {}, mtMarks = [], mtTimer = 0, MNAME = ls('mnames') || {};
+function metroLater() { clearTimeout(mtTimer); mtTimer = setTimeout(metroLabels, 600); }
+function stParse(n) {   // 美的大道(地铁站)C口 → {st:'美的大道', ex:'C'}
+  var m = /^(.+?)[（(]?地铁站[)）]?\s*([A-Za-z0-9]+)\s*口/.exec(n); if (m) return { st: m[1], ex: m[2].toUpperCase() };
+  m = /^(.+?)[（(]地铁站[)）]$/.exec(n) || /^(.+?)地铁站$/.exec(n) || /^(.+?)站$/.exec(n); if (m) return { st: m[1], ex: '' };
+  return { st: n.replace(/[（(].*$/, ''), ex: '' };
+}
+function clearMetro() { mtMarks.forEach(function (m) { m.setMap(null); }); mtMarks = []; }
+function metroLabels() {
+  if (!map || !S.metro || NAV) { clearMetro(); return; }
+  var z = map.getZoom(); if (z < 14.5) { clearMetro(); return; }
+  var c = map.getCenter(), key = Math.round(c.lng * 200) + ',' + Math.round(c.lat * 200);
+  var draw = function (pois) {
+    var need = []; pois.forEach(function (p) { var s = stParse(p.name).st; if (!MNAME[s] && need.indexOf(s) < 0) need.push(s); });
+    var paint = function () {
+      clearMetro();
+      pois.forEach(function (p) {
+        var pr = stParse(p.name), ru = MNAME[pr.st]; if (!ru || !p.location) return;
+        if (pr.ex && z < 16) return;   // входы — только крупно
+        var txt = pr.ex ? ru + ', вход ' + pr.ex : ru;
+        var mk = new AMap.Marker({ position: p.location, zIndex: pr.ex ? 90 : 95, anchor: 'top-left', content: '<div class="ml' + (pr.ex ? ' e' : '') + '"><b>М</b><span>' + esc(txt) + '</span></div>' });
+        mk.setMap(map); mtMarks.push(mk);
+      });
+    };
+    if (!need.length) { paint(); return; }
+    post('names', { items: need.map(function (s) { return s + '站'; }) }).then(function (j) {
+      need.forEach(function (s, i) { var r = (j.list[i] || '').replace(/^станция\s+/i, '').replace(/\s*\(?станция метро\)?$/i, ''); if (r) MNAME[s] = capital(r); });
+      ls('mnames', MNAME); paint();
+    }).catch(paint);
+  };
+  if (MT[key]) { draw(MT[key]); return; }
+  var ps = new AMap.PlaceSearch({ pageSize: 25, extensions: 'base', type: '150500' });
+  ps.searchNearBy('地铁', c, 1600, function (st, r) {
+    var pois = (st === 'complete' && r.poiList && r.poiList.pois) || [];
+    MT[key] = pois; draw(pois);
+  });
+}
+
+/* ---------- нижняя панель: быстрые кнопки и мои места ---------- */
+var CH = [
+  ['Метро', '地铁站', 'M17.8 2.8C16 2.22 13.58 2 12 2s-4 .22-5.8.8C3.53 3.84 2 6.05 2 8.86V22h20V8.86c0-2.81-1.53-5.02-4.2-6.06zM9.17 20l1.5-1.5h2.66l1.5 1.5H9.17zm-2.16-6V9h10v5h-10zm9.49 2c0 .55-.45 1-1 1s-1-.45-1-1 .45-1 1-1 1 .45 1 1zm-8-1c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM20 20h-3.5v-.38l-1.15-1.16c1.49-.17 2.65-1.42 2.65-2.96V9c0-2.63-3-3-6-3s-6 .37-6 3v6.5c0 1.54 1.16 2.79 2.65 2.96L7.5 19.62V20H4V8.86c0-2 1.01-3.45 2.93-4.2C8.41 4.18 10.42 4 12 4s3.59.18 5.07.66c1.92.75 2.93 2.2 2.93 4.2V20z'],
+  ['Рынки', '批发市场', 'M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 4H6v-4h6v4z'],
+  ['Аптека', '药店', 'M21 5h-2.64l1.14-3.14L17.15 1l-1.46 4H3v2l2 6-2 6v2h18v-2l-2-6 2-6V5zm-5 9h-3v3h-2v-3H8v-2h3V9h2v3h3v2z'],
+  ['Еда', '餐厅', 'M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z'],
+  ['Банкомат', 'ATM', 'M11 17h2v-1h1c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1h-3v-1h4V8h-2V7h-2v1h-1c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1h3v1H9v2h2v1zm9-13H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4V6h16v12z'],
+  ['Отель', '酒店', 'M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z'],
+  ['Заправка', '加油站', 'M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33 0 1.38 1.12 2.5 2.5 2.5.36 0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v16h10v-7.5h1.5v5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V9c0-.69-.28-1.32-.73-1.77zM12 10H6V5h6v5z']
+];
+/* №330 · больше мест: в ряду главные, остальное — под «Ещё» (плюс), открывается сеткой */
+CH = CH.concat([["Супермаркет", "超市", "M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1.003 1.003 0 0 0 20 4H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"], ["Магазин у дома", "便利店", "M19 7V4H5v3H2v13h8v-4h4v4h8V7h-3zm-8 3H9v1h2v1H8V9h2V8H8V7h3v3zm5 2h-1v-2h-2V7h1v2h1V7h1v5z"], ["Торговый центр", "购物中心", "M19 6h-2c0-2.76-2.24-5-5-5S7 3.24 7 6H5c-1.1 0-1.99.9-1.99 2L3 20c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-7-3c1.66 0 3 1.34 3 3H9c0-1.66 1.34-3 3-3zm0 10c-2.76 0-5-2.24-5-5h2c0 1.66 1.34 3 3 3s3-1.34 3-3h2c0 2.76-2.24 5-5 5z"], ["Парк", "公园", "M17 12h2L12 2 5.05 12H7l-3.9 6h6.92v4h3.96v-4H21z"], ["Кафе", "咖啡", "M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2a2 2 0 0 0 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z"], ["Больница", "医院", "M19 3H5c-1.1 0-1.99.9-1.99 2L3 19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 11h-4v4h-4v-4H6v-4h4V6h4v4h4v4z"], ["Банк", "银行", "M4 10h3v7H4zm6.5 0h3v7h-3zM2 19h20v3H2zm15-9h3v7h-3zm-5-9L2 6v2h20V6z"], ["Туалет", "公共厕所", "M5.5 22v-7.5H4V9c0-1.1.9-2 2-2h3c1.1 0 2 .9 2 2v5.5H9.5V22h-4zM18 22v-6h3l-2.54-7.63A2.01 2.01 0 0 0 16.56 7h-.12a2 2 0 0 0-1.9 1.37L12 16h3v6h3zM7.5 6c1.11 0 2-.89 2-2s-.89-2-2-2-2 .89-2 2 .89 2 2 2zm9 0c1.11 0 2-.89 2-2s-.89-2-2-2-2 .89-2 2 .89 2 2 2z"], ["Автобус", "公交站", "M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"], ["Вокзал", "火车站", "M12 2c-4 0-8 .5-8 4v9.5C4 17.43 5.57 19 7.5 19L6 20.5v.5h2.23l2-2H14l2 2h2v-.5L16.5 19c1.93 0 3.5-1.57 3.5-3.5V6c0-3.5-3.58-4-8-4zM7.5 17c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm3.5-7H6V6h5v4zm2 0V6h5v4h-5zm3.5 7c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"], ["Аэропорт", "机场", "M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"], ["Музей", "博物馆", "M22 11V9L12 2 2 9v2h2v9H2v2h20v-2h-2v-9h2zm-6 7h-2v-4l-2 3-2-3v4H8v-7h2l2 3 2-3h2v7z"], ["Обмен валюты", "外币兑换", "M12.89 11.1c-1.78-.59-2.64-.96-2.64-1.9 0-1.02 1.11-1.39 1.81-1.39 1.31 0 1.79.99 1.9 1.34l1.58-.67c-.15-.45-.82-1.92-2.54-2.24V5h-2v1.26c-2.48.56-2.49 2.86-2.49 2.96 0 2.27 2.25 2.91 3.35 3.31 1.58.56 2.28 1.07 2.28 2.03 0 1.13-1.05 1.61-1.98 1.61-1.82 0-2.34-1.87-2.4-2.09l-1.66.67c.63 2.19 2.28 2.78 2.9 2.96V19h2v-1.24c.4-.09 2.9-.59 2.9-3.22 0-1.39-.61-2.61-3.01-3.44zM3 21H1v-6h6v2H4.52c1.61 2.41 4.36 4 7.48 4a9 9 0 0 0 9-9h2c0 6.08-4.92 11-11 11-3.72 0-7.01-1.85-9-4.67V21zm-2-9C1 5.92 5.92 1 12 1c3.72 0 7.01 1.85 9 4.67V3h2v6h-6V7h2.48C17.87 4.59 15.12 3 12 3a9 9 0 0 0-9 9H1z"], ["Доставка", "快递", "M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"], ["Связь, SIM", "营业厅", "m7.3 14.7 1.2-1.2c-1-1-1.5-2.3-1.5-3.5 0-1.3.5-2.6 1.5-3.5L7.3 5.3c-1.3 1.3-2 3-2 4.7s.7 3.4 2 4.7zM19.1 2.9l-1.2 1.2c1.6 1.6 2.4 3.8 2.4 5.9 0 2.1-.8 4.3-2.4 5.9l1.2 1.2c2-2 2.9-4.5 2.9-7.1 0-2.6-1-5.1-2.9-7.1z M6.1 4.1 4.9 2.9C3 4.9 2 7.4 2 10c0 2.6 1 5.1 2.9 7.1l1.2-1.2c-1.6-1.6-2.4-3.8-2.4-5.9 0-2.1.8-4.3 2.4-5.9zm10.6 10.6c1.3-1.3 2-3 2-4.7-.1-1.7-.7-3.4-2-4.7l-1.2 1.2c1 1 1.5 2.3 1.5 3.5 0 1.3-.5 2.6-1.5 3.5l1.2 1.2zM14.5 10a2.5 2.5 0 0 0-5 0c0 .76.34 1.42.87 1.88L7 22h2l.67-2h4.67l.66 2h2l-3.37-10.12c.53-.46.87-1.12.87-1.88zm-4.17 8L12 13l1.67 5h-3.34z"], ["Ремонт телефонов", "手机维修", "M16 1H8C6.34 1 5 2.34 5 4v16c0 1.66 1.34 3 3 3h8c1.66 0 3-1.34 3-3V4c0-1.66-1.34-3-3-3zm-2 20h-4v-1h4v1zm3.25-3H6.75V4h10.5v14z"], ["Спортзал", "健身房", "M20.57 14.86 22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z"], ["Парикмахерская", "美发", "M9.64 7.64c.23-.5.36-1.05.36-1.64 0-2.21-1.79-4-4-4S2 3.79 2 6s1.79 4 4 4c.59 0 1.14-.13 1.64-.36L10 12l-2.36 2.36C7.14 14.13 6.59 14 6 14c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4c0-.59-.13-1.14-.36-1.64L12 14l7 7h3v-1L9.64 7.64zM6 8c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2zm0 12c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2zm6-7.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5zM19 3l-6 6 2 2 7-7V3z"], ["Массаж", "按摩", "M8.55 12zm10.43-1.61zm-3.49-.76c-.18-2.79-1.31-5.51-3.43-7.63a12.188 12.188 0 0 0-3.55 7.63c1.28.68 2.46 1.56 3.49 2.63 1.03-1.06 2.21-1.94 3.49-2.63zm-6.5 2.65c-.14-.1-.3-.19-.45-.29.15.11.31.19.45.29zm6.42-.25c-.13.09-.27.16-.4.26.13-.1.27-.17.4-.26zM12 15.45C9.85 12.17 6.18 10 2 10c0 5.32 3.36 9.82 8.03 11.49.63.23 1.29.4 1.97.51.68-.12 1.33-.29 1.97-.51C18.64 19.82 22 15.32 22 10c-4.18 0-7.85 2.17-10 5.45z"], ["Кино", "电影院", "m18 4 2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"], ["Для детей", "儿童乐园", "M22 14c0-1.95-1.4-3.57-3.25-3.92L17.4 6.05A2.978 2.978 0 0 0 14.56 4H9.44C8.15 4 7 4.82 6.6 6.05L5.81 8.4 4.41 7l.29-.29A.996.996 0 1 0 3.29 5.3l-2 2A.996.996 0 1 0 2.7 8.71l.3-.3 1.79 1.79C3.18 10.72 2 12.22 2 14c0 1.5.83 2.79 2.05 3.48A3 3 0 0 0 7 20c1.3 0 2.4-.84 2.82-2h4.37c.41 1.16 1.51 2 2.82 2a3 3 0 0 0 2.95-2.52C21.17 16.79 22 15.5 22 14zM7 18c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm4-8H7.41l-.02-.02 1.1-3.3A1 1 0 0 1 9.44 6H11v4zm2-4h1.56a1 1 0 0 1 .95.68l1.1 3.32H13V6zm4 12c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"], ["Полиция", "派出所", "M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm2.5 11.59.9 3.88-3.4-2.05-3.4 2.05.9-3.87-3-2.59 3.96-.34L12 6.02l1.54 3.64 3.96.34-3 2.59z"], ["Парковка", "停车场", "M13 3H6v18h4v-6h3c3.31 0 6-2.69 6-6s-2.69-6-6-6zm.2 8H10V7h3.2c1.1 0 2 .9 2 2s-.9 2-2 2z"], ["Зарядка авто", "充电站", "m19.77 7.23.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33a2.5 2.5 0 0 0 2.5 2.5c.36 0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v16h10v-7.5h1.5v5a2.5 2.5 0 0 0 5 0V9c0-.69-.28-1.32-.73-1.77zM18 10c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM8 18v-4.5H6L10 6v5h2l-4 7z"], ["Электроника", "电子市场", "M4 6h18V4H4c-1.1 0-2 .9-2 2v11H0v3h14v-3H4V6zm19 2h-6c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1zm-1 9h-4v-7h4v7z"], ["Одежда", "服装", "M21.6 18.2 13 11.75v-.91a3.496 3.496 0 0 0-.18-6.75A3.51 3.51 0 0 0 8.5 7.5h2c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5c0 .84-.69 1.52-1.53 1.5-.54-.01-.97.45-.97.99v1.76L2.4 18.2c-.77.58-.36 1.8.6 1.8h18c.96 0 1.37-1.22.6-1.8zM6 18l6-4.5 6 4.5H6z"], ["Мебель", "家具城", "M7 11v2h10v-2c0-1.86 1.28-3.41 3-3.86V6c0-1.65-1.35-3-3-3H7C5.35 3 4 4.35 4 6v1.14c1.72.45 3 2 3 3.86z M21 9c-1.1 0-2 .9-2 2v4H5v-4c0-1.1-.9-2-2-2s-2 .9-2 2v5c0 1.65 1.35 3 3 3v1c0 .55.45 1 1 1s1-.45 1-1v-1h12v1c0 .55.45 1 1 1s1-.45 1-1v-1c1.65 0 3-1.35 3-3v-5c0-1.1-.9-2-2-2z"]]);
+var CH_TOP = 4, IC_ADD = 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z';
+function chipHtml(c, i) { return '<button class="chip" data-i="' + i + '"><i><svg class="mi" viewBox="0 0 24 24"><path d="' + c[2] + '"/></svg></i>' + c[0] + '</button>'; }
+$('chips').innerHTML = CH.slice(0, CH_TOP).map(chipHtml).join('') + '<button class="chip" data-more="1"><i><svg class="mi" viewBox="0 0 24 24"><path d="' + IC_ADD + '"/></svg></i>Ещё</button>';
+function catGrid() { openPanel(true); $('res').innerHTML = '<div class="sec">Что найти рядом</div><div class="cgrid">' + CH.map(chipHtml).join('') + '</div>'; $('res').classList.remove('hidden'); }
+$('chips').onclick = function (e) { var b = e.target.closest('.chip'); if (!b) return; if (b.dataset.more) { catGrid(); return; } var c = CH[+b.dataset.i]; nearby(c[1], c[0]); };
+$('res').addEventListener('click', function (e) { var b = e.target.closest('.cgrid .chip'); if (!b) return; e.stopPropagation(); var c = CH[+b.dataset.i]; nearby(c[1], c[0]); }, true);
+function openPanel(on) { $('panel').classList.toggle('open', !!on); }
+$('grab').onclick = function () { if ($('panel').classList.contains('open')) { openPanel(false); $('res').classList.add('hidden'); } else openPanel(true); };
+$('bFav').onclick = function () { openPanel(true); paintFav(); };
+/* v5 · последние маршруты (как «Недавние» в «Моём Гуанчжоу»): сохраняются сами, когда строится маршрут */
+S.recent = S.recent || [];
+var MODE_IC = {};
+function modeIc(m) { if (!MODE_IC[m]) { var b = document.querySelector('#modes [data-m="' + m + '"]'); MODE_IC[m] = b ? b.querySelector('svg').outerHTML : ''; } return MODE_IC[m]; }
+function recAdd(x) { if (!x || !x.pos) return; var k = x.pos.lng.toFixed(5) + ',' + x.pos.lat.toFixed(5);
+  S.recent = S.recent.filter(function (r) { return r.k !== k; }); S.recent.unshift({ k: k, name: x.name, ru: x.ru || '', en: x.en || '', addr: x.addr || '', lng: x.pos.lng, lat: x.pos.lat, mode: S.mode, t: Date.now() });
+  S.recent = S.recent.slice(0, 12); saveS(); }
+function recUpd(x) { if (!x || !x.pos) return; var k = x.pos.lng.toFixed(5) + ',' + x.pos.lat.toFixed(5); S.recent.forEach(function (r) { if (r.k === k) { if (x.ru) r.ru = x.ru; if (x.en) r.en = x.en; r.mode = S.mode; } }); saveS(); }
+function ago(t) { var m = Math.round((Date.now() - t) / 60000); if (m < 60) return m <= 1 ? 'только что' : m + ' мин назад'; var h = Math.round(m / 60); if (h < 24) return h + ' ч назад'; var d = Math.round(h / 24); return d === 1 ? 'вчера' : d + ' дн. назад'; }
+function recHtml(max) {
+  if (!S.recent.length) return '<div class="hint">Пока пусто — построенные маршруты появятся здесь.</div>';
+  return S.recent.slice(0, max || 12).map(function (r, i) { return '<button class="ri" data-r="' + i + '"><span class="ic">' + (modeIc(r.mode) || '') + '</span><div class="x"><div class="n">' + esc(r.ru || r.name) + '</div>' + (r.en ? '<div class="a">' + esc(r.en) + '</div>' : '') + '<div class="z">' + esc(r.name) + '</div><div class="rt-m">' + esc(MODE_RU[r.mode] || '') + ' · ' + ago(r.t) + '</div></div><div class="d">' + (ME ? fmtD(AMap.GeometryUtil.distance(ME, new AMap.LngLat(r.lng, r.lat))) : '') + '</div></button>'; }).join('');
+}
+function recPick(i) { var r = S.recent[i]; if (!r) return; if (r.mode) { S.mode = r.mode; saveS(); } pick({ name: r.name, ru: r.ru, en: r.en, addr: r.addr, pos: new AMap.LngLat(r.lng, r.lat) }); }
+function mnuOpen() { $('mnuR').innerHTML = recHtml(12); $('mnu').classList.remove('hidden'); history.pushState({ s: 'menu' }, ''); }
+$('bMenu').onclick = mnuOpen;
+$('mnu').onclick = function (e) {
+  if (e.target === $('mnu')) { history.back(); return; }
+  var r = e.target.closest('[data-r]'); if (r) { var i = +r.dataset.r; $('mnu').classList.add('hidden'); history.replaceState({ s: 'home' }, ''); setTimeout(function () { recPick(i); }, 0); return; }
+  var b = e.target.closest('[data-mn]'); if (!b) return; var k = b.dataset.mn;
+  if (k === 'clr') { S.recent = []; saveS(); $('mnuR').innerHTML = recHtml(); toast('Последние маршруты очищены'); return; }
+  $('mnu').classList.add('hidden'); history.replaceState({ s: 'home' }, '');
+  if (k === 'fav') { openPanel(true); paintFav(); } else if (k === 'set') $('bSet').click();
+};
+var PIN = '<svg class="mi" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>';
+var STAR = '<svg class="mi" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>';
+var STARO = '<svg class="mi" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15-5-2.18L7 18V5h10v13z"/></svg>';
+function paintFav() {
+  var h = S.recent && S.recent.length ? '<div class="sec">Последние маршруты</div>' + recHtml(5) : '';
+  h += '<div class="sec">Мои места</div>';
+  if (!S.fav.length) h += '<div class="hint">Пока пусто. Найдите место и нажмите значок закладки в его карточке — сохраните как «Дом», «Офис», «Склад» или под своим названием.</div>';
+  else h += S.fav.map(function (f, i) { return '<button class="ri" data-f="' + i + '"><span class="ic">' + STAR + '</span><div class="x"><div class="n">' + esc(f.k || f.ru || f.name) + '</div><div class="a">' + esc(f.k ? (f.ru || f.name) : f.name) + '</div></div><div class="d">' + (ME ? fmtD(AMap.GeometryUtil.distance(ME, [f.lng, f.lat])) : '') + '</div></button>'; }).join('');
+  $('res').innerHTML = h; $('res').classList.remove('hidden');
+}
+function nearby(kw, ruName) {
+  openPanel(true); resMsg('<span class="spin"></span>Ищу рядом: ' + esc(ruName.toLowerCase()) + '…');
+  var c = ME || map.getCenter();
+  var ps = new AMap.PlaceSearch({ pageSize: 20, extensions: 'base' });
+  ps.searchNearBy(kw, c, 3000, function (st, r) {
+    var pois = (st === 'complete' && r.poiList && r.poiList.pois) || [];
+    RES = pois.map(function (p) { return { name: p.name, addr: (p.address && typeof p.address === 'string') ? p.address : '', pos: p.location, tel: p.tel || '', ru: '' }; });
+    if (!RES.length) { resMsg('Рядом ничего не нашлось'); return; }
+    paintRes(''); ruNames();
+  });
+}
+
+/* ---------- поиск ---------- */
+var DEST = null, RES = [];
+function qChanged() { $('qx').classList.toggle('hidden', !$('q').value); }
+$('q').addEventListener('input', qChanged);
+$('q').addEventListener('focus', function () { openPanel(true); if (!$('q').value) paintFav(); });
+$('q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { search(); $('q').blur(); } });
+$('qx').onclick = function () { $('q').value = ''; qChanged(); paintFav(); $('q').focus(); };
+function resMsg(h) { $('res').innerHTML = '<div class="hint">' + h + '</div>'; $('res').classList.remove('hidden'); }
+function search() {
+  var q = $('q').value.trim(); if (!q) return;
+  openPanel(true); resMsg('<span class="spin"></span>Ищу…');
+  var p = hasHan(q) ? Promise.resolve({ kw: q, alt: [], ru: '' }) : post('place', { q: q, city: CITY });
+  p.then(function (j) {
+    var kws = [j.kw].concat(j.alt || []).filter(Boolean);
+    return placeSearch(kws, 0).then(function (pois) { return { pois: pois, ru: j.ru, kw: j.kw }; });
+  }).then(function (r) {
+    RES = r.pois;
+    if (!RES.length) { voiceGo = false; resMsg('Ничего не нашлось. Попробуйте сказать иначе: название места, улицы или ТЦ.'); return; }
+    if (voiceGo) { voiceGo = false; var bi = 0, kw0 = (r.kw || '').replace(/[（(].*$/, '');   // голосом — сразу маршрут к лучшему совпадению
+      if (kw0) for (var ri = 0; ri < RES.length; ri++) if (RES[ri].name.indexOf(kw0) === 0) { bi = ri; break; }
+      if (r.ru) RES[bi].ru = r.ru; pick(RES[bi]); return; }
+    paintRes(r.ru); ruNames(r.ru);
+  }).catch(function (e) { voiceGo = false; resMsg(esc(e.msg || 'Не получилось')); });
+}
+function ruNames(hint) {   // №330 · русские и английские названия — вторым шагом, по 10 штук параллельно
+  var R0 = RES;
+  for (var k = 0; k < R0.length; k += 10) (function (k) {
+    post('names', { items: R0.slice(k, k + 10).map(function (x) { return x.name; }) }, 45000).then(function (n) {
+      if (RES !== R0) return;
+      (n.list || []).forEach(function (ru, i) { if (ru && R0[k + i]) R0[k + i].ru = ru; });
+      (n.en || []).forEach(function (en, i) { if (en && R0[k + i]) R0[k + i].en = en; });
+      paintRes(hint); }).catch(function () {});
+  })(k);
+}
+function placeSearch(kws, i) {
+  return new Promise(function (ok) {
+    if (i >= kws.length) { ok([]); return; }
+    var ps = new AMap.PlaceSearch({ city: CITY || '全国', citylimit: false, pageSize: 12, extensions: 'base' });
+    ps.search(kws[i], function (st, r) {
+      var pois = (st === 'complete' && r.poiList && r.poiList.pois) || [];
+      if (!pois.length) { placeSearch(kws, i + 1).then(ok); return; }
+      ok(pois.map(function (p) { return { name: p.name, addr: (p.address && typeof p.address === 'string') ? p.address : '', pos: p.location, tel: p.tel || '', ru: '' }; }));
+    });
+  });
+}
+/* v4 · на чём ехать — выбор прямо над результатами поиска, у каждого места примерное время этим способом */
+var SPD = { walk: 4.5, bike: 13, car: 25 }, MODE_RU = { walk: 'пешком', bike: 'на велосипеде', car: 'на машине' };
+function etaTxt(m) { var k = SPD[S.mode] || 4.5, t = Math.max(1, Math.round(m * 1.3 / 1000 / k * 60)); return '≈ ' + (t < 60 ? t + ' мин' : Math.floor(t / 60) + ' ч' + (t % 60 ? ' ' + t % 60 + ' мин' : '')); }
+function modesBar() { return '<div class="modes rmodes">' + Array.prototype.map.call($('modes').children, function (b) { return '<button data-rm="' + b.dataset.m + '" class="' + (b.dataset.m === S.mode ? 'on' : '') + '">' + b.innerHTML + '</button>'; }).join('') + '</div>'; }
+var RES_HINT = '';
+function paintRes(ruHint) {
+  if (ruHint !== undefined) RES_HINT = ruHint;
+  $('res').innerHTML = modesBar() + RES.map(function (x, i) {
+    var m = (ME && x.pos) ? AMap.GeometryUtil.distance(ME, x.pos) : null, d = m != null ? fmtD(m) + '<br><b>' + etaTxt(m) + '</b>' : '';
+    var ru = x.ru || (i === 0 && RES_HINT) || '';
+    return '<button class="ri" data-i="' + i + '"><span class="ic">' + PIN + '</span><div class="x"><div class="n">' + esc(ru || x.name) + '</div>' + (x.en ? '<div class="e" lang="en">' + esc(x.en) + '</div>' : (!ru && hasHan(x.name) ? '<div class="z">Перевожу…</div>' : '')) + (ru ? '<div class="z" lang="zh">' + esc(x.name) + '</div>' : '') + '<div class="a">' + esc(x.addr) + '</div></div><div class="d">' + d + '</div></button>';
+  }).join('');
+  $('res').classList.remove('hidden');
+}
+$('res').onclick = function (e) {
+  var rm = e.target.closest('[data-rm]'); if (rm) { S.mode = rm.dataset.rm; saveS(); paintModes(); paintRes(); return; }
+  var rr = e.target.closest('[data-r]'); if (rr) { recPick(+rr.dataset.r); return; }
+  var b = e.target.closest('.ri'); if (!b) return;
+  if (b.dataset.f != null) { var f = S.fav[+b.dataset.f]; pick({ name: f.name, ru: f.ru, addr: f.addr || '', pos: new AMap.LngLat(f.lng, f.lat), favK: f.k }); return; }
+  pick(RES[+b.dataset.i]);
+};
+
+/* ---------- место и маршрут ---------- */
+var destMarker = null, line = null, ROUTE = null;
+function favIdx(x) { for (var i = 0; i < S.fav.length; i++) if (Math.abs(S.fav[i].lng - x.pos.lng) < 1e-5 && Math.abs(S.fav[i].lat - x.pos.lat) < 1e-5) return i; return -1; }
+function paintStar() { var on = DEST && favIdx(DEST) >= 0; $('star').innerHTML = on ? STAR : STARO; $('star').style.color = on ? 'var(--sea)' : ''; }
+$('star').onclick = function () {
+  if (!DEST) return; var i = favIdx(DEST);
+  if (i >= 0) { S.fav.splice(i, 1); saveS(); paintStar(); toast('Убрано из моих мест'); return; }
+  $('favAs').classList.toggle('hidden');
+};
+$('favAs').onclick = function (e) {
+  var b = e.target.closest('button'); if (!b || !DEST) return; var k = b.dataset.k;
+  if (k) S.fav = S.fav.filter(function (f) { return f.k !== k; });   // «Дом» один — заменяем
+  S.fav.unshift({ k: k, name: DEST.name, ru: DEST.ru || '', addr: DEST.addr || '', lng: DEST.pos.lng, lat: DEST.pos.lat }); S.fav = S.fav.slice(0, 30); saveS();
+  $('favAs').classList.add('hidden'); paintStar(); toast(k ? 'Сохранено как «' + k + '»' : 'Сохранено в моих местах');
+};
+function pick(x) {
+  DEST = x; FOLLOW = false; $('res').classList.add('hidden'); $('q').blur(); openPanel(false);
+  history.pushState({ s: 'dest' }, '');
+  if (!destMarker) destMarker = new AMap.Marker({ zIndex: 150 });
+  destMarker.setPosition(x.pos); destMarker.setMap(map);
+  /* v2 · название по-русски крупно, ниже — китайское (для таксиста) и адрес; русское подтягиваем сразу */
+  /* v3 · три языка: крупно по-русски, ниже по-английски, затем иероглифы (для таксиста) и адрес по-русски */
+  var nmPaint = function () { $('dn').textContent = x.favK || x.ru || x.name;
+    $('dz').innerHTML = (x.en ? '<div class="dn2" lang="en">' + esc(x.en) + '</div>' : '') + (x.ru || x.favK ? '<span lang="zh">' + esc(x.name) + '</span>' : '') + (x.addrRu || x.addr ? '<div>' + esc(x.addrRu || x.addr) + '</div>' : ''); };
+  nmPaint();
+  if (!x.en || !x.ru || (x.addr && !x.addrRu)) post('place3', { zh: x.name, addr: x.addr || '' }).then(function (n) { if (DEST !== x || !n.ok) return; if (!x.ru && n.ru) x.ru = n.ru; if (n.en) x.en = n.en; if (n.addr_ru) x.addrRu = n.addr_ru; nmPaint(); recUpd(x); }).catch(function () {});
+  $('favAs').classList.add('hidden'); paintStar();
+  $('panel').classList.add('hidden'); $('sheet').classList.remove('hidden'); if (window.sheetMini) sheetMini(false);
+  paintModes(); route(); recAdd(x);
+}
+function paintModes() { Array.prototype.forEach.call($('modes').children, function (b) { b.classList.toggle('on', b.dataset.m === S.mode); }); }
+$('modes').onclick = function (e) { var b = e.target.closest('button'); if (!b) return; S.mode = b.dataset.m; saveS(); paintModes(); route(); recUpd(DEST); };
+
+// что делать на повороте — по-русски
+var ACT = { '左转': ['поверните налево', -90], '右转': ['поверните направо', 90], '向左前方行驶': ['держитесь левее', -45], '向右前方行驶': ['держитесь правее', 45],
+  '向左前方': ['держитесь левее', -45], '向右前方': ['держитесь правее', 45], '向左后方行驶': ['резко налево', -135], '向右后方行驶': ['резко направо', 135], '向左后方': ['резко налево', -135], '向右后方': ['резко направо', 135],
+  '左转调头': ['развернитесь', 180], '直行': ['продолжайте прямо', 0], '靠左': ['держитесь левой стороны', -20], '靠右': ['держитесь правой стороны', 20],
+  '进入环岛': ['въезжайте на круговое движение', 0], '离开环岛': ['съезжайте с круга', 45], '减速行驶': ['снизьте скорость', 0], '插入直行': ['продолжайте прямо', 0] };
+var ASSIST = { '到达目的地': 'вы на месте', '进入主路': 'въезжайте на основную дорогу', '进入辅路': 'съезжайте на боковую дорогу', '进入隧道': 'въезжайте в тоннель',
+  '通过人行横道': 'перейдите по пешеходному переходу', '通过过街天桥': 'перейдите по надземному переходу', '通过地下通道': 'перейдите по подземному переходу', '通过广场': 'пройдите через площадь',
+  '到道路斜对面': 'перейдите на другую сторону', '进入人行横道': 'перейдите по пешеходному переходу', '通过天桥': 'перейдите по мосту', '通过隧道': 'пройдите через тоннель', '靠左': 'держитесь левее', '靠右': 'держитесь правее' };
+function arrow(deg) { return '<svg class="mi" viewBox="0 0 24 24" style="transform:rotate(' + deg + 'deg)"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>'; }
+function stepText(st, roadRu) {
+  var a = ACT[st.action] || null, as = ASSIST[st.assistant_action] || '';
+  var t = a ? a[0] : (as || 'продолжайте движение');
+  if (roadRu && a && st.action !== '直行' && st.action !== '减速行驶') t += ' на ' + roadRu;
+  if (as && a) t += ', ' + as;
+  return t;
+}
+var routeSeq = 0;
+function route() {
+  if (!DEST) return;
+  var my = ++routeSeq;
+  $('rinfo').innerHTML = '<div class="hint" style="padding:6px 0"><span class="spin"></span>Строю маршрут…</div>'; $('steps').innerHTML = '';
+  var start = function () {
+    if (!ME) { $('rinfo').innerHTML = '<div class="hint" style="padding:6px 0">Не знаю, где вы. Нажмите кнопку «Где я».</div>'; return; }
+    buildRoute(ME, DEST.pos, S.mode).then(function (R) {
+      if (my !== routeSeq) return;
+      ROUTE = R; drawRoute(R);
+      $('rinfo').innerHTML = '<div class="sum"><b>' + fmtT(R.time) + '</b><span>' + fmtD(R.dist) + (R.mode === 'car' && S.noToll ? ' · без платных дорог' : '') + '</span></div>';
+      paintSteps();
+      translateRoads(R).then(function () { if (my === routeSeq) paintSteps(); });
+    }).catch(function (e) { if (my === routeSeq) $('rinfo').innerHTML = '<div class="hint" style="padding:6px 0">' + esc(e) + '</div>'; });
+  };
+  if (ME) start(); else locate(function () { start(); });
+}
+function buildRoute(from, to, mode) {
+  return new Promise(function (ok, bad) {
+    var svc = mode === 'car' ? new AMap.Driving({ policy: S.noToll ? AMap.DrivingPolicy.LEAST_FEE : AMap.DrivingPolicy.LEAST_TIME, extensions: 'base' }) : mode === 'bike' ? new AMap.Riding({}) : new AMap.Walking({});
+    svc.search(from, to, function (st, r) {
+      if (st !== 'complete' || !r.routes || !r.routes.length) { bad(mode === 'walk' ? 'Пешком маршрут не построился — далеко? Попробуйте «На машине».' : 'Маршрут не построился.'); return; }
+      var rt = r.routes[0], raw = rt.steps || rt.rides || [], steps = [];
+      raw.forEach(function (s) {
+        var path = (s.path || []).map(function (p) { return p instanceof AMap.LngLat ? p : new AMap.LngLat(p.lng || p[0], p.lat || p[1]); });
+        if (path.length) steps.push({ action: s.action || '', assistant_action: s.assistant_action || '', road: s.road || '', instruction: s.instruction || '', distance: s.distance || 0, time: s.time || 0, path: path, roadRu: '' });
+      });
+      if (!steps.length) { bad('Маршрут пустой.'); return; }
+      var pts = [], cum = [], idx = [], acc = 0;
+      steps.forEach(function (s, si) { s.path.forEach(function (p) { if (pts.length) acc += AMap.GeometryUtil.distance(pts[pts.length - 1], p); pts.push(p); cum.push(acc); idx.push(si); }); s.end = pts.length - 1; s.endCum = acc; });
+      ok({ steps: steps, dist: rt.distance || acc, time: rt.time || 0, pts: pts, cum: cum, idx: idx, mode: mode });
+    });
+  });
+}
+function drawRoute(R) {
+  if (line) line.setMap(null);
+  line = new AMap.Polyline({ path: R.pts, strokeColor: '#1a73e8', strokeWeight: 9, strokeOpacity: .95, lineJoin: 'round', showDir: true, zIndex: 100, borderWeight: 2, outlineColor: '#ffffff', isOutline: true });
+  line.setMap(map); map.setFitView([line], false, [120, 380, 40, 90]);
+}
+function translateRoads(R) {
+  var roads = []; R.steps.forEach(function (s) { if (s.road && roads.indexOf(s.road) < 0) roads.push(s.road); });
+  if (!roads.length) return Promise.resolve();
+  return post('names', { items: roads }).then(function (j) { R.steps.forEach(function (s) { var i = roads.indexOf(s.road); if (i >= 0 && j.list[i]) s.roadRu = j.list[i]; }); }).catch(function () {});
+}
+function paintSteps() {
+  if (!ROUTE) return;
+  $('steps').innerHTML = ROUTE.steps.map(function (s, i) {
+    var a = ACT[s.action]; var last = i === ROUTE.steps.length - 1;
+    return '<div class="st"><div class="ar">' + arrow(a ? a[1] : 0) + '</div><div class="t">' + esc(last ? 'Вы на месте' : capital(stepText(s, (ROUTE.steps[i + 1] || {}).roadRu || s.roadRu))) + (s.roadRu && !last ? '<div class="m">' + esc(s.roadRu) + '</div>' : '') + '</div><div class="m">' + fmtD(s.distance) + '</div></div>';
+  }).join('');
+}
+$('taxiB').onclick = function () {
+  if (!DEST) return;
+  $('txZ').textContent = DEST.name; $('txA').textContent = DEST.addr || ''; $('txR').textContent = DEST.ru || '';
+  $('taxi').classList.remove('hidden'); history.pushState({ s: 'taxi' }, '');
+};
+$('taxi').onclick = function () { history.back(); };
+/* v3 · шторку можно опустить и поднять: потянуть вниз за любое место карточки (список шагов — когда он
+   прокручен в самый верх), потянуть вверх — раскрыть; нажатие на полоску — тоже переключает */
+(function () {
+  var sh = $('sheet'), st = $('steps'), y0 = null, dy = 0, inList = false, moved = false;
+  function setMini(on) { sh.classList.toggle('mini', on); sh.style.transform = ''; st.scrollTop = 0; }
+  $('sGrab').addEventListener('click', function () { if (!moved) setMini(!sh.classList.contains('mini')); });
+  sh.addEventListener('touchstart', function (e) { if (e.target.closest('button,input')) { y0 = null; return; } inList = !!e.target.closest('.steps'); y0 = e.touches[0].clientY; dy = 0; moved = false; }, { passive: true });
+  sh.addEventListener('touchmove', function (e) {
+    if (y0 == null) return; dy = e.touches[0].clientY - y0;
+    if (inList && (dy < 0 || st.scrollTop > 0)) { y0 = null; return; }   // крутим список — шторку не трогаем
+    if (Math.abs(dy) > 6) moved = true;
+    if (dy > 0) { sh.classList.add('drag'); sh.style.transform = 'translateY(' + Math.min(dy, sh.offsetHeight - 110) + 'px)'; if (e.cancelable) e.preventDefault(); }
+    else if (e.cancelable && !inList) e.preventDefault();
+  }, { passive: false });
+  sh.addEventListener('touchend', function () { if (y0 == null) { sh.classList.remove('drag'); sh.style.transform = ''; return; } sh.classList.remove('drag'); y0 = null;
+    if (dy > 50) setMini(true); else if (dy < -40) setMini(false); else sh.style.transform = ''; setTimeout(function () { moved = false; }, 60); });
+  window.sheetMini = setMini;
+})();
+
+/* ---------- ведение ---------- */
+var NAV = null, wake = null;
+$('go').onclick = function () { if (ROUTE) startNav(); };
+function sideBtns(on) { ['bVoice', 'bSet', 'bMenu'].forEach(function (id) { $(id).classList.toggle('hidden', !on); }); }
+function startNav() {
+  NAV = { step: 0, said: {}, offCnt: 0, lastReroute: 0 }; FOLLOW = true; headUp = true; clearMetro();
+  $('sheet').classList.add('hidden'); $('panel').classList.add('hidden'); sideBtns(false);
+  $('nb').classList.remove('hidden'); $('nf').classList.remove('hidden'); paintSound();
+  history.pushState({ s: 'nav' }, '');
+  try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {}); } catch (e) {}
+  var first = ROUTE.steps[0];
+  say('Поехали. ' + capital(stepText(first, (ROUTE.steps[1] || {}).roadRu)) + ' ' + sayD(first.distance) + '.', 2);
+  paintNav(0, first.distance);
+  startWatch();
+  /* v12 · сразу ставим стрелку на начало маршрута рядом с вами и разворачиваем карту по первому куску дороги */
+  var sn = ME ? navSnap(ROUTE, ME, 0, 200) : { bi: 0, best: 0, snap: ROUTE.pts[0] };
+  if (sn.best > 80) sn = { bi: 0, best: 0, snap: ROUTE.pts[0] };
+  NAV.view = sn.snap; NAV.seg = sn.bi; NAV.h0 = 1; meDot(sn.snap);
+  headSet(routeAhead(ROUTE, sn.bi, sn.snap, 15), true); map.setZoom(18, true); if (AR.rel != null && !(HC.absAt && Date.now() - HC.absAt < 3000)) AR.off = ((HEAD - AR.rel) % 360 + 360) % 360; else AR.off = null;   // v6: разворот по маршруту сразу, даже пока GPS не поймался
+  try { map.setPitch(45, true); } catch (e) {} rotateTo(HEAD); AN.D = null; navCalib();
+}
+function stopNav() {
+  try { if (wake) wake.release(); } catch (e) {} wake = null;
+  NAV = null; $('nb').classList.add('hidden'); $('nf').classList.add('hidden'); $('off').classList.add('hidden');
+  sideBtns(true); try { map.setPitch(0); } catch (e) {} rotateTo(0);
+  if (DEST) $('sheet').classList.remove('hidden'); else $('panel').classList.remove('hidden');
+  shutUp(); metroLater();
+}
+/* v12 · «дорога впереди»: направление — по ближайшему куску маршрута от точки на самом маршруте
+   (не от того места, куда отбросил GPS), смотрим всего на 15 м вперёд — первый поворот сразу смотрит вверх */
+function routeAhead(R, bi, pos, m) {
+  var j = bi + 1, acc = AMap.GeometryUtil.distance(pos, R.pts[j]);
+  if (acc >= 4) return bearing(pos, R.pts[j]);            // до конца этого куска ещё есть путь — смотрим вдоль него
+  while (acc < m && j < R.pts.length - 1) { acc += AMap.GeometryUtil.distance(R.pts[j], R.pts[j + 1]); j++; if (acc >= 4) break; }
+  return bearing(R.pts[bi + 1] || pos, R.pts[j]);
+}
+function navSnap(R, pos, from, to) {   // ближайшая точка маршрута: {bi, best, snap}
+  var best = 1e9, bi = 0; from = Math.max(0, from || 0); to = Math.min(R.pts.length - 1, to || R.pts.length - 1);
+  for (var i = from; i < to; i++) { var d = AMap.GeometryUtil.distanceToSegment(pos, [R.pts[i], R.pts[i + 1]]); if (d < best) { best = d; bi = i; } }
+  var snap = pos; try { var cp = AMap.GeometryUtil.closestOnSegment(pos, R.pts[bi], R.pts[bi + 1]); if (cp) snap = new AMap.LngLat(cp[0] != null ? cp[0] : cp.lng, cp[1] != null ? cp[1] : cp.lat); } catch (e) {}
+  return { bi: bi, best: best, snap: snap };
+}
+function navFix(pos, acc) {
+  if (!NAV || !ROUTE) return;
+  if (headUp) headRot();
+  var R = ROUTE, best = 1e9, bi = 0, from = Math.max(0, (NAV.seg || 0) - 30);
+  for (var i = from; i < R.pts.length - 1; i++) {
+    var d = AMap.GeometryUtil.distanceToSegment(pos, [R.pts[i], R.pts[i + 1]]);
+    if (d < best) { best = d; bi = i; }
+    if (i > from + 400 && best < 30) break;
+  }
+  NAV.seg = bi;
+  /* v5 · «вперёд — вверх»: в ведении направление берём по самому маршруту (на 30 м вперёд), а не по компасу —
+     дорога, по которой ехать, всегда смотрит вверх; сошли с маршрута — тогда по движению GPS */
+  /* v11 · стрелка «прилипает» к маршруту, если вы рядом с ним; направление меняем, только когда едете
+     (стоите — карта не крутится от прыжков GPS) */
+  var onR = best <= Math.max(moving ? 35 : 60, acc * 1.5), snap = pos;
+  if (onR) { try { var cp = AMap.GeometryUtil.closestOnSegment(pos, R.pts[bi], R.pts[bi + 1]); if (cp) snap = new AMap.LngLat(cp[0] != null ? cp[0] : cp.lng, cp[1] != null ? cp[1] : cp.lat); } catch (e) {} }
+  NAV.view = snap; meDot(snap); if (FOLLOW) navPlace();
+  if (!onR && !moving && NAV.h0 == null) NAV.h0 = 1;
+  if (onR) { if (moving || NAV.h0 == null || R.mode !== 'car') { headSet(routeAhead(R, bi, snap, R.mode !== 'car' ? 25 : 15)); NAV.h0 = 1; } }
+  else if (moving && NAV.gpsH != null) headSet(NAV.gpsH);
+  var along = R.cum[bi] + Math.min(AMap.GeometryUtil.distance(R.pts[bi], pos), R.cum[bi + 1] - R.cum[bi]);
+  if (best > Math.max(40, acc * 1.5)) {
+    NAV.offCnt++;
+    if (NAV.offCnt >= 3 && Date.now() - NAV.lastReroute > 15000) { reroute(pos); return; }
+  } else { NAV.offCnt = 0; $('off').classList.add('hidden'); }
+  var si = R.idx[bi]; while (si < R.steps.length - 1 && along > R.steps[si].endCum) si++;
+  NAV.step = si;
+  var st = R.steps[si], left = st.endCum - along, total = R.cum[R.cum.length - 1] - along;
+  paintNav(si, left, total);
+  if (total < 25 || AMap.GeometryUtil.distance(pos, DEST.pos) < 20) { say('Вы прибыли. ' + (DEST.ru || ''), 1); toast('Вы на месте'); history.back(); return; }
+  var isLast = si === R.steps.length - 1, txt = isLast ? 'вы будете на месте' : stepText(st, (R.steps[si + 1] || {}).roadRu);
+  var far = R.mode === 'car' ? 400 : 120, near = R.mode === 'car' ? 60 : 25;
+  if (left <= far && left > near * 2 && !NAV.said[si + 'f'] && st.distance > far * 1.3) { NAV.said[si + 'f'] = 1; say(capital(sayD(left)) + ' ' + txt + '.', 3); }
+  if (left <= near && !NAV.said[si + 'n']) { NAV.said[si + 'n'] = 1; if (!isLast) say(capital(txt) + '.', 2); }
+}
+function paintNav(si, left, total) {
+  var R = ROUTE, st = R.steps[si], last = si === R.steps.length - 1, a = ACT[st.action];
+  $('nbA').innerHTML = last ? PIN.replace('class="mi"', 'class="mi"') : arrow(a ? a[1] : 0);
+  $('nbD').textContent = fmtD(left);
+  $('nbT').textContent = last ? 'Место назначения' : capital(stepText(st, (R.steps[si + 1] || {}).roadRu));
+  var nx = R.steps[si + 1]; $('nbN').textContent = nx && nx.roadRu ? 'Дальше: ' + nx.roadRu : '';
+  if (total == null) total = R.dist;
+  var sp = R.mode === 'car' ? 8 : R.mode === 'bike' ? 4 : 1.25, sec = R.time && R.dist ? R.time * total / R.dist : total / sp;
+  var arr = new Date(Date.now() + sec * 1000);
+  $('nfD').textContent = fmtT(sec); $('nfT').textContent = fmtD(total) + ' · прибытие в ' + ('0' + arr.getHours()).slice(-2) + ':' + ('0' + arr.getMinutes()).slice(-2);
+}
+function reroute(pos) {
+  NAV.lastReroute = Date.now(); NAV.offCnt = 0; $('off').classList.remove('hidden'); say('Перестраиваю маршрут', 1);
+  buildRoute(pos, DEST.pos, S.mode).then(function (R) {
+    if (!NAV) return; ROUTE = R; drawRoute(R); NAV.seg = 0; NAV.said = {}; $('off').classList.add('hidden'); map.setZoom(18, true); AN.D = null; navPlace();
+    translateRoads(R).then(function () {});
+  }).catch(function () { $('off').classList.add('hidden'); });
+}
+var SND_ICON = function (v) { return $('sSnd').querySelector('[data-v="' + v + '"]').innerHTML; };
+function paintSound() { $('nfS').innerHTML = SND_ICON(S.snd); }
+$('nfS').onclick = function () { S.snd = S.snd ? 0 : 3; saveS(); paintSound(); paintSet(); if (!S.snd) shutUp(); toast(S.snd ? 'Все звуки включены' : 'Звук выключен'); };
+$('nfX').onclick = function () { history.back(); };
+
+/* ---------- настройки ---------- */
+var SND_N = ['Звук выключен', 'Только важное: прибытие и ушли с маршрута', 'Только повороты', 'Все звуки включены'];
+function segPaint(id, v) { Array.prototype.forEach.call($(id).children, function (b) { b.classList.toggle('on', String(b.dataset.v) === String(v)); }); }
+function paintSet() {
+  segPaint('sSnd', S.snd); $('sSndN').textContent = SND_N[S.snd];
+  segPaint('sVol', S.vol); segPaint('sTheme', S.theme); segPaint('sCur', S.cur);
+  $('swToll').classList.toggle('on', !!S.noToll); $('swMetro').classList.toggle('on', !!S.metro);
+}
+function segBind(id, key, num, after) { $(id).onclick = function (e) { var b = e.target.closest('button'); if (!b) return; S[key] = num ? +b.dataset.v : b.dataset.v; saveS(); paintSet(); if (after) after(); }; }
+segBind('sSnd', 'snd', true, function () { if (!S.snd) shutUp(); paintSound(); });
+segBind('sVol', 'vol', true, function () { say('Громкость', 0); });
+segBind('sTheme', 'theme', false, function () { curDark = null; applyTheme(); });
+segBind('sCur', 'cur', false, function () { if (ME) meDot(ME); });
+$('tToll').onclick = function () { S.noToll = !S.noToll; saveS(); paintSet(); if (DEST && S.mode === 'car') route(); };
+$('tMetro').onclick = function () { S.metro = !S.metro; saveS(); paintSet(); metroLabels(); };
+$('bSet').onclick = function () { paintSet(); $('set').classList.remove('hidden'); history.pushState({ s: 'set' }, ''); };
+$('setX').onclick = function () { history.back(); };
+
+/* ---------- «Назад»: на шаг; с главного экрана — в магазин ---------- */
+var INWIN = /ITCApp/.test(navigator.userAgent || '');
+function closeTop() {
+  if (!$('mnu').classList.contains('hidden')) { $('mnu').classList.add('hidden'); return true; }
+  if (!$('set').classList.contains('hidden')) { $('set').classList.add('hidden'); return true; }
+  if (!$('taxi').classList.contains('hidden')) { $('taxi').classList.add('hidden'); return true; }
+  if (NAV) { stopNav(); return true; }
+  if (DEST) { DEST = null; ROUTE = null; routeSeq++; $('sheet').classList.add('hidden'); $('panel').classList.remove('hidden'); if (line) line.setMap(null); if (destMarker) destMarker.setMap(null); return true; }
+  if ($('panel').classList.contains('open')) { openPanel(false); $('res').classList.add('hidden'); $('q').blur(); return true; }
+  return false;
+}
+history.replaceState({ root: 1 }, ''); history.pushState({ s: 'home' }, '');
+var lastBack = 0;
+window.addEventListener('popstate', function (e) {
+  if (closeTop()) { if (!e.state || e.state.root) history.pushState({ s: 'home' }, ''); return; }
+  if (e.state && !e.state.root) return;
+  if (Date.now() - lastBack < 2000) { history.back(); return; }
+  lastBack = Date.now(); history.pushState({ s: 'home' }, ''); toast('Нажмите «Назад» ещё раз, чтобы выйти');
+});
+function itcLeave(go){try{if(window.AndroidApp&&AndroidApp.fromIcon()){AndroidApp.close();return;}}catch(e){}go();}
+window.itcNativeBack = function () {
+  if (closeTop()) return true;
+  /* №260 · в приложении на главном экране «Назад» закрывает окно навигатора — под ним то, откуда открыли.
+     Раньше открывали магазин новым окном, и окна ходили по кругу */
+  if (INWIN) { try { if (window.AndroidApp && AndroidApp.close) { AndroidApp.close(); return true; } } catch (e) {} location.href = 'https://itcpartner.store/'; return true; }
+  return false;
+};
+if ('serviceWorker' in navigator) {
+  var hadSW = !!navigator.serviceWorker.controller, reloaded = false;
+    /* №16 · без самоперезагрузки: новая версия приложения откроется при следующем запуске */
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (rg) { try { rg.update(); } catch (e) {} }).catch(function () {});
+}
+</script>
+<script src="/apps/install.js" defer></script>
+<script src="/ptr.js" defer></script>
+</body>
+</html>

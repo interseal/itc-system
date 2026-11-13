@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<!-- «Рисовалка ИТК» v4.1 · 13.11.2026 · кнопка «Скачать» у каждой картинки в «Моих запросах» (№532). v4 · 07.11.2026 · камера, «Мои работы», несколько фото, белый фон, оформление, «Поставить в товар магазина», запуск из Фила. v3 · «Маркетплейсы»: наборы карточек для ИТК ГЛОБАЛ (1:1), Wildberries (3:4) и Ozon (3:4) по фото товара. v2 · вкладка «Карточка товара»: фон рисует ИИ, текст и логотип ИТК ГЛОБАЛ накладываются ровно. v1 · внутреннее приложение сотрудников: голосом или текстом → картинка (Alibaba Wanxiang).
+     Лежит в /apps/draw/, данные — api/api.php (art_draw, art_list, art_save, art_del), голос — api/flow.php (sp_hear) через /apps/fil/voice.js -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#5b2ca0">
+<title>Рисовалка ИТК</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<link href="/fonts/itk-fonts.css?v=1" rel="stylesheet">
+<style>
+:root{--pri:#5b2ca0;--pri2:#7b3fd0;--bg:#f3f1f8;--card:#fff;--ink:#1d1b24;--muted:#6b6778;--line:#e1dcea;--red:#c62828;--green:#128A04}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent}
+header{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 16px}
+header h1{margin:0;font-size:24px;font-weight:800}header p{margin:4px 0 0;opacity:.85;font-size:14px}
+main{max-width:720px;margin:0 auto;padding:14px 16px calc(env(safe-area-inset-bottom,0px) + 30px)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
+.mi{width:24px;height:24px;fill:currentColor;flex:none}
+.ask{position:relative}.ask textarea{width:100%;min-height:110px;border:2px solid var(--line);border-radius:14px;padding:12px 64px 12px 12px;font:inherit;font-size:17px;resize:vertical;outline:0}
+.ask textarea:focus{border-color:var(--pri)}
+.mic{position:absolute;right:10px;top:10px;width:48px;height:48px;border-radius:50%;border:0;background:var(--pri);color:#fff;display:grid;place-items:center;cursor:pointer}
+.mic.on{background:var(--red);animation:pl 1.2s infinite}@keyframes pl{50%{box-shadow:0 0 0 10px rgba(198,40,40,.15)}}
+.lbl{font-weight:700;margin:12px 0 6px;font-size:15px}.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 14px;font:inherit;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px}.chip.on{border-color:var(--pri);background:#efe7fb;color:var(--pri)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:14px;padding:14px;font:inherit;font-weight:700;font-size:17px;cursor:pointer;text-decoration:none}
+.b-pri{background:var(--pri);color:#fff}.b-line{background:#fff;color:var(--pri);border:1px solid var(--pri)}.b-ghost{background:#efe7fb;color:var(--pri)}
+.btn:disabled{opacity:.5}.row{display:flex;gap:8px;margin-top:10px}.row .btn{flex:1}
+.res img{display:block;width:100%;border-radius:14px;background:#eee}
+.wait{text-align:center;padding:30px 10px;color:var(--muted)}.spin{width:44px;height:44px;border:4px solid #e4daf5;border-top-color:var(--pri);border-radius:50%;margin:0 auto 12px;animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+.muted{color:var(--muted)}.err{color:var(--red)}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.gal button{border:0;padding:0;background:none;cursor:pointer;border-radius:12px;overflow:hidden;aspect-ratio:1}.gal img{width:100%;height:100%;object-fit:cover;display:block}
+.view{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:none;flex-direction:column;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px calc(env(safe-area-inset-bottom,0px) + 12px)}
+.view.on{display:flex}.view img{flex:1;min-height:0;object-fit:contain;width:100%}.view .t{color:#ddd;font-size:14px;margin:8px 2px}
+.view .x{align-self:flex-end;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:50%;width:44px;height:44px;display:grid;place-items:center;margin-bottom:6px}
+.tabs{display:flex;gap:8px;padding:0 16px;margin-top:-1px;background:linear-gradient(135deg,var(--pri),var(--pri2))}.tabs button{flex:1;border:0;border-radius:12px 12px 0 0;padding:11px 6px;background:rgba(255,255,255,.15);color:#fff;font:inherit;font-weight:700;cursor:pointer}.tabs button.on{background:var(--bg);color:var(--pri)}
+.cv{display:block;width:100%;height:auto;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.fld{display:block;margin-top:10px}.fld span{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}.fld input,.fld textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;font-size:16px}
+.prow{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:8px;margin-bottom:6px;font:inherit;cursor:pointer}.prow.on{border-color:var(--pri);background:#efe7fb}.prow img,.prow .pim0{width:52px;height:52px;border-radius:9px;object-fit:cover;flex:none;background:#eee}.prow small{display:block;color:var(--muted);font-size:12px}.prow b{display:block;font-size:14px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);background:#1d1b24;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90vw}.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<!-- №470 · своя заставка приложения --><style id="itcSplCss">#itcSpl{position:fixed;inset:0;z-index:2147483000;background:#efe9e4 url(/apps/splash/draw.jpg?v=1) 50% 50%/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:max(64px,9vh);box-sizing:border-box;transition:opacity .35s;font-family:Roboto,Arial,sans-serif}#itcSpl:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.72) 100%)}#itcSpl .nm{position:relative;color:#fff;font-size:30px;font-weight:700;letter-spacing:.3px;text-shadow:0 2px 12px rgba(0,0,0,.45);margin-bottom:22px;text-align:center;padding:0 20px}#itcSpl .sp{position:relative;width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;animation:itcSplR .9s linear infinite}@keyframes itcSplR{to{transform:rotate(360deg)}}#itcSpl.off{opacity:0;pointer-events:none}</style><div id="itcSpl"><div class="nm">Рисовалка</div><div class="sp"></div></div><script>(function(){var s=document.getElementById("itcSpl");if(!s)return;var u=navigator.userAgent||"",sa=false;try{sa=matchMedia("(display-mode: standalone)").matches||navigator.standalone}catch(e){}if(!/ITCMini|ITCWindow|ITCSklad/.test(u)&&!sa){s.parentNode.removeChild(s);return}var t0=Date.now(),d=0;function h(){if(d)return;d=1;setTimeout(function(){s.className="off";setTimeout(function(){if(s.parentNode)s.parentNode.removeChild(s)},450)},Math.max(0,1000-(Date.now()-t0)))}if(document.readyState==="complete")h();else addEventListener("load",h);setTimeout(h,6000)})()</script>
+<header><h1>Рисовалка ИТК</h1><p>Скажите или напишите, что нарисовать</p></header>
+<nav class="tabs"><button type="button" class="on" data-mode="pic">Картинка</button><button type="button" data-mode="card">Маркетплейсы</button><button type="button" data-mode="works">Мои работы</button></nav>
+<main>
+ <div id="camrow" style="margin-bottom:12px"><label class="btn b-pri" style="cursor:pointer;background:linear-gradient(135deg,#2e7d32,#128A04)"><svg class="mi" viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>Сфотографировать товар<input type="file" id="camin" accept="image/*" capture="environment" style="display:none"></label></div>
+ <div id="formcard">
+ <div class="card">
+  <div class="ask"><textarea id="txt" placeholder="Например: склад в Фошане, ровные ряды коробок, погрузчик, утренний свет"></textarea>
+   <button type="button" class="mic" id="mic" title="Сказать голосом"><svg class="mi" viewBox="0 0 24 24"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg></button></div>
+  <div class="muted" id="micst" style="font-size:13px;margin-top:6px">Нажмите на микрофон и говорите. Нажмите ещё раз — когда закончите.</div>
+  <div id="cardhint" class="muted" style="display:none;font-size:14px;margin-top:8px;background:#efe7fb;border-radius:12px;padding:10px"><b style="color:var(--ink)">Карточки для ИТК ГЛОБАЛ, Wildberries и Ozon.</b> Загрузите фото товара (можно с телефона) — фон уберётся, товар останется как есть, вокруг дорисуется подходящая обстановка. Скажите, что за товар и какой текст: «вставь текст: …, цена …» — поставлю дословно; «придумай текст» — придумает DeepSeek. Логотип ИТК ГЛОБАЛ поставится сам.</div>
+  <div id="picopts"><div class="lbl">Формат</div>
+  <div class="chips" id="ratio"><button type="button" class="chip on" data-v="sq">Квадрат</button><button type="button" class="chip" data-v="wide">Широкая</button><button type="button" class="chip" data-v="tall">Вертикальная</button><button type="button" class="chip" data-v="banner">Баннер для магазина</button><button type="button" class="chip" data-v="post">Пост для соцсетей</button><button type="button" class="chip" data-v="news">Обложка новости сайта</button></div>
+  <div class="lbl">Стиль</div>
+  <div class="chips" id="style"><button type="button" class="chip on" data-v="photo">Как фото</button><button type="button" class="chip" data-v="art">Рисунок</button><button type="button" class="chip" data-v="free">Как скажу</button></div></div>
+  <div id="cardopts" style="display:none">
+   <div class="lbl">Для какой площадки</div>
+   <div class="chips" id="fmt"><button type="button" class="chip on" data-v="itc">ИТК ГЛОБАЛ · квадрат 1200×1200</button><button type="button" class="chip" data-v="wb">Wildberries · 3:4, 900×1200</button><button type="button" class="chip" data-v="oz">Ozon · 3:4, 1200×1600</button></div>
+   <div class="lbl">Фото товара — до 6 ракурсов (можно без фото)</div>
+   <div id="phbox"></div>
+   <div class="lbl">Фон</div>
+   <div class="chips" id="bgk"><button type="button" class="chip on" data-v="scene">Обстановка по смыслу</button><button type="button" class="chip" data-v="white">Чистый белый</button></div>
+   <div class="lbl">Сколько картинок</div>
+   <div class="chips" id="cnt"><button type="button" class="chip" data-v="1">1 — только обложка</button><button type="button" class="chip" data-v="2">2</button><button type="button" class="chip" data-v="3">3</button><button type="button" class="chip on" data-v="4">4</button><button type="button" class="chip" data-v="5">5</button><button type="button" class="chip" data-v="6">6</button></div>
+   <div class="muted" style="font-size:13px;margin-top:6px">1-я — обложка, дальше — по одному преимуществу на картинку, последняя (от 4 штук) — характеристики. Несколько фото — каждая карточка берёт свой ракурс.</div>
+   <details style="margin-top:12px"><summary style="cursor:pointer;color:var(--pri);font-weight:700">Оформление текста</summary>
+    <div class="lbl">Плашка</div><div class="chips" id="stp"><button type="button" class="chip on" data-v="white">Белая</button><button type="button" class="chip" data-v="dark">Тёмная</button><button type="button" class="chip" data-v="navy">Фирменная синяя</button></div>
+    <div class="lbl">Где текст</div><div class="chips" id="sts"><button type="button" class="chip on" data-v="bottom">Снизу</button><button type="button" class="chip" data-v="top">Сверху</button></div>
+    <div class="lbl">Размер текста</div><div class="chips" id="stz"><button type="button" class="chip" data-v="0.85">Мельче</button><button type="button" class="chip on" data-v="1">Обычный</button><button type="button" class="chip" data-v="1.15">Крупнее</button></div>
+   </details>
+  </div>
+  <button type="button" class="btn b-pri" id="go" style="margin-top:14px"><svg class="mi" viewBox="0 0 24 24"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37-1.34-1.34a.996.996 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96a.996.996 0 0 0 0-1.41z"/></svg>Нарисовать</button>
+ </div>
+ </div>
+ <div class="card res" id="res" style="display:none"></div>
+ <div id="works" style="display:none">
+  <div class="card"><div style="font-weight:800;font-size:18px">Расходы на рисовалку</div><div id="spend" class="muted" style="margin-top:6px">Загружаю…</div></div>
+  <div class="card"><div style="font-weight:800;font-size:18px;margin-bottom:10px">Мои запросы</div><div id="hist"><div class="muted">Загружаю…</div></div></div>
+ </div>
+ <div class="card"><div style="font-weight:800;font-size:18px;margin-bottom:10px">Сохранённые картинки</div><div id="gal"><div class="muted">Загружаю…</div></div></div>
+</main>
+<div class="view" id="view"><button type="button" class="x" id="vx"><svg class="mi" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button><img id="vimg" alt=""><div class="t" id="vt"></div><div class="row"><a class="btn b-pri" id="vdl" download>Скачать</a><button type="button" class="btn b-line" id="vdel" style="background:transparent;color:#fff;border-color:#fff">Удалить</button></div></div>
+<div class="view" id="putv" style="background:rgba(0,0,0,.55);justify-content:flex-end;padding:0"><div style="background:#fff;border-radius:20px 20px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 16px);max-height:85vh;overflow:auto">
+ <div style="display:flex;align-items:center;gap:8px"><b style="flex:1;font-size:18px">Поставить в товар магазина</b><button type="button" class="btn b-ghost" style="width:auto;padding:8px 12px" data-putx="1">Закрыть</button></div>
+ <input id="putq" placeholder="Название или номер товара" autocomplete="off" style="width:100%;margin-top:10px;border:2px solid var(--line);border-radius:12px;padding:12px;font:inherit;font-size:17px">
+ <div id="putl" style="margin-top:8px"></div>
+ <div id="putgo" style="display:none;margin-top:10px"><div class="muted" style="font-size:14px">Товар: <b id="putnm" style="color:var(--ink)"></b></div>
+  <div class="row"><button type="button" class="btn b-pri" data-putm="first">Поставить первыми</button><button type="button" class="btn b-line" data-putm="add">Добавить в конец</button></div>
+  <div class="row"><button type="button" class="btn b-ghost" data-putm="replace">Заменить все фото</button></div></div>
+</div></div>
+<div class="toast" id="toast"></div>
+<script src="/apps/fil/voice.js"></script>
+<script>
+var API='/api/api.php',FAPI='/api/flow.php';
+function $(i){return document.getElementById(i);}
+function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function toast(t){var e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(function(){e.classList.remove('on');},2800);}
+var t='';var m=/[?&]t=([^&]+)/.exec(location.search||'');if(m){try{t=decodeURIComponent(m[1]);}catch(e){}}
+if(!t){try{t=sessionStorage.getItem('eco_t')||'';}catch(e){}}
+if(!t){try{var a=JSON.parse(localStorage.getItem('itc_auth')||'null');if(a&&a.token&&a.auth&&a.auth.role==='itc')t=a.token;}catch(e){}}
+  if (!t && /ITCMini/.test(navigator.userAgent || '')) { location.replace('/?back=' + encodeURIComponent(location.pathname)); }   // №333 · отдельное приложение: сначала вход в аккаунт ИТК
+if(t){try{sessionStorage.setItem('eco_t',t);}catch(e){}}
+function api(a,d){d=d||{};d.t=t;return fetch(API+'?action='+a+'&t='+encodeURIComponent(t),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json();});}
+function fapi(a,d){d=d||{};d.t=t;return fetch(FAPI+'?action='+a+'&t='+encodeURIComponent(t),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json();});}
+if(!t){document.querySelector('main').innerHTML='<div class="card"><b>Нужен вход сотрудника</b><p class="muted">Откройте «Рисовалку» из магазина: «Мои приложения».</p><a class="btn b-pri" href="/">В магазин</a></div>';}
+/* выбор формата и стиля */
+var RATIO='sq',STYLE='photo';
+function chips(id,set){$(id).onclick=function(e){var b=e.target.closest('.chip');if(!b)return;[].forEach.call(this.children,function(c){c.classList.toggle('on',c===b);});set(b.dataset.v);};}
+chips('ratio',function(v){RATIO=v;});chips('style',function(v){STYLE=v;});
+/* голос */
+try{FilVoice.init(fapi);}catch(e){}
+var LIS=false;
+$('mic').onclick=function(){if(!window.FilVoice){toast('Голос недоступен — напишите текстом');return;}
+ if(LIS){FilVoice.stop();return;}
+ var base=$('txt').value.trim();
+ FilVoice.listen({start:function(){LIS=true;$('mic').classList.add('on');$('micst').textContent='Слушаю… говорите. Нажмите ещё раз, когда закончите.';},
+  partial:function(x){$('txt').value=(base?base+' ':'')+x;},
+  final:function(x){LIS=false;$('mic').classList.remove('on');$('micst').textContent='Нажмите на микрофон и говорите. Нажмите ещё раз — когда закончите.';if(x)$('txt').value=(base?base+' ':'')+x;},
+  error:function(m){LIS=false;$('mic').classList.remove('on');$('micst').textContent=m||'Не расслышал — попробуйте ещё раз';}});
+};
+/* рисуем */
+var CUR=null,BUSY=false;
+function draw(){var tx=$('txt').value.trim();if(tx.length<3){toast('Скажите или напишите, что нарисовать');$('txt').focus();return;}if(BUSY)return;BUSY=true;$('go').disabled=true;
+ var r=$('res');r.style.display='';r.innerHTML='<div class="wait"><div class="spin"></div>Рисую… обычно 15–40 секунд</div>';r.scrollIntoView({behavior:'smooth',block:'start'});
+ api('art_draw',{text:tx,ratio:RATIO,style:STYLE}).then(function(x){BUSY=false;$('go').disabled=false;
+  if(!x||!x.ok){r.innerHTML='<div class="err">'+esc((x&&x.error)||'Не получилось')+'</div><div class="row"><button type="button" class="btn b-pri" data-again="1">Попробовать ещё раз</button></div>';return;}
+  CUR=x;r.innerHTML='<img src="'+esc(x.file)+'" alt=""><div class="row"><button type="button" class="btn b-pri" data-save="1"><svg class="mi" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Сохранить</button><button type="button" class="btn b-line" data-again="1"><svg class="mi" viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>Перерисовать</button></div><div class="row"><button type="button" class="btn b-ghost" data-edit="1">Изменить описание</button><a class="btn b-ghost" href="'+esc(x.file)+'" download="risovalka.jpg">Скачать</a></div>';})
+ .catch(function(){BUSY=false;$('go').disabled=false;r.innerHTML='<div class="err">Нет связи — попробуйте ещё раз</div>';});}
+$('go').onclick=function(){if(MODE==='card')makeSet();else draw();};
+/* ---- №344 · карточка товара ---- */
+var MODE='pic',CRATIO='card',CARD=null,LOGO=new Image();LOGO.src='logo.png';
+
+document.querySelector('.tabs').onclick=function(e){var b=e.target.closest('[data-mode]');if(!b)return;setMode(b.dataset.mode);};
+function setMode(mo){var b=document.querySelector('.tabs [data-mode="'+mo+'"]');MODE=mo;var wk=mo==='works';$('formcard').style.display=wk?'none':'';$('works').style.display=wk?'':'none';$('camrow').style.display=wk?'none':'';if(wk){$('res').style.display='none';loadWorks();}else if($('res').innerHTML)$('res').style.display='';var self=document.querySelector('.tabs');[].forEach.call(self.children,function(c){c.classList.toggle('on',c===b);});if(wk)return;
+ var c=MODE==='card';$('picopts').style.display=c?'none':'';$('cardopts').style.display=c?'':'none';$('cardhint').style.display=c?'':'none';
+ $('go').lastChild.textContent=c?'Сделать карточки':'Нарисовать';$('txt').placeholder=c?'Например: белый блендер на мраморном столе, вставь текст: Блендер 1200 Вт, 5 скоростей, цена 3 490 рублей':'Например: склад в Фошане, ровные ряды коробок, погрузчик, утренний свет';};
+function makeCard(onlyImg){var tx=$('txt').value.trim();if(tx.length<3&&!onlyImg){toast('Скажите или напишите, какая нужна карточка');$('txt').focus();return;}if(BUSY)return;BUSY=true;$('go').disabled=true;
+ var r=$('res');r.style.display='';if(!onlyImg||!CARD)r.innerHTML='<div class="wait"><div class="spin"></div>Придумываю текст и рисую… обычно 20–50 секунд</div>';else{var w=$('cwait');if(w)w.style.display='';}
+ if(!onlyImg)r.scrollIntoView({behavior:'smooth',block:'start'});
+ var body=onlyImg&&CARD?{text:tx||'x',ratio:CARD.ratio,only_img:1,prompt_en:CARD.prompt_en}:{text:tx,ratio:CRATIO};
+ api('art_card',body).then(function(x){BUSY=false;$('go').disabled=false;
+  if(!x||!x.ok){if(onlyImg&&CARD){var w=$('cwait');if(w)w.style.display='none';toast((x&&x.error)||'Не получилось');return;}r.innerHTML='<div class="err">'+esc((x&&x.error)||'Не получилось')+'</div>';return;}
+  if(onlyImg&&CARD){CARD.bg=x.bg;loadBg(function(){var w=$('cwait');if(w)w.style.display='none';renderCard();});return;}
+  CARD={ratio:CRATIO,bg:x.bg,prompt_en:x.prompt_en,title:x.title||'',bullets:(x.bullets||[]).join('\n'),badge:x.badge||'',price:x.price||'',img:null};
+  r.innerHTML='<div style="position:relative"><canvas class="cv" id="cv"></canvas><div id="cwait" class="wait" style="display:none;position:absolute;inset:0;background:rgba(255,255,255,.8);border-radius:14px;padding-top:40%"><div class="spin"></div>Рисую новую картинку…</div></div>'+
+   '<label class="fld"><span>Заголовок</span><input id="c_t" value="'+esc(CARD.title)+'"></label>'+
+   '<label class="fld"><span>Преимущества — каждое с новой строки (до 4)</span><textarea id="c_b" rows="4">'+esc(CARD.bullets)+'</textarea></label>'+
+   '<div style="display:flex;gap:8px"><label class="fld" style="flex:1"><span>Наклейка (Новинка, Хит, −20%)</span><input id="c_g" value="'+esc(CARD.badge)+'"></label><label class="fld" style="flex:1"><span>Цена</span><input id="c_p" value="'+esc(CARD.price)+'"></label></div>'+
+   '<div class="row"><button type="button" class="btn b-pri" data-csave="1">Сохранить</button><button type="button" class="btn b-line" data-cagain="1">Перерисовать картинку</button></div>'+
+   '<div class="row"><button type="button" class="btn b-ghost" data-edit="1">Изменить описание</button><button type="button" class="btn b-ghost" data-cdl="1">Скачать</button></div>';
+  ['c_t','c_b','c_g','c_p'].forEach(function(id){$(id).oninput=function(){CARD.title=$('c_t').value;CARD.bullets=$('c_b').value;CARD.badge=$('c_g').value;CARD.price=$('c_p').value;renderCard();};});
+  loadBg(renderCard);})
+ .catch(function(){BUSY=false;$('go').disabled=false;toast('Нет связи — попробуйте ещё раз');});}
+function loadBg(cb){var im=new Image();im.onload=function(){CARD.img=im;(document.fonts&&document.fonts.load?Promise.all([document.fonts.load('800 60px Roboto'),document.fonts.load('500 30px Roboto')]):Promise.resolve()).then(cb,cb);};im.onerror=function(){toast('Картинка не загрузилась');};im.src=CARD.bg+'?v='+Date.now();}
+function wrap(c,text,maxW,maxLines){var w=String(text||'').split(/\s+/),lines=[],cur='';w.forEach(function(x){var t=cur?cur+' '+x:x;if(c.measureText(t).width>maxW&&cur){lines.push(cur);cur=x;}else cur=t;});if(cur)lines.push(cur);if(lines.length>maxLines){lines=lines.slice(0,maxLines);lines[maxLines-1]=lines[maxLines-1].replace(/\s*\S*$/,'')+'…';}return lines;}
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+function renderCard(){var cv=$('cv');if(!cv||!CARD||!CARD.img)return;var sq=CARD.ratio==='sq',W=sq?1080:900,H=sq?1080:1200,c=cv.getContext('2d');cv.width=W;cv.height=H;
+ var im=CARD.img,k=Math.max(W/im.width,H/im.height),iw=im.width*k,ih=im.height*k;c.drawImage(im,(W-iw)/2,(H-ih)/2,iw,ih);
+ var P=Math.round(W*0.045);
+ /* логотип ИТК ГЛОБАЛ — небольшой, слева сверху */
+ c.font='800 '+Math.round(W*0.034)+'px Roboto, Arial';var lt='ИТК ГЛОБАЛ',ls=Math.round(W*0.06),lw=ls+16+c.measureText(lt).width+28;
+ c.fillStyle='rgba(255,255,255,.94)';rr(c,P,P,lw,ls+20,(ls+20)/2);c.fill();if(LOGO.complete&&LOGO.naturalWidth)c.drawImage(LOGO,P+12,P+10,ls,ls);c.fillStyle='#112C93';c.textBaseline='middle';c.fillText(lt,P+12+ls+12,P+10+ls/2+1);
+ /* наклейка — справа сверху */
+ var bd=String(CARD.badge||'').trim();if(bd){c.font='800 '+Math.round(W*0.036)+'px Roboto, Arial';var bw=c.measureText(bd).width+48,bh=Math.round(W*0.075);c.fillStyle='#E53935';rr(c,W-P-bw,P+(ls+20-bh)/2,bw,bh,bh/2);c.fill();c.fillStyle='#fff';c.fillText(bd,W-P-bw+24,P+(ls+20)/2+1);}
+ /* нижняя плашка с текстом */
+ var tl=String(CARD.title||'').trim(),bl=String(CARD.bullets||'').split('\n').map(function(x){return x.trim();}).filter(Boolean).slice(0,4),pr=String(CARD.price||'').trim();
+ if(!tl&&!bl.length&&!pr)return;
+ var fT=Math.round(W*0.058),fB=Math.round(W*0.034),gap=Math.round(fB*0.55);c.font='800 '+fT+'px Roboto, Arial';var tL=tl?wrap(c,tl,W-P*4,2):[];
+ var ph=P+tL.length*fT*1.12+(tL.length&&bl.length?gap*1.5:0)+bl.length*(fB+gap)+(pr?fT*1.2+gap:0)+P*0.8,py=H-ph-P;
+ c.fillStyle='rgba(255,255,255,.95)';rr(c,P,py,W-P*2,ph,28);c.fill();
+ var y=py+P*0.9;c.textBaseline='top';c.fillStyle='#17202b';c.font='800 '+fT+'px Roboto, Arial';tL.forEach(function(l){c.fillText(l,P*2,y);y+=fT*1.12;});if(tL.length&&bl.length)y+=gap*1.5;
+ c.font='500 '+fB+'px Roboto, Arial';bl.forEach(function(b){c.fillStyle='#128A04';c.beginPath();c.arc(P*2+fB*0.4,y+fB*0.55,fB*0.4,0,7);c.fill();c.strokeStyle='#fff';c.lineWidth=Math.max(3,fB*0.1);c.beginPath();c.moveTo(P*2+fB*0.22,y+fB*0.56);c.lineTo(P*2+fB*0.36,y+fB*0.7);c.lineTo(P*2+fB*0.6,y+fB*0.4);c.stroke();c.fillStyle='#2d3640';c.fillText(wrap(c,b,W-P*4-fB*1.3,1)[0],P*2+fB*1.2,y);y+=fB+gap;});
+ if(pr){y+=gap*0.5;c.font='800 '+Math.round(fT*1.05)+'px Roboto, Arial';var pw=c.measureText(pr).width+44;c.fillStyle='#112C93';rr(c,P*2,y,pw,fT*1.2,fT*0.6);c.fill();c.fillStyle='#fff';c.textBaseline='middle';c.fillText(pr,P*2+22,y+fT*0.62);}
+}
+/*№345*/
+/* ---- №345 · «Маркетплейсы»: набор карточек ---- */
+var FMT='itc',CNT=4,PH=null,PHUP={},SET=null;
+var FMTS={itc:{W:1200,H:1200,n:'ИТК ГЛОБАЛ'},wb:{W:900,H:1200,n:'Wildberries'},oz:{W:1200,H:1600,n:'Ozon'}};
+chips('fmt',function(v){FMT=v;});chips('cnt',function(v){CNT=+v;});
+var PHS=[],WHITE=false,STY={panel:'white',pos:'bottom',size:1};
+chips('bgk',function(v){WHITE=v==='white';});
+chips('stp',function(v){STY.panel=v;reAll();});chips('sts',function(v){STY.pos=v;PHUP={};reAll();});chips('stz',function(v){STY.size=+v;reAll();});
+function reAll(){if(SET)SET.slides.forEach(function(sl,i){renderSlide(i);});}
+function addPhoto(f){if(!f)return;if(PHS.length>=6){toast('Не больше 6 фото');return;}var im=new Image();im.onload=function(){PHS.push(im);PHUP={};drawPh();};im.onerror=function(){toast('Не удалось открыть фото');};im.src=URL.createObjectURL(f);}
+$('phbox').onchange=function(e){var fs=e.target.files||[];for(var k=0;k<fs.length;k++)addPhoto(fs[k]);e.target.value='';};
+function drawPh(){var b=$('phbox'),h='';
+ if(PHS.length)h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'+PHS.map(function(im,k){return '<div style="position:relative"><img src="'+im.src+'" style="width:76px;height:76px;object-fit:cover;border-radius:12px;border:1px solid var(--line);display:block"><button type="button" data-phdel="'+k+'" style="position:absolute;right:-6px;top:-6px;width:26px;height:26px;border-radius:50%;border:0;background:#1d1b24;color:#fff;font:700 15px/26px Roboto;cursor:pointer">×</button>'+(k===0?'<div style="position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;border-radius:6px;padding:1px 5px">обложка</div>':'')+'</div>';}).join('')+'</div>';
+ if(PHS.length<6)h+='<div class="row" style="margin-top:0"><label class="btn b-line" style="cursor:pointer"><svg class="mi" viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>Камера<input type="file" accept="image/*" capture="environment" style="display:none"></label><label class="btn b-line" style="cursor:pointer"><svg class="mi" viewBox="0 0 24 24"><path d="M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-11-4 2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.1.9 2 2 2h14v-2H4V6H2z"/></svg>'+(PHS.length?'Добавить фото':'Выбрать файл')+'<input type="file" accept="image/*" multiple style="display:none"></label></div>';
+ b.innerHTML=h;}
+drawPh();
+$('phbox').onclick=function(e){var d=e.target.closest('[data-phdel]');if(d){PHS.splice(+d.dataset.phdel,1);PHUP={};drawPh();}};
+/* фото на белом поле нужного формата: товар там, где не будет текста */
+function padPhoto(fmt,im){var tall=fmt!=='itc',W=tall?768:1024,H=1024,c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,H);
+ var top=STY.pos==='top',bw=W*0.82,bh=H*0.56,k=Math.min(bw/im.naturalWidth,bh/im.naturalHeight),w=im.naturalWidth*k,h=im.naturalHeight*k;x.drawImage(im,(W-w)/2,(top?H*0.37:H*0.07)+(bh-h)/2,w,h);return c.toDataURL('image/jpeg',0.9);}
+function upPhoto(){if(!PHS.length)return Promise.resolve([]);var key=FMT+'|'+STY.pos;if(PHUP[key])return Promise.resolve(PHUP[key]);var ids=[],i=0;
+ return new Promise(function(ok,bad){(function nx(){if(i>=PHS.length){PHUP[key]=ids;ok(ids);return;}api('art_photo_up',{img:padPhoto(FMT,PHS[i++])}).then(function(x){if(!x||!x.ok){bad(new Error((x&&x.error)||'Фото не загрузилось'));return;}ids.push(x.photo);nx();},function(){bad(new Error('Нет связи'));});})();});}
+function makeSet(){var tx=$('txt').value.trim();if(tx.length<3){toast('Скажите или напишите, что за товар и какой текст');$('txt').focus();return;}if(BUSY)return;BUSY=true;$('go').disabled=true;
+ var r=$('res');r.style.display='';r.innerHTML='<div class="wait"><div class="spin"></div>'+(PHS.length?'Загружаю фото и придумываю набор…':'Придумываю набор карточек…')+'</div>';r.scrollIntoView({behavior:'smooth',block:'start'});
+ var fmt=FMT,pid='';
+ upPhoto().then(function(p){pid=p;return api('art_set_plan',{text:tx,n:CNT,has_photo:pid.length?1:0,fmt:fmt,white:WHITE?1:0});}).then(function(x){
+  if(!x||!x.ok)throw new Error((x&&x.error)||'Не получилось');
+  SET={fmt:fmt,photos:pid,white:WHITE,slides:x.slides.map(function(sl){sl.img=null;sl.bullets=(sl.bullets||[]).join('\n');return sl;})};
+  var F=FMTS[fmt];
+  r.innerHTML='<div style="font-weight:800;font-size:18px">Набор для '+F.n+' · '+SET.slides.length+' шт.</div><div class="muted" style="font-size:13px;margin:2px 0 10px">Картинки рисуются по очереди, по 20–60 секунд каждая.</div>'+
+   SET.slides.map(function(sl,i){return '<div class="sl" style="margin-bottom:16px"><div class="muted" style="font-size:13px;margin-bottom:4px">'+(i+1)+'. '+(sl.kind==='cover'?'Обложка':sl.kind==='spec'?'Характеристики':'Преимущество')+'</div><div style="position:relative"><canvas class="cv" id="cv'+i+'" width="'+F.W+'" height="'+F.H+'" style="background:#eee;aspect-ratio:'+F.W+'/'+F.H+'"></canvas><div id="w'+i+'" class="wait" style="position:absolute;inset:0;background:rgba(255,255,255,.8);border-radius:14px;padding-top:35%"><div class="spin"></div>Жду очереди…</div></div>'+
+    '<details style="margin-top:6px"><summary style="cursor:pointer;color:var(--pri);font-weight:700">Изменить текст</summary><label class="fld"><span>Заголовок</span><input data-f="title" data-i="'+i+'" value="'+esc(sl.title)+'"></label><label class="fld"><span>Пункты — каждый с новой строки</span><textarea data-f="bullets" data-i="'+i+'" rows="3">'+esc(sl.bullets)+'</textarea></label>'+(i===0?'<div style="display:flex;gap:8px"><label class="fld" style="flex:1"><span>Наклейка</span><input data-f="badge" data-i="0" value="'+esc(sl.badge)+'"></label><label class="fld" style="flex:1"><span>Цена</span><input data-f="price" data-i="0" value="'+esc(sl.price)+'"></label></div>':'')+'</details>'+
+    '<div class="row"><button type="button" class="btn b-line" data-sre="'+i+'">Перерисовать</button><button type="button" class="btn b-ghost" data-sdl="'+i+'">Скачать</button></div></div>';}).join('')+
+   '<div class="row"><button type="button" class="btn b-pri" data-sput="1" style="background:#112C93">Поставить в товар магазина</button></div><div class="row"><button type="button" class="btn b-pri" data-sall="1">Сохранить все</button><button type="button" class="btn b-line" data-sdlall="1">Скачать все</button></div><div class="row"><button type="button" class="btn b-ghost" data-edit="1">Изменить описание</button></div>';
+  [].forEach.call(r.querySelectorAll('[data-f]'),function(el){el.oninput=function(){var sl=SET.slides[+el.dataset.i];sl[el.dataset.f]=el.value;renderSlide(+el.dataset.i);};});
+  var i=0;(function next(){if(i>=SET.slides.length){BUSY=false;$('go').disabled=false;return;}slideImg(i++,next);})();
+ }).catch(function(e){BUSY=false;$('go').disabled=false;r.innerHTML='<div class="err">'+esc(e&&e.message||'Нет связи')+'</div>';});}
+function slideImg(i,cb){var sl=SET.slides[i],w=$('w'+i);if(w){w.style.display='';w.lastChild.textContent='Рисую…';}
+ api('art_set_img',{scene_en:sl.scene_en,fmt:SET.fmt,photo:SET.photos.length?SET.photos[i%SET.photos.length]:'',white:SET.white?1:0}).then(function(x){
+  if(!x||!x.ok){if(w)w.lastChild.textContent=(x&&x.error)||'Не получилось';if(cb)cb();return;}
+  var im=new Image();im.onload=function(){sl.img=im;sl.bg=x.bg;(document.fonts&&document.fonts.load?Promise.all([document.fonts.load('800 60px Roboto'),document.fonts.load('500 30px Roboto')]):Promise.resolve()).then(function(){if(w)w.style.display='none';renderSlide(i);if(cb)cb();},function(){if(w)w.style.display='none';renderSlide(i);if(cb)cb();});};
+  im.onerror=function(){if(w)w.lastChild.textContent='Картинка не загрузилась';if(cb)cb();};im.src=x.bg;})
+ .catch(function(){if(w)w.lastChild.textContent='Нет связи';if(cb)cb();});}
+function renderSlide(i){var sl=SET.slides[i],cv=$('cv'+i);if(!cv||!sl.img)return;var F=FMTS[SET.fmt],W=F.W,H=F.H,c=cv.getContext('2d');cv.width=W;cv.height=H;
+ var im=sl.img,k=Math.max(W/im.width,H/im.height),iw=im.width*k,ih=im.height*k;c.drawImage(im,(W-iw)/2,(H-ih)/2,iw,ih);
+ var P=Math.round(W*0.045),u=Math.min(W,H*0.9);
+ c.font='800 '+Math.round(u*0.034)+'px Roboto, Arial';var lt='ИТК ГЛОБАЛ',ls=Math.round(u*0.06),lw=ls+16+c.measureText(lt).width+28;
+ c.fillStyle='rgba(255,255,255,.94)';rr(c,P,P,lw,ls+20,(ls+20)/2);c.fill();if(LOGO.complete&&LOGO.naturalWidth)c.drawImage(LOGO,P+12,P+10,ls,ls);c.fillStyle='#112C93';c.textBaseline='middle';c.fillText(lt,P+12+ls+12,P+10+ls/2+1);
+ var bd=String(sl.badge||'').trim();if(bd){c.font='800 '+Math.round(u*0.036)+'px Roboto, Arial';var bw=c.measureText(bd).width+48,bh=Math.round(u*0.075);c.fillStyle='#E53935';rr(c,W-P-bw,P+(ls+20-bh)/2,bw,bh,bh/2);c.fill();c.fillStyle='#fff';c.fillText(bd,W-P-bw+24,P+(ls+20)/2+1);}
+ var tl=String(sl.title||'').trim(),bl=String(sl.bullets||'').split('\n').map(function(x){return x.trim();}).filter(Boolean).slice(0,6),pr=String(sl.price||'').trim();
+ if(!tl&&!bl.length&&!pr)return;
+ var z=STY.size||1,spec=sl.kind==='spec',fT=Math.round(u*(spec?0.052:0.058)*z),fB=Math.round(u*(spec?0.032:0.036)*z),gap=Math.round(fB*0.55);c.font='800 '+fT+'px Roboto, Arial';var tL=tl?wrap(c,tl,W-P*4,2):[];
+ var ph=P+tL.length*fT*1.12+(tL.length&&bl.length?gap*1.5:0)+bl.length*(fB+gap)+(pr?fT*1.2+gap:0)+P*0.8,py=STY.pos==='top'?P*2+ls+20:H-ph-P;
+ var pc={white:['rgba(255,255,255,.95)','#17202b','#2d3640','#112C93'],dark:['rgba(20,22,30,.86)','#ffffff','#e6e8ee','#F57C00'],navy:['rgba(17,44,147,.92)','#ffffff','#e3e9ff','#F57C00']}[STY.panel]||['rgba(255,255,255,.95)','#17202b','#2d3640','#112C93'];
+ c.fillStyle=pc[0];rr(c,P,py,W-P*2,ph,28);c.fill();
+ var y=py+P*0.9;c.textBaseline='top';c.fillStyle=pc[1];c.font='800 '+fT+'px Roboto, Arial';tL.forEach(function(l){c.fillText(l,P*2,y);y+=fT*1.12;});if(tL.length&&bl.length)y+=gap*1.5;
+ c.font='500 '+fB+'px Roboto, Arial';bl.forEach(function(b){c.fillStyle='#128A04';c.beginPath();c.arc(P*2+fB*0.4,y+fB*0.55,fB*0.4,0,7);c.fill();c.strokeStyle='#fff';c.lineWidth=Math.max(3,fB*0.1);c.beginPath();c.moveTo(P*2+fB*0.22,y+fB*0.56);c.lineTo(P*2+fB*0.36,y+fB*0.7);c.lineTo(P*2+fB*0.6,y+fB*0.4);c.stroke();c.fillStyle=pc[2];c.fillText(wrap(c,b,W-P*4-fB*1.3,1)[0],P*2+fB*1.2,y);y+=fB+gap;});
+ if(pr){y+=gap*0.5;c.font='800 '+Math.round(fT*1.05)+'px Roboto, Arial';var pw=c.measureText(pr).width+44;c.fillStyle=pc[3];rr(c,P*2,y,pw,fT*1.2,fT*0.6);c.fill();c.fillStyle='#fff';c.textBaseline='middle';c.fillText(pr,P*2+22,y+fT*0.62);}}
+function slData(i){return $('cv'+i).toDataURL('image/jpeg',0.92);}
+function dl(uri,name){var a=document.createElement('a');a.href=uri;a.download=name;document.body.appendChild(a);a.click();a.remove();}
+function cardData(){return $('cv').toDataURL('image/jpeg',0.92);}
+$('res').onclick=function(e){var b=e.target;
+ if(b.closest('[data-sput]')){putOpen();return;}
+ var sre=b.closest('[data-sre]');if(sre&&SET){if(BUSY){toast('Подождите — ещё рисуются другие картинки');return;}BUSY=true;slideImg(+sre.dataset.sre,function(){BUSY=false;});return;}
+ var sdl=b.closest('[data-sdl]');if(sdl&&SET){var k=+sdl.dataset.sdl;if(!SET.slides[k].img){toast('Картинка ещё рисуется');return;}dl(slData(k),'itk-'+SET.fmt+'-'+(k+1)+'.jpg');return;}
+ if(b.closest('[data-sdlall]')&&SET){SET.slides.forEach(function(sl,k){if(sl.img)setTimeout(function(){dl(slData(k),'itk-'+SET.fmt+'-'+(k+1)+'.jpg');},k*700);});return;}
+ if(b.closest('[data-sall]')&&SET){var sb=b.closest('[data-sall]'),L=SET.slides.map(function(sl,k){return k;}).filter(function(k){return SET.slides[k].img;});if(!L.length){toast('Картинки ещё рисуются');return;}sb.disabled=true;sb.textContent='Сохраняю…';
+  var n=0;(function nx(){if(!L.length){sb.textContent='Сохранено: '+n;toast('Набор сохранён в «Сохранённые картинки»');loadGal();return;}var k=L.shift();api('art_card_save',{img:slData(k),title:(SET.slides[k].title||'')+' ('+FMTS[SET.fmt].n+', '+(k+1)+')',ratio:SET.fmt==='itc'?'sq':'card'}).then(function(x){if(x&&x.ok)n++;nx();},nx);})();return;}
+ if(b.closest('[data-cagain]')){makeCard(true);return;}
+ if(b.closest('[data-cdl]')){var a=document.createElement('a');a.href=cardData();a.download='kartochka-itk.jpg';document.body.appendChild(a);a.click();a.remove();return;}
+ if(b.closest('[data-csave]')&&CARD){var sb=b.closest('[data-csave]');sb.disabled=true;sb.textContent='Сохраняю…';api('art_card_save',{img:cardData(),title:CARD.title,ratio:CARD.ratio}).then(function(x){if(x&&x.ok){sb.textContent='Сохранено';toast('Карточка сохранена в «Сохранённые картинки»');loadGal();}else{sb.disabled=false;sb.textContent='Сохранить';toast((x&&x.error)||'Не сохранилось');}});return;}
+ if(b.closest('[data-again]')){draw();return;}
+ if(b.closest('[data-edit]')){window.scrollTo({top:0,behavior:'smooth'});setTimeout(function(){$('txt').focus();},300);return;}
+ if(b.closest('[data-save]')&&CUR){var s=b.closest('[data-save]');s.disabled=true;api('art_save',{id:CUR.id}).then(function(x){if(x&&x.ok){s.innerHTML='Сохранено';toast('Сохранено в «Сохранённые картинки»');loadGal();}else{s.disabled=false;toast((x&&x.error)||'Не сохранилось');}});}};
+/* галерея */
+var GAL=[];
+function loadGal(){if(!t)return;api('art_list').then(function(x){GAL=(x&&x.ok&&x.list)||[];$('gal').innerHTML=GAL.length?'<div class="gal">'+GAL.map(function(g,i){return '<button type="button" data-i="'+i+'"><img src="'+esc(g.file)+'" alt="" loading="lazy"></button>';}).join('')+'</div>':'<div class="muted">Пока ничего не сохранено.</div>';});}
+$('gal').onclick=function(e){var b=e.target.closest('[data-i]');if(!b)return;var g=GAL[+b.dataset.i];if(!g)return;VI=g;$('vimg').src=g.file;$('vt').textContent=(g.prompt_ru||'')+(g.who?' · '+g.who:'');$('vdl').href=g.file;$('view').classList.add('on');};
+var VI=null;function closeView(){$('view').classList.remove('on');VI=null;}
+$('vx').onclick=closeView;
+$('vdel').onclick=function(){if(!VI||!confirm('Удалить картинку?'))return;api('art_del',{id:VI.id}).then(function(){closeView();loadGal();});};
+/* ---- №346 · камера на главном экране, «Мои работы», черновик текста ---- */
+$('camrow').onchange=function(e){var f=e.target.files&&e.target.files[0];if(!f)return;e.target.value='';setMode('card');addPhoto(f);setTimeout(function(){$('phbox').scrollIntoView({behavior:'smooth',block:'center'});toast('Фото добавлено. Скажите, что за товар, и нажмите «Сделать карточки»');},400);};
+try{var dr=localStorage.getItem('draw_txt');if(dr&&!$('txt').value)$('txt').value=dr;}catch(e){}
+$('txt').addEventListener('input',function(){try{localStorage.setItem('draw_txt',this.value);}catch(e){}});
+var HIST=[];
+function fdt(ts){var d=new Date(ts*1000);return ('0'+d.getDate()).slice(-2)+'.'+('0'+(d.getMonth()+1)).slice(-2)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}
+var RN={sq:'квадрат',wide:'широкая',tall:'вертикальная',banner:'баннер',post:'пост',news:'обложка новости',itc:'ИТК ГЛОБАЛ',wb:'Wildberries',oz:'Ozon'};
+function loadWorks(){api('art_spend').then(function(x){$('spend').innerHTML=x&&x.ok?'Сегодня: <b>'+x.day+' ¥</b> · за месяц: <b>'+x.month+' ¥</b> · всего: '+x.all+' ¥<div style="font-size:13px;margin-top:4px">Примерно, по цене картинок. Остаток на счёте Alibaba смотрите в консоли Alibaba Cloud → «Оплата».</div>':'Нет данных';});
+ api('art_hist').then(function(x){HIST=(x&&x.ok&&x.list)||[];$('hist').innerHTML=HIST.length?HIST.map(function(h,i){var set=h.style==='set';
+   return '<div style="display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)">'+(h.file?'<img src="'+esc(h.file)+'" style="width:64px;height:64px;object-fit:cover;border-radius:10px;flex:none">':'<div style="width:64px;height:64px;border-radius:10px;background:#efe7fb;display:grid;place-items:center;color:var(--pri);flex:none;font-size:12px;text-align:center">'+(set?'набор':'—')+'</div>')+
+    '<div style="flex:1;min-width:0"><div style="font-size:14px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">'+esc(h.prompt_ru||'')+'</div><div class="muted" style="font-size:12px;margin-top:2px">'+fdt(h.ts)+' · '+(set?'карточки, '+(RN[h.ratio]||''):'картинка, '+(RN[h.ratio]||''))+(+h.saved?' · сохранено':'')+'</div></div>'+
+    (h.file?'<a class="btn b-ghost" style="width:auto;padding:10px;font-size:14px;flex:none" href="'+esc(h.file)+'" download="risovalka_'+esc(fdt(h.ts).replace(/[ .:]/g,'-'))+'.jpg" title="Скачать" aria-label="Скачать"><svg class="mi" viewBox="0 0 24 24" style="margin:0"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></a>':'')+   /* №532 · скачать из «Моих запросов» */
+    '<button type="button" class="btn b-ghost" style="width:auto;padding:10px 12px;font-size:14px" data-rep="'+i+'">Повторить</button></div>';}).join(''):'<div class="muted">Пока пусто — здесь будут все ваши запросы.</div>';});}
+$('hist').onclick=function(e){var b=e.target.closest('[data-rep]');if(!b)return;var h=HIST[+b.dataset.rep];if(!h)return;$('txt').value=h.prompt_ru||'';try{localStorage.setItem('draw_txt',$('txt').value);}catch(_){}
+ var pick=function(id,v){var c=$(id);if(!c)return;[].forEach.call(c.children,function(x){if(x.dataset.v===String(v))x.click();});};
+ if(h.style==='set'){setMode('card');var o={};try{o=JSON.parse(h.prompt_en||'{}');}catch(_){}pick('fmt',o.fmt||h.ratio);if(o.n)pick('cnt',o.n);pick('bgk',o.white?'white':'scene');}
+ else{setMode('pic');pick('ratio',h.ratio);pick('style',h.style);}
+ window.scrollTo({top:0,behavior:'smooth'});toast('Описание подставлено — можно поправить и нажать кнопку');};
+/* ---- №347 · «Поставить в товар магазина» ---- */
+var PUT={pid:'',name:''};
+function putOpen(){if(!SET||!SET.slides.some(function(sl){return sl.img;})){toast('Картинки ещё рисуются');return;}
+ var v=$('putv');v.classList.add('on');$('putq').value='';$('putl').innerHTML='<div class="muted">Начните вводить название или номер товара</div>';$('putgo').style.display='none';PUT={pid:'',name:''};setTimeout(function(){$('putq').focus();},200);}
+function putClose(){$('putv').classList.remove('on');}
+var putT=null;
+document.addEventListener('input',function(e){if(e.target.id!=='putq')return;clearTimeout(putT);var q=e.target.value.trim();putT=setTimeout(function(){if(q.length<2){$('putl').innerHTML='';return;}
+ api('art_prod_find',{q:q}).then(function(x){var L=(x&&x.ok&&x.list)||[];if(x&&!x.ok){$('putl').innerHTML='<div class="err">'+esc(x.error||'')+'</div>';return;}
+  $('putl').innerHTML=L.length?L.map(function(p){return '<button type="button" class="prow" data-pid="'+esc(p.id)+'" data-pn="'+esc(p.name)+'">'+(p.img?'<img src="'+esc(p.img)+'">':'<span class="pim0"></span>')+'<span style="flex:1;min-width:0"><b>'+esc(p.name)+'</b><small>№ '+esc(p.id)+' · фото: '+p.n+'</small></span></button>';}).join(''):'<div class="muted">Ничего не нашлось</div>';});},350);});
+document.addEventListener('click',function(e){var r=e.target.closest('.prow');if(r){PUT={pid:r.dataset.pid,name:r.dataset.pn};[].forEach.call(document.querySelectorAll('.prow'),function(x){x.classList.toggle('on',x===r);});$('putgo').style.display='';$('putnm').textContent=PUT.name;return;}
+ var m=e.target.closest('[data-putm]');if(m){if(!PUT.pid)return;var mode=m.dataset.putm;if(mode==='replace'&&!confirm('Заменить ВСЕ фото товара «'+PUT.name+'» на эти карточки?'))return;
+  var L=SET.slides.map(function(sl,k){return k;}).filter(function(k){return SET.slides[k].img;});m.disabled=true;var old=m.textContent;m.textContent='Отправляю…';
+  api('art_to_product',{id:PUT.pid,mode:mode,imgs:L.map(function(k){return slData(k);})}).then(function(x){m.disabled=false;m.textContent=old;if(x&&x.ok){putClose();toast('Готово: '+x.n+' карт. в товаре «'+(x.name||'')+'», всего фото: '+x.total);}else toast((x&&x.error)||'Не получилось');},function(){m.disabled=false;m.textContent=old;toast('Нет связи');});return;}
+ if(e.target.closest('[data-putx]'))putClose();});
+/* ---- №269 · открыли из Фила: всё уже заполнено ---- */
+(function(){var Q={};(location.search||'').replace(/^\?/,'').split('&').forEach(function(kv){var i=kv.indexOf('=');if(i<0)return;try{Q[decodeURIComponent(kv.slice(0,i))]=decodeURIComponent(kv.slice(i+1).replace(/\+/g,' '));}catch(_){}});
+ if(!Q.q)return;$('txt').value=Q.q;var pick=function(id,v){var c=$(id);if(!c||v==null)return;[].forEach.call(c.children,function(x){if(x.dataset.v===String(v))x.click();});};
+ if(Q.mode==='card'){setMode('card');pick('fmt',Q.fmt);pick('cnt',Q.n);if(Q.white==='1')pick('bgk','white');toast('Запрос от Фила: добавьте фото товара (кнопка «Камера») и нажмите «Сделать карточки»');}
+ else{setMode('pic');pick('ratio',Q.ratio);if(Q.go==='1')setTimeout(function(){$('go').click();},500);}
+ try{history.replaceState(null,'','/apps/draw/');}catch(_){}})();
+loadGal();
+/* «Назад»: сначала закрываем просмотр, потом — само приложение */
+(function(){try{if(window.AndroidApp&&AndroidApp.fromIcon&&AndroidApp.fromIcon())sessionStorage.setItem('draw_icon','1');}catch(e){}})();
+function fromIcon(){try{if(window.AndroidApp&&AndroidApp.fromIcon&&AndroidApp.fromIcon())return true;}catch(e){}try{return sessionStorage.getItem('draw_icon')==='1';}catch(e){return false;}}
+window.itcNativeBack=function(){if($('putv').classList.contains('on')){putClose();return true;}if(VI){closeView();return true;}if(LIS){try{FilVoice.stop();}catch(e){}return true;}
+ try{if(window.AndroidApp&&AndroidApp.close&&(/ITCApp/.test(navigator.userAgent||'')||fromIcon())){AndroidApp.close();return true;}}catch(e){}
+ location.href='https://itcpartner.store/';return true;};
+</script>
+<script>if('serviceWorker' in navigator){try{navigator.serviceWorker.register('sw.js');}catch(e){}}</script>
+<script src="/apps/install.js" defer></script>
+<script src="/ptr.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Экосистема ИТК</title>
+<link rel="icon" type="image/png" href="/apps/eco/icon-192.png">
+<link rel="apple-touch-icon" href="/apps/eco/icon-192.png">
+<style>
+  :root{--navy:#112C93;--green:#128A04;--line:#d0d4dc;--muted:#6b7a99}
+  html,body{margin:0;height:100%;background:#eef1f7;font-family:Arial,Helvetica,sans-serif;color:#1b1b1b}
+  .g{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box}
+  .box{background:#fff;max-width:420px;width:100%;border-radius:4px;border-top:4px solid var(--navy);padding:28px 24px;box-shadow:0 2px 12px rgba(17,44,147,.08);text-align:center}
+  .ic{width:52px;height:52px;color:var(--navy);margin:0 auto 10px;display:block}
+  h1{font-size:20px;color:var(--navy);margin:0 0 8px}
+  p{font-size:15px;line-height:1.5;color:#444;margin:0 0 18px}
+  a.btn{display:inline-block;background:var(--navy);color:#fff;text-decoration:none;font-weight:bold;font-size:15px;padding:12px 22px;border-radius:4px}
+  .spin{width:34px;height:34px;border:4px solid #dfe4f0;border-top-color:var(--navy);border-radius:50%;animation:s 0.9s linear infinite;margin:6px auto 14px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  [hidden]{display:none!important}
+</style></head>
+<body><div class="g"><div class="box">
+  <div id="wait"><div class="spin"></div><p>Проверяю доступ…</p></div>
+  <div id="deny" hidden>
+    <svg class="ic" viewBox="0 0 24 24"><path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>
+    <h1>Только для сотрудников ИТК</h1>
+    <p id="why">Чтобы открыть Экосистему, войдите в магазин itcpartner.store со своим рабочим входом, затем вернитесь сюда.</p>
+    <a class="btn" href="/">Войти</a>
+  </div>
+</div></div>
+<script>
+/* №861 · Экосистема отдельным окном приложения 1.7 (копия /eco/index.html, без своего обработчика офлайна).
+   Экосистема 4.10.9: сама программа приходит с сервера только после проверки пропуска сотрудника. */
+(function(){
+  /* Пропуск: из адреса (/eco/?t=… — так открывает приложение магазина), из этой вкладки или из входа в магазин */
+  function tok(){
+    var m = /[?&]t=([^&]+)/.exec(location.search || ''); if (m) { try{ return decodeURIComponent(m[1]); }catch(e){} }
+    try{ var s = sessionStorage.getItem('eco_t'); if (s) return s; }catch(e){}
+    try{ var a = JSON.parse(localStorage.getItem('itc_auth') || 'null'); return (a && a.token) || ''; }catch(e){ return ''; }
+  }
+  function deny(t){ document.getElementById('wait').hidden = true; document.getElementById('deny').hidden = false; if (t) document.getElementById('why').textContent = t; }
+  var t = tok();
+  if (!t && /ITCMini/.test(navigator.userAgent || '')) { location.replace('/?back=' + encodeURIComponent('/apps/eco/')); return; }   // №429 · отдельное приложение: сначала вход в аккаунт ИТК
+  if (!t) { deny(); return; }
+  /* №16 · Экосистема хранится в телефоне и открывается СРАЗУ; свежая версия тихо скачивается в фоне
+     и откроется в следующий раз (раньше каждый запуск качал ~6 МБ из России — отсюда ожидание и «перезагрузка»).
+     Пропуск недействителен — копию из телефона стираем. */
+  function show(html){
+    try{ sessionStorage.setItem('eco_t', t); }catch(e){}   // программа Экосистемы берёт пропуск отсюда
+      var F = '<style id="itc-font">/* Шрифт Roboto — как на сайте itcpartner.ru (01.11.2026) */@font-face{font-family:\'Roboto\';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-cyrillic-300-normal.woff2) format(\'woff2\');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:\'Roboto\';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-latin-300-normal.woff2) format(\'woff2\');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:\'Roboto\';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/roboto-cyrillic-400-normal.woff2) format(\'woff2\');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:\'Roboto\';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/roboto-latin-400-normal.woff2) format(\'woff2\');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:\'Roboto\';font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/roboto-cyrillic-500-normal.woff2) format(\'woff2\');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:\'Roboto\';font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/roboto-latin-500-normal.woff2) format(\'woff2\');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:\'Roboto\';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/roboto-cyrillic-700-normal.woff2) format(\'woff2\');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:\'Roboto\';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/roboto-latin-700-normal.woff2) format(\'woff2\');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}html body,html body *:not(svg):not(path):not(code):not(pre):not(kbd):not(samp){font-family:\'Roboto\',Arial,sans-serif!important}</style>';
+    html = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, F + '</head>') : F + html;   /* шрифт Roboto, как на сайте */
+    /* №32 · «Назад» приложения ИТК — и в самой программе Экосистемы */
+    html += '<script>window.itcNativeBack=function(){try{if(window.ecoNativeBack&&window.ecoNativeBack())return true;}catch(e){}try{if(window.AndroidApp&&AndroidApp.close){AndroidApp.close();return true;}}catch(e){}location.href="https://itcpartner.store/";return true;};<\/script>';   /* №429 · на главном экране «Назад» закрывает Экосистему — вы там, откуда её открыли */
+    /* №36 · из Экосистемы — в магазин: кнопка «В приложение» стала «В магазин» и всегда ведёт в магазин;
+       «закрыть» на главном экране, если Экосистему открыли из магазина (а не своим значком), тоже ведёт в магазин */
+    html += '<script>(function(){var S="https://itcpartner.store/";'
+      + 'function isBtn(b){return b&&/^[\\s‹<]*В (приложение|магазин)\\s*$/.test(b.textContent||"");}'
+      + 'document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest("button,a,[role=button]"):null;if(!isBtn(b))return;e.preventDefault();e.stopPropagation();location.href=S;},true);'
+      + 'function ren(){try{Array.prototype.forEach.call(document.querySelectorAll("button,a,[role=button]"),function(b){if(b.children.length===0&&/^[\\s‹<]*В приложение\\s*$/.test(b.textContent||""))b.textContent="‹ В магазин";});}catch(e){}}'
+      + 'document.addEventListener("DOMContentLoaded",ren);setInterval(ren,1500);})();<\/script>' + '<script src="/ptr.js" defer><\/script>';
+    document.open('text/html', 'replace'); document.write(html); document.close();
+  }
+  var h = 0; for (var i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0;
+  var KEY = '/apps/eco/__prog__?k=' + (h >>> 0).toString(36), CN = 'itc-eco-prog';
+  function fresh(){
+    return fetch('/api/eco_app.php?t=' + encodeURIComponent(t), { cache: 'no-store', credentials: 'same-origin' }).then(function(r){
+      if (r.status === 401 || r.status === 403) { try { caches.open(CN).then(function(c){ c.delete(KEY); }); } catch(e){} return { st:r.status }; }
+      if (!r.ok) return { st:r.status };
+      return r.text().then(function(html){ try { caches.open(CN).then(function(c){ c.put(KEY, new Response(html, { headers:{ 'Content-Type':'text/html; charset=utf-8' } })); }); } catch(e){} return { html:html }; });
+    });
+  }
+  function online(){
+    fresh().then(function(x){
+      if (x.html) { show(x.html); return; }
+      if (x.st === 401) deny('Вход устарел. Войдите в магазин itcpartner.store заново, затем вернитесь сюда.');
+      else if (x.st === 403) deny('Этот вход не сотруднический. Экосистема открывается только сотрудникам ИТК.');
+      else deny('Не удалось открыть Экосистему. Обновите страницу.');
+    }).catch(function(){ deny('Нет связи с сервером. Проверьте интернет и обновите страницу.'); });
+  }
+  if (!window.caches) { online(); return; }
+  caches.open(CN).then(function(c){ return c.match(KEY); }).then(function(hit){
+    if (!hit) { online(); return; }
+    var bg = fresh().catch(function(){});               // в фоне — свежая версия на следующий раз
+    hit.text().then(show);
+  }).catch(online);
+})();
+/* №32 · «Назад» в приложении ИТК: сначала закрываем окна Экосистемы, на главном экране —
+   открыто своим значком: приложение сворачивается; открыто из магазина: возвращаемся в магазин */
+window.itcNativeBack = function(){
+  try { if (window.ecoNativeBack && window.ecoNativeBack()) return true; } catch(e){}
+  try { if (window.AndroidApp && AndroidApp.close) { AndroidApp.close(); return true; } } catch(e){}   // №429 · закрываем окно, в магазин силой не ведём
+  location.href = 'https://itcpartner.store/'; return true;
+};
+</script>
+<script src="/ptr.js" defer></script>
+</body></html>

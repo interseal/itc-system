@@ -1,0 +1,15 @@
+[Unit]
+Description=ITK Kosmos background tasks
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=www-data
+Group=www-data
+ExecStart=/usr/bin/php /opt/kosmos/bin/worker.php
+Restart=always
+RestartSec=3
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

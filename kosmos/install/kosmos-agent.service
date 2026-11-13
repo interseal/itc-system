@@ -1,0 +1,8 @@
+[Unit]
+Description=ITK Kosmos agent: status, updates, backups, certificate
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/php /opt/kosmos/bin/agent.php
+TimeoutStartSec=900

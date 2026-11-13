@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<!-- «Отели ИТК» v1 · 08.11.2026 · поиск и бронь гостиниц с оплатой через магазин; кабинет гостиницы (по-русски и по-китайски); управление для босса.
+     Лежит в /apps/hotels/, данные — api/api.php (htl_*). -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#112C93">
+<title>Отели ИТК</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="fav-64.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Отели ИТК">
+<style>
+:root{--navy:#112C93;--bg:#eef1f4;--card:#fff;--ink:#17202b;--muted:#5d6876;--line:#d5dbe2;--green:#128A04;--red:#c62828;--amber:#b26a00}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 Roboto,-apple-system,"Segoe UI",Arial,sans-serif;-webkit-tap-highlight-color:transparent}
+header{background:var(--navy);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 12px}
+header h1{margin:0;font-size:24px;font-weight:800}header p{margin:4px 0 0;opacity:.85;font-size:14px}
+#toShop{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.16);color:#fff;border:0;border-radius:10px;padding:7px 12px 7px 8px;font:inherit;font-size:15px;font-weight:600;margin-bottom:10px;cursor:pointer}
+nav{display:flex;gap:8px;padding:10px 16px 0;background:var(--navy)}
+nav button{flex:1;border:0;border-radius:12px 12px 0 0;padding:10px 4px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;font-size:15px}
+nav button.on{background:var(--bg);color:var(--navy)}
+.mi{width:22px;height:22px;fill:currentColor;flex:none}.ms{width:18px;height:18px;fill:currentColor;flex:none;vertical-align:-3px}
+main{padding:14px 16px calc(env(safe-area-inset-bottom,0px) + 24px);max-width:720px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.btn{border:0;border-radius:12px;padding:12px 14px;font:inherit;font-weight:700;cursor:pointer;text-align:center;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+.btn:disabled{opacity:.5}
+.b-navy{background:var(--navy);color:#fff}.b-line{background:#fff;color:var(--navy);border:2px solid var(--navy)}.b-green{background:var(--green);color:#fff}.b-red{background:#fff;color:var(--red);border:2px solid var(--red)}
+.b-sm{padding:8px 12px;font-size:14px;border-radius:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.row>.btn{flex:1 1 140px}
+.muted{color:var(--muted)}.small{font-size:13.5px}
+label.f{display:block;font-size:13.5px;color:var(--muted);margin:10px 0 4px}
+input.i,select.i,textarea.i{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;font:inherit;background:#fff;color:var(--ink)}
+textarea.i{min-height:90px;resize:vertical}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.load{padding:18px;text-align:center;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);background:#17202b;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.on{opacity:1}
+.htl{display:flex;gap:12px;cursor:pointer}.htl .ph{width:110px;height:96px;border-radius:12px;background:#dfe5ee center/cover;flex:none;display:grid;place-items:center;color:#9aa6b5}
+.htl .t{flex:1;min-width:0}.htl .t b{font-size:17px;display:block}.htl .pr{font-weight:800;font-size:18px;color:var(--navy);margin-top:6px}
+.stars{color:#e8a200;letter-spacing:1px;font-size:14px}
+.tag{display:inline-block;font-size:12.5px;font-weight:700;border-radius:8px;padding:2px 8px;background:#e8f5e9;color:var(--green);margin:2px 4px 2px 0}
+.tag.w{background:#fff6d6;color:var(--amber)}.tag.r{background:#fde8e8;color:var(--red)}.tag.b{background:#e8edfb;color:var(--navy)}.tag.g{background:#eef1f4;color:var(--muted)}
+.gal{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;margin:-14px -14px 12px;padding:0}
+.gal img{height:220px;width:auto;max-width:92%;object-fit:cover;scroll-snap-align:start;flex:none}
+.gal img:first-child{border-top-left-radius:16px}
+.back{border:1px solid var(--line);background:#fff;border-radius:12px;width:42px;height:42px;display:grid;place-items:center;color:var(--navy);cursor:pointer;flex:none}
+.hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}.hd b{font-size:20px}
+.room{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.room:first-child{border-top:0;margin-top:0;padding-top:0}
+.rph{display:flex;gap:6px;overflow-x:auto;margin:8px 0}.rph img{height:90px;border-radius:10px}
+.copyline{display:flex;gap:8px;align-items:flex-start;background:#f3f5f8;border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:8px}
+.copyline div{flex:1;word-break:break-word}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chip{border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:14px;background:#fff}
+.stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}.stepper button{border:0;background:#fff;width:46px;height:44px;font-size:22px;color:var(--navy);cursor:pointer}.stepper span{flex:1;text-align:center;font-weight:700}
+.sub{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px}.sub button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font:inherit;font-size:14.5px;font-weight:600;white-space:nowrap;cursor:pointer;color:var(--ink)}
+.sub button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.cal .wd{font-size:12px;color:var(--muted);text-align:center}
+.cal .d{border:1px solid var(--line);border-radius:10px;background:#fff;padding:4px 2px;text-align:center;cursor:pointer;min-height:58px;font-size:12px;line-height:1.25}
+.cal .d b{display:block;font-size:14px}.cal .d.own{background:#fff6d6}.cal .d.cl{background:#fde8e8;color:var(--red)}.cal .d.sel{outline:3px solid var(--navy);outline-offset:-2px}.cal .d.full{background:#eef1f4;color:var(--muted)}.cal .d.x{visibility:hidden}
+.phs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.phs .p{position:relative}.phs img{width:84px;height:64px;object-fit:cover;border-radius:8px;display:block}
+.phs .p button{position:absolute;right:-6px;top:-6px;width:24px;height:24px;border-radius:50%;border:0;background:var(--red);color:#fff;font-size:14px;cursor:pointer;line-height:24px;padding:0}
+.lang{display:flex;gap:4px;justify-content:flex-end;margin-bottom:8px}.lang button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer}.lang button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+h3{margin:16px 0 8px;font-size:17px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<!-- №470 · своя заставка приложения --><style id="itcSplCss">#itcSpl{position:fixed;inset:0;z-index:2147483000;background:#1d1a18 url(/apps/splash/hotels.jpg?v=1) 50% 50%/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:max(64px,9vh);box-sizing:border-box;transition:opacity .35s;font-family:Roboto,Arial,sans-serif}#itcSpl:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.72) 100%)}#itcSpl .nm{position:relative;color:#fff;font-size:30px;font-weight:700;letter-spacing:.3px;text-shadow:0 2px 12px rgba(0,0,0,.45);margin-bottom:22px;text-align:center;padding:0 20px}#itcSpl .sp{position:relative;width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;animation:itcSplR .9s linear infinite}@keyframes itcSplR{to{transform:rotate(360deg)}}#itcSpl.off{opacity:0;pointer-events:none}</style><div id="itcSpl"><div class="nm">Отели</div><div class="sp"></div></div><script>(function(){var s=document.getElementById("itcSpl");if(!s)return;var u=navigator.userAgent||"",sa=false;try{sa=matchMedia("(display-mode: standalone)").matches||navigator.standalone}catch(e){}if(!/ITCMini|ITCWindow|ITCSklad/.test(u)&&!sa){s.parentNode.removeChild(s);return}var t0=Date.now(),d=0;function h(){if(d)return;d=1;setTimeout(function(){s.className="off";setTimeout(function(){if(s.parentNode)s.parentNode.removeChild(s)},450)},Math.max(0,1000-(Date.now()-t0)))}if(document.readyState==="complete")h();else addEventListener("load",h);setTimeout(h,6000)})()</script>
+<header><button id="toShop" type="button" class="hidden"><svg class="mi" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>В кабинет</button>
+<h1>Отели ИТК</h1><p>Гостиницы для поездок и командировок · оплата в рублях</p></header>
+<nav><button id="tFind" class="on"><svg class="mi" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>Поиск</button>
+<button id="tMy"><svg class="mi" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>Мои брони</button>
+<button id="tCab" class="hidden"><svg class="mi" viewBox="0 0 24 24"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/></svg><span id="tCabT">Гостиница</span></button></nav>
+<main>
+<section id="pFind"><div id="find"></div></section>
+<section id="pMy" class="hidden"><div id="my"><div class="load">Загружаю…</div></div></section>
+<section id="pCab" class="hidden"><div id="cab"><div class="load">Загружаю…</div></div></section>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+var API='/api/api.php';
+function $(i){return document.getElementById(i);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function toast(t){var e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(function(){e.classList.remove('on');},2800);}
+var IC={search:'M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',back:'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',copy:'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z',
+ bed:'M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z',add:'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
+ edit:'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
+ check:'M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',close:'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
+ photo:'M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z',
+ place:'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z',
+ call:'M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z',
+ cal:'M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z',
+ del:'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',people:'M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z'};
+function ic(k,c){return '<svg class="'+(c||'ms')+'" viewBox="0 0 24 24"><path d="'+IC[k]+'"/></svg>';}
+/* ---- вход: метка из магазина (u=…) или сохранённая ---- */
+var TOK='';
+try{var mu=location.search.match(/[?&]u=([^&]+)/);if(mu){TOK=decodeURIComponent(mu[1]);localStorage.setItem('htl_u',TOK);}else TOK=localStorage.getItem('htl_u')||'';
+ if(!TOK){var a=JSON.parse(localStorage.getItem('itc_auth')||'null');if(a&&a.token)TOK=a.token;}}catch(e){}
+if(!TOK&&/ITCMini/.test(navigator.userAgent||'')){location.replace('/?back='+encodeURIComponent('/apps/hotels/?from=itc'));}   /* №429 · отдельное приложение: сначала вход в аккаунт ИТК */
+if(!TOK)location.replace('/?back='+encodeURIComponent('/apps/hotels/'+location.search.replace(/[?&]u=[^&]*/,'')));
+var FROM_ITC=/[?&]from=itc/.test(location.search)||!!sessionStorage.getItem('htl_from');try{if(FROM_ITC)sessionStorage.setItem('htl_from','1');}catch(e){}
+function backToShop(){if(history.length>1&&/itcpartner\.store/.test(document.referrer||''))history.back();else location.href='/';}
+$('toShop').classList.toggle('hidden',!FROM_ITC);$('toShop').onclick=backToShop;
+if('serviceWorker' in navigator){try{navigator.serviceWorker.register('sw.js');}catch(e){}}
+function apiGet(a,p){var qs='';if(p)qs='&'+Object.keys(p).map(function(k){return k+'='+encodeURIComponent(p[k]);}).join('&');return fetch(API+'?action='+a+'&t='+encodeURIComponent(TOK)+qs,{cache:'no-store'}).then(function(r){return r.json();});}
+function apiPost(a,b){b=b||{};b.t=TOK;return fetch(API+'?action='+a+'&t='+encodeURIComponent(TOK),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){return r.json();});}
+function fmtRub(n){return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,' ')+' ₽';}
+function nW(n){var a=n%10,b=n%100;return (a===1&&b!==11)?'ночь':(a>=2&&a<=4&&(b<10||b>=20))?'ночи':'ночей';}
+function gW(n){var a=n%10,b=n%100;return (a===1&&b!==11)?'гость':(a>=2&&a<=4&&(b<10||b>=20))?'гостя':'гостей';}
+function ymd(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function addD(s,n){var d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return ymd(d);}
+function dm(s){var d=new Date(s+'T12:00:00');return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'});}
+function stars(n){return n>0?'<span class="stars">'+'★'.repeat(n)+'</span>':'';}
+function copyTxt(t){try{navigator.clipboard.writeText(t).then(function(){toast(L('Скопировано','已复制'));},function(){window.prompt('',t);});}catch(e){window.prompt('',t);}}
+/* ---- вкладки ---- */
+var TAB='Find';
+function tab(n){TAB=n;['Find','My','Cab'].forEach(function(k){$('p'+k).classList.toggle('hidden',k!==n);$('t'+k).classList.toggle('on',k===n);});window.scrollTo(0,0);if(n==='My')loadMy();if(n==='Cab')loadCab();}
+$('tFind').onclick=function(){tab('Find');};$('tMy').onclick=function(){tab('My');};$('tCab').onclick=function(){tab('Cab');};
+/* ===================== ПОИСК ===================== */
+var Q={city:'',in:ymd(new Date()),out:addD(ymd(new Date()),1),guests:2,all:0};
+try{var sq=JSON.parse(localStorage.getItem('htl_q')||'null');if(sq){Q.city=sq.city||'';Q.guests=sq.guests||2;}}catch(e){}
+var RES=null,HOTEL=null,BOSS=0;
+function drawFind(){
+ if(HOTEL)return drawHotel();
+ var h='<div class="card"><label class="f">Город или название гостиницы</label><input class="i" id="qCity" list="cities" placeholder="Например, Шэньчжэнь или 深圳" value="'+esc(Q.city)+'"><datalist id="cities"></datalist>'
+  +'<div class="g2"><div><label class="f">Заезд</label><input class="i" type="date" id="qIn" value="'+Q.in+'"></div><div><label class="f">Выезд</label><input class="i" type="date" id="qOut" value="'+Q.out+'"></div></div>'
+  +'<label class="f">Гости</label><div class="stepper"><button type="button" id="gM">−</button><span id="gN">'+Q.guests+' '+gW(Q.guests)+'</span><button type="button" id="gP">+</button></div>'
+  +(BOSS?'<label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:14px"><input type="checkbox" id="qAll"'+(Q.all?' checked':'')+'> Показывать и черновики (видит только босс)</label>':'')
+  +'<div class="row"><button class="btn b-navy" id="qGo">'+ic('search')+' Найти гостиницы</button></div></div><div id="res"></div>';
+ $('find').innerHTML=h;
+ $('gM').onclick=function(){if(Q.guests>1){Q.guests--;$('gN').textContent=Q.guests+' '+gW(Q.guests);}};
+ $('gP').onclick=function(){if(Q.guests<10){Q.guests++;$('gN').textContent=Q.guests+' '+gW(Q.guests);}};
+ $('qIn').onchange=function(){Q.in=this.value;if(!Q.out||Q.out<=Q.in){Q.out=addD(Q.in,1);$('qOut').value=Q.out;}};
+ $('qOut').onchange=function(){Q.out=this.value;};
+ $('qGo').onclick=search;
+ if($('qAll'))$('qAll').onchange=function(){Q.all=this.checked?1:0;};
+ apiGet('htl_cities').then(function(r){if(r&&r.ok&&$('cities'))$('cities').innerHTML=r.list.map(function(c){return '<option value="'+esc(c.city)+'">'+esc(c.city_local||'')+'</option>';}).join('');}).catch(function(){});
+ if(RES)drawRes();
+}
+function search(){Q.city=$('qCity').value.trim();Q.in=$('qIn').value;Q.out=$('qOut').value;
+ if(!Q.in||!Q.out||Q.out<=Q.in){toast('Проверьте даты: выезд позже заезда');return;}
+ try{localStorage.setItem('htl_q',JSON.stringify({city:Q.city,guests:Q.guests}));}catch(e){}
+ $('res').innerHTML='<div class="load">Ищу гостиницы…</div>';
+ apiGet('htl_search',{city:Q.city,in:Q.in,out:Q.out,guests:Q.guests,all:Q.all}).then(function(r){if(!r||!r.ok){$('res').innerHTML='<div class="card">'+esc((r&&r.error)||'Ошибка')+'</div>';return;}RES=r;drawRes();})
+ .catch(function(){$('res').innerHTML='<div class="card">Нет связи — попробуйте ещё раз.</div>';});}
+function drawRes(){var r=RES,h='';
+ if(!r.list.length)h='<div class="card"><b>Пока ничего не нашли</b><p class="muted small">Мы подключаем гостиницы по всему миру. Попробуйте другой город или даты.</p></div>';
+ else h='<h3>Найдено: '+r.list.length+' · '+r.nights+' '+nW(r.nights)+'</h3>'+r.list.map(function(o){var p=o.photos&&o.photos[0];
+  return '<div class="card htl" data-h="'+esc(o.id)+'"><div class="ph" style="'+(p?'background-image:url('+esc(p)+')':'')+'">'+(p?'':ic('bed','mi'))+'</div><div class="t"><b>'+esc(o.name)+'</b>'+stars(o.stars)+(o.status&&o.status!=='active'?' <span class="tag w">черновик</span>':'')
+   +'<div class="muted small">'+esc(o.city)+(o.address?' · '+esc(o.address):'')+'</div>'
+   +(o.avail?'<div class="pr">'+fmtRub(o.from_rub)+'</div><div class="muted small">за '+r.nights+' '+nW(r.nights)+', налоги включены</div>':'<div class="tag g" style="margin-top:6px">Нет свободных номеров на эти даты</div>')+'</div></div>';}).join('');
+ $('res').innerHTML=h;
+ Array.prototype.forEach.call(document.querySelectorAll('[data-h]'),function(e){e.onclick=function(){openHotel(e.getAttribute('data-h'));};});}
+function openHotel(id){HOTEL={id:id,load:1};drawHotel();window.scrollTo(0,0);
+ apiGet('htl_hotel',{id:id,in:Q.in,out:Q.out,guests:Q.guests}).then(function(r){if(!r||!r.ok){toast((r&&r.error)||'Ошибка');HOTEL=null;drawFind();return;}HOTEL=r;drawHotel();});}
+function drawHotel(){
+ if(HOTEL.load){$('find').innerHTML='<div class="load">Загружаю гостиницу…</div>';return;}
+ var H=HOTEL.hotel,n=HOTEL.nights,h='<div class="hd"><button class="back" id="hBack">'+ic('back','mi')+'</button><b>'+esc(H.name)+'</b></div><div class="card">';
+ if(H.photos.length)h+='<div class="gal">'+H.photos.map(function(u){return '<img src="'+esc(u)+'" alt="" loading="lazy">';}).join('')+'</div>';
+ h+=stars(H.stars)+(H.name_local?'<div class="muted small">'+esc(H.name_local)+'</div>':'')
+  +'<div style="margin-top:6px">'+ic('place')+' '+esc(H.address||H.city)+'</div>';
+ if(H.address_local)h+='<div class="copyline"><div><span class="muted small">Адрес для такси</span><br><b>'+esc(H.name_local||H.name)+'</b><br>'+esc(H.address_local)+'</div><button class="btn b-line b-sm" data-copy="'+esc((H.name_local||H.name)+' '+H.address_local)+'">'+ic('copy')+'</button></div>';
+ h+='<div class="muted small" style="margin-top:8px">Заезд с '+esc(H.checkin)+' · выезд до '+esc(H.checkout)+'</div>';
+ if(H.amen&&H.amen.length)h+='<div class="chips">'+H.amen.map(function(a){return '<span class="chip">'+esc(a)+'</span>';}).join('')+'</div>';
+ if(H.descr)h+='<p style="white-space:pre-wrap">'+esc(H.descr)+'</p>';
+ h+='</div><h3>Номера · '+dm(Q.in)+' – '+dm(Q.out)+', '+n+' '+nW(n)+', '+Q.guests+' '+gW(Q.guests)+'</h3><div class="card">';
+ if(!HOTEL.rooms.length)h+='<div class="muted">Гостиница ещё не добавила номера.</div>';
+ HOTEL.rooms.forEach(function(r){
+  h+='<div class="room"><b style="font-size:17px">'+esc(r.name)+'</b><div class="muted small">'+[r.beds,r.area?r.area+' м²':'','до '+r.guests+' '+gW(r.guests)].filter(Boolean).map(esc).join(' · ')+'</div>';
+  if(r.photos.length)h+='<div class="rph">'+r.photos.map(function(u){return '<img src="'+esc(u)+'" alt="" loading="lazy">';}).join('')+'</div>';
+  h+='<div>'+(r.breakfast?'<span class="tag">Завтрак включён</span>':'<span class="tag g">Без завтрака</span>')+(r.free_cancel_days?'<span class="tag b">Бесплатная отмена за '+r.free_cancel_days+' дн. до заезда</span>':'<span class="tag w">Без бесплатной отмены</span>')+'</div>';
+  if(r.amen&&r.amen.length)h+='<div class="muted small" style="margin-top:4px">'+r.amen.map(esc).join(' · ')+'</div>';
+  if(!r.fits)h+='<div class="tag g" style="margin-top:8px">Для '+Q.guests+' '+gW(Q.guests)+' мал</div>';
+  else if(!r.free||!r.rub)h+='<div class="tag g" style="margin-top:8px">Занято на эти даты</div>';
+  else h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px"><div><b style="font-size:20px;color:var(--navy)">'+fmtRub(r.rub)+'</b><div class="muted small">за '+n+' '+nW(n)+(r.free<=2?' · осталось '+r.free:'')+'</div></div><button class="btn b-navy" data-room="'+esc(r.id)+'">Выбрать</button></div>';
+  h+='</div>';});
+ h+='</div>';
+ $('find').innerHTML=h;
+ $('hBack').onclick=function(){HOTEL=null;drawFind();};
+ bindCopy();
+ Array.prototype.forEach.call($('find').querySelectorAll('[data-room]'),function(e){e.onclick=function(){bookForm(e.getAttribute('data-room'));};});}
+function bindCopy(){Array.prototype.forEach.call(document.querySelectorAll('[data-copy]'),function(e){e.onclick=function(ev){ev.stopPropagation();copyTxt(e.getAttribute('data-copy'));};});}
+function bookForm(rid){var r=HOTEL.rooms.filter(function(x){return x.id===rid;})[0],H=HOTEL.hotel,n=HOTEL.nights,nm='';
+ try{nm=localStorage.getItem('htl_guest')||'';}catch(e){}
+ var h='<div class="hd"><button class="back" id="bBack">'+ic('back','mi')+'</button><b>Бронирование</b></div><div class="card"><b>'+esc(H.name)+'</b><div>'+esc(r.name)+'</div><div class="muted small">'+dm(Q.in)+' – '+dm(Q.out)+' · '+n+' '+nW(n)+' · '+Q.guests+' '+gW(Q.guests)+'</div>'
+  +'<label class="f">Имя и фамилия гостя латиницей, как в паспорте</label><input class="i" id="bName" placeholder="IVANOV IVAN" value="'+esc(nm)+'" autocapitalize="characters">'
+  +'<label class="f">Телефон для связи</label><input class="i" id="bPhone" type="tel" placeholder="+7…">'
+  +'<label class="f">Пожелания гостинице (необязательно)</label><textarea class="i" id="bNote" placeholder="Например: поздний заезд, высокий этаж"></textarea>'
+  +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><span>К оплате</span><b style="font-size:22px;color:var(--navy)">'+fmtRub(r.rub)+'</b></div>'
+  +'<p class="muted small">Номер держим за вами 30 минут, пока идёт оплата. После оплаты гостиница подтвердит бронь — придёт уведомление. Если гостиница откажет, деньги вернём полностью.</p>'
+  +'<div class="row"><button class="btn b-navy" id="bGo">Перейти к оплате</button></div></div>';
+ $('find').innerHTML=h;window.scrollTo(0,0);
+ $('bBack').onclick=function(){drawHotel();};
+ $('bGo').onclick=function(){var b=this,name=$('bName').value.trim().toUpperCase();if(!/^[A-Z][A-Z \-']{2,}$/.test(name)){toast('Имя латиницей, как в паспорте');return;}
+  try{localStorage.setItem('htl_guest',name);}catch(e){}b.disabled=true;b.textContent='Оформляю…';
+  apiPost('htl_book',{room_id:rid,in:Q.in,out:Q.out,guests:Q.guests,guest_name:name,guest_phone:$('bPhone').value.trim(),note:$('bNote').value.trim()}).then(function(r){
+   if(r&&r.ok){location.href=r.pay_url;}else{b.disabled=false;b.textContent='Перейти к оплате';toast((r&&r.error)||'Ошибка');}}).catch(function(){b.disabled=false;b.textContent='Перейти к оплате';toast('Нет связи');});};}
+/* ===================== МОИ БРОНИ ===================== */
+var BST={new:['Ждёт оплаты','w'],paid:['Оплачена · ждём подтверждения гостиницы','b'],confirmed:['Подтверждена','' ],rejected:['Гостиница отказала · деньги вернём','r'],cancelled:['Отменена','g'],done:['Завершена','g'],refunded:['Деньги возвращены','g']};
+function loadMy(){apiGet('htl_my').then(function(r){if(!r||!r.ok){$('my').innerHTML='<div class="card">'+esc((r&&r.error)||'Ошибка')+'</div>';return;}
+ var L=r.list.filter(function(b){return b.status!=='cancelled'&&!(b.status==='new'&&b.expired);}),h='';
+ if(!L.length)h='<div class="card"><b>Броней пока нет</b><p class="muted small">Найдите гостиницу во вкладке «Поиск».</p></div>';
+ L.forEach(function(b){var st=BST[b.status]||[b.status,'g'],H=b.h;
+  h+='<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(b.hotel)+'</b><span class="muted small">'+esc(b.num)+'</span></div><div>'+esc(b.room)+'</div>'
+   +'<div class="muted small">'+dm(b.date_in)+' – '+dm(b.date_out)+' · '+b.nights+' '+nW(b.nights)+' · '+esc(b.guest_name)+'</div><div style="margin-top:6px"><span class="tag '+st[1]+'">'+st[0]+'</span> <b>'+fmtRub(b.rub_total)+'</b></div>';
+  if(b.hotel_note)h+='<div class="small" style="margin-top:6px">Гостиница: '+esc(b.hotel_note)+'</div>';
+  if(H&&(b.status==='confirmed'||b.status==='paid')){
+   h+='<div class="copyline"><div><span class="muted small">Покажите на ресепшене или водителю такси</span><br><b>'+esc(H.name_local||H.name)+'</b>'+(H.address_local||H.address?'<br>'+esc(H.address_local||H.address):'')+'<br>Бронь '+esc(b.num)+' · '+esc(b.guest_name)+'</div><button class="btn b-line b-sm" data-copy="'+esc((H.name_local||H.name)+' '+(H.address_local||H.address))+'">'+ic('copy')+'</button></div>'
+    +'<div class="muted small" style="margin-top:6px">Заезд с '+esc(H.checkin)+' · выезд до '+esc(H.checkout)+(H.phone?' · тел. гостиницы '+esc(H.phone):'')+(H.wechat?' · WeChat '+esc(H.wechat):'')+'</div>';}
+  if(b.status==='new')h+='<div class="row"><a class="btn b-navy" href="'+esc(b.pay_url)+'">Оплатить</a><button class="btn b-red" data-drop="'+esc(b.id)+'">'+ic('del')+' Удалить</button></div>';
+  h+='</div>';});
+ $('my').innerHTML=h;bindCopy();
+ Array.prototype.forEach.call(document.querySelectorAll('[data-drop]'),function(e){e.onclick=function(){apiPost('htl_drop',{id:e.getAttribute('data-drop')}).then(function(r){toast(r&&r.ok?'Удалено':(r&&r.error)||'Ошибка');loadMy();});};});
+}).catch(function(){$('my').innerHTML='<div class="card">Нет связи.</div>';});}
+/* ===================== КАБИНЕТ ГОСТИНИЦЫ (русский / китайский) ===================== */
+var LG='ru';try{LG=localStorage.getItem('htl_lg')||(/^zh/i.test(navigator.language||'')?'zh':'ru');}catch(e){}
+function L(ru,zh){return LG==='zh'?zh:ru;}
+var CAB=null,CH=0,CS='book',CROOM=null,CALD=null,CSEL=[];
+function loadCab(){apiGet('htl_cab').then(function(r){if(!r||!r.ok){$('cab').innerHTML='<div class="card">'+esc((r&&r.error)||'Ошибка')+'</div>';return;}CAB=r;BOSS=r.boss;if(CH>=r.hotels.length)CH=0;drawCab();}).catch(function(){$('cab').innerHTML='<div class="card">Нет связи.</div>';});}
+function hotelNow(){return CAB&&CAB.hotels[CH];}
+var HST={draft:['Черновик · не продаётся','草稿 · 未上线','w'],active:['Продаётся','在售',''],off:['Выключена','已停用','g']};
+var BSTH={paid:['Ждёт подтверждения','待确认','b'],confirmed:['Подтверждена','已确认',''],rejected:['Отказ','已拒绝','r'],cancelled:['Отменена','已取消','g'],done:['Завершена','已完成','g'],refunded:['Деньги возвращены','已退款','g']};
+function drawCab(){var h='<div class="lang"><button data-lg="ru" class="'+(LG==='ru'?'on':'')+'">Русский</button><button data-lg="zh" class="'+(LG==='zh'?'on':'')+'">中文</button></div>';
+ if(BOSS)h+='<div class="sub"><button data-cs="adm" class="'+(CS==='adm'?'on':'')+'">'+L('Управление','管理')+'</button><button data-cs="allb" class="'+(CS==='allb'?'on':'')+'">'+L('Все брони','全部订单')+'</button></div>';
+ if(CS==='adm')return finish(h+admHtml());
+ if(CS==='allb')return finish(h+'<div id="allb"><div class="load">…</div></div>',loadAllB);
+ if(!CAB.hotels.length)return finish(h+'<div class="card">'+L('К вашему номеру телефона пока не привязана ни одна гостиница. Напишите менеджеру ИТК.','您的手机号尚未绑定酒店，请联系 ITC 经理。')+'</div>');
+ var H=hotelNow();
+ if(CAB.hotels.length>1)h+='<select class="i" id="cH" style="margin-bottom:10px">'+CAB.hotels.map(function(x,i){return '<option value="'+i+'"'+(i===CH?' selected':'')+'>'+esc(x.name)+' · '+esc(x.city)+'</option>';}).join('')+'</select>';
+ var hs=HST[H.status]||HST.draft,pend=H.bookings.filter(function(b){return b.status==='paid';}).length;
+ h+='<div class="card"><b style="font-size:18px">'+esc(H.name)+'</b> <span class="tag '+hs[2]+'">'+L(hs[0],hs[1])+'</span><div class="muted small">'+esc(H.city)+' · '+L('комиссия ИТК','ITC 佣金')+' '+H.commission+'% · '+L('цены в','价格单位')+' '+H.cur+'</div></div>';
+ h+='<div class="sub">'+[['book',L('Брони','订单')+(pend?' · '+pend:'')],['rooms',L('Номера','房型')],['cal',L('Календарь','房价房态')],['info',L('Гостиница','酒店信息')]].concat(BOSS?[['boss',L('Договор','合同设置')]]:[]).map(function(x){return '<button data-cs="'+x[0]+'" class="'+(CS===x[0]?'on':'')+'">'+x[1]+'</button>';}).join('')+'</div>';
+ if(CS==='book')h+=cabBook(H);else if(CS==='rooms')h+=cabRooms(H);else if(CS==='cal')h+=cabCal(H);else if(CS==='info')h+=cabInfo(H);else if(CS==='boss')h+=cabBoss(H);else if(CS==='room')h+=roomForm(H);
+ finish(h,function(){if(CS==='cal')loadCal();});}
+function finish(h,after){$('cab').innerHTML=h;
+ Array.prototype.forEach.call(document.querySelectorAll('[data-lg]'),function(e){e.onclick=function(){LG=e.getAttribute('data-lg');try{localStorage.setItem('htl_lg',LG);}catch(x){}setCabT();drawCab();};});
+ Array.prototype.forEach.call(document.querySelectorAll('[data-cs]'),function(e){e.onclick=function(){CS=e.getAttribute('data-cs');CROOM=null;drawCab();};});
+ if($('cH'))$('cH').onchange=function(){CH=+this.value;CROOM=null;CALD=null;drawCab();};
+ bindCab();if(after)after();}
+function setCabT(){$('tCabT').textContent=L('Гостиница','酒店后台');
+ var zh=LG==='zh'&&CAB&&!CAB.boss;   /* сотрудник китайской гостиницы — шапка тоже по-китайски */
+ document.querySelector('header h1').textContent=zh?'ITC 酒店后台':'Отели ИТК';document.querySelector('header p').textContent=zh?'管理房型、房价房态和订单':'Гостиницы для поездок и командировок · оплата в рублях';
+ $('tFind').lastChild.textContent=zh?'搜索':'Поиск';$('tMy').lastChild.textContent=zh?'我的预订':'Мои брони';}
+function cabBook(H){var B=H.bookings.slice().sort(function(a,b){return (a.status==='paid'?0:1)-(b.status==='paid'?0:1)||a.date_in.localeCompare(b.date_in);}),h='';
+ if(!B.length)return '<div class="card muted">'+L('Броней пока нет. Когда гость оплатит, придёт уведомление.','暂无订单。客人付款后您会收到通知。')+'</div>';
+ B.forEach(function(b){var st=BSTH[b.status]||[b.status,b.status,'g'];
+  h+='<div class="card"><div style="display:flex;justify-content:space-between"><b>'+esc(b.num)+'</b><span class="tag '+st[2]+'">'+L(st[0],st[1])+'</span></div>'
+   +'<div>'+esc(b.room)+'</div><div><b>'+esc(b.date_in)+' → '+esc(b.date_out)+'</b> · '+b.nights+' '+L('ноч.','晚')+' · '+b.guests+' '+L('гост.','位')+'</div>'
+   +'<div>'+L('Гость','客人')+': <b>'+esc(b.guest_name)+'</b>'+(b.guest_phone?' · '+esc(b.guest_phone):'')+'</div>'
+   +(b.note?'<div class="small">'+L('Пожелания','备注')+': '+esc(b.note)+'</div>':'')
+   +'<div class="small muted">'+L('Сумма','房费')+' '+b.total_cur+' '+b.cur+' · '+L('вам к выплате','您应收')+' <b>'+b.payout+' '+b.cur+'</b></div>'
+   +(b.hotel_note?'<div class="small">'+L('Ваш ответ','您的回复')+': '+esc(b.hotel_note)+'</div>':'');
+  if(b.status==='paid')h+='<input class="i" id="an_'+esc(b.id)+'" placeholder="'+L('Комментарий гостю (для отказа — обязательно)','给客人的留言（拒绝时必填）')+'" style="margin-top:8px"><div class="row"><button class="btn b-green" data-ans="1" data-id="'+esc(b.id)+'">'+ic('check')+' '+L('Подтвердить','确认订单')+'</button><button class="btn b-red" data-ans="0" data-id="'+esc(b.id)+'">'+ic('close')+' '+L('Отказать','拒绝')+'</button></div>';
+  h+='</div>';});
+ return h;}
+function cabRooms(H){var h='<div class="row" style="margin:0 0 10px"><button class="btn b-navy" data-newroom="1">'+ic('add')+' '+L('Добавить номер','添加房型')+'</button></div>';
+ if(!H.rooms.length)h+='<div class="card muted">'+L('Добавьте типы номеров: название, сколько таких номеров, сколько гостей, цена за ночь, фото.','请添加房型：名称、数量、可住人数、每晚价格、照片。')+'</div>';
+ H.rooms.forEach(function(r){h+='<div class="card"><div style="display:flex;gap:10px">'+(r.photos[0]?'<img src="'+esc(r.photos[0])+'" style="width:84px;height:64px;object-fit:cover;border-radius:8px">':'')+'<div style="flex:1"><b>'+esc(r.name)+'</b>'+(r.active?'':' <span class="tag g">'+L('выключен','已停用')+'</span>')
+  +'<div class="muted small">'+r.qty+' '+L('шт.','间')+' · '+L('до','最多')+' '+r.guests+' '+L('гост.','人')+' · '+r.price+' '+H.cur+' / '+L('ночь','晚')+'</div></div><button class="btn b-line b-sm" data-eroom="'+esc(r.id)+'">'+ic('edit')+'</button></div></div>';});
+ return h;}
+function roomForm(H){var r=CROOM||{name:'',beds:'',guests:2,area:0,descr:'',photos:[],amen:[],price:0,qty:1,breakfast:0,free_cancel_days:1,active:1};
+ return '<div class="card"><b>'+(r.id?L('Номер','房型')+': '+esc(r.name):L('Новый номер','新房型'))+'</b>'
+  +'<label class="f">'+L('Название (по-русски или по-английски)','房型名称（俄文或英文）')+'</label><input class="i" id="rName" value="'+esc(r.name)+'" placeholder="Double room, sea view">'
+  +'<div class="g2"><div><label class="f">'+L('Кровати','床型')+'</label><input class="i" id="rBeds" value="'+esc(r.beds)+'" placeholder="1 queen"></div><div><label class="f">'+L('Площадь, м²','面积 ㎡')+'</label><input class="i" id="rArea" type="number" value="'+(r.area||'')+'"></div></div>'
+  +'<div class="g3"><div><label class="f">'+L('Гостей','可住人数')+'</label><input class="i" id="rGuests" type="number" min="1" value="'+r.guests+'"></div><div><label class="f">'+L('Таких номеров','房间数量')+'</label><input class="i" id="rQty" type="number" min="0" value="'+r.qty+'"></div><div><label class="f">'+L('Цена за ночь','每晚价格')+', '+H.cur+'</label><input class="i" id="rPrice" type="number" min="0" value="'+(r.price||'')+'"></div></div>'
+  +'<label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="rBf"'+(r.breakfast?' checked':'')+'> '+L('Завтрак включён','含早餐')+'</label>'
+  +'<label class="f">'+L('Бесплатная отмена — за сколько дней до заезда (0 — без отмены)','免费取消：入住前几天（0 = 不可取消）')+'</label><input class="i" id="rFc" type="number" min="0" value="'+r.free_cancel_days+'">'
+  +'<label class="f">'+L('Удобства через запятую','设施（用逗号分隔）')+'</label><input class="i" id="rAmen" value="'+esc((r.amen||[]).join(', '))+'" placeholder="Wi-Fi, кондиционер, балкон">'
+  +'<label class="f">'+L('Описание','描述')+'</label><textarea class="i" id="rDescr">'+esc(r.descr)+'</textarea>'
+  +'<label class="f">'+L('Фото номера','房间照片')+'</label><div class="phs" id="rPhs">'+phsHtml(r.photos,'r')+'</div><label class="btn b-line b-sm" style="margin-top:8px">'+ic('photo')+' '+L('Добавить фото','添加照片')+'<input type="file" accept="image/*" multiple id="rFile" class="hidden"></label>'
+  +'<label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="rAct"'+(r.active?' checked':'')+'> '+L('Продаётся','在售')+'</label>'
+  +'<div class="row"><button class="btn b-navy" id="rSave">'+ic('check')+' '+L('Сохранить','保存')+'</button><button class="btn b-line" data-cs="rooms">'+L('Отмена','取消')+'</button></div>'
+  +(r.id?'<div class="row"><button class="btn b-red" id="rDel">'+ic('del')+' '+L('Удалить номер','删除房型')+'</button></div>':'')+'</div>';}
+var RPH=[],HPH=[];
+function phsHtml(a,k){return a.map(function(u,i){return '<div class="p"><img src="'+esc(u)+'"><button type="button" data-rmph="'+k+'" data-i="'+i+'">×</button></div>';}).join('');}
+function upPhotos(files,hid,arr,box,k){Array.prototype.forEach.call(files,function(f){var rd=new FileReader();rd.onload=function(){toast(L('Загружаю фото…','正在上传…'));
+  apiPost('htl_cab_photo',{hotel_id:hid,data:rd.result}).then(function(r){if(r&&r.ok){arr.push(r.url);$(box).innerHTML=phsHtml(arr,k);bindRm();}else toast((r&&r.error)||'Ошибка');});};rd.readAsDataURL(f);});}
+function bindRm(){Array.prototype.forEach.call(document.querySelectorAll('[data-rmph]'),function(e){e.onclick=function(){var k=e.getAttribute('data-rmph'),a=k==='r'?RPH:HPH;a.splice(+e.getAttribute('data-i'),1);$(k==='r'?'rPhs':'hPhs').innerHTML=phsHtml(a,k);bindRm();};});}
+function cabInfo(H){HPH=H.photos.slice();
+ return '<div class="card"><label class="f">'+L('Название для клиентов (латиницей или по-русски)','酒店名称（英文）')+'</label><input class="i" id="hName" value="'+esc(H.name)+'">'
+  +'<label class="f">'+L('Название по-китайски','中文名称')+'</label><input class="i" id="hNameL" value="'+esc(H.name_local)+'">'
+  +'<div class="g2"><div><label class="f">'+L('Город','城市（英文/俄文）')+'</label><input class="i" id="hCity" value="'+esc(H.city)+'"></div><div><label class="f">'+L('Город по-китайски','城市（中文）')+'</label><input class="i" id="hCityL" value="'+esc(H.city_local)+'"></div></div>'
+  +'<label class="f">'+L('Адрес (латиницей)','地址（英文）')+'</label><input class="i" id="hAddr" value="'+esc(H.address)+'">'
+  +'<label class="f">'+L('Адрес по-китайски — для такси','中文地址（给司机看）')+'</label><input class="i" id="hAddrL" value="'+esc(H.address_local)+'">'
+  +'<div class="g3"><div><label class="f">'+L('Звёзд','星级')+'</label><input class="i" id="hStars" type="number" min="0" max="5" value="'+H.stars+'"></div><div><label class="f">'+L('Заезд с','入住时间')+'</label><input class="i" id="hIn" value="'+esc(H.checkin)+'"></div><div><label class="f">'+L('Выезд до','退房时间')+'</label><input class="i" id="hOut" value="'+esc(H.checkout)+'"></div></div>'
+  +'<div class="g3"><div><label class="f">'+L('Телефон','电话')+'</label><input class="i" id="hPhone" value="'+esc(H.phone)+'"></div><div><label class="f">WeChat</label><input class="i" id="hWx" value="'+esc(H.wechat)+'"></div><div><label class="f">E-mail</label><input class="i" id="hMail" value="'+esc(H.email)+'"></div></div>'
+  +'<label class="f">'+L('Удобства через запятую','酒店设施（用逗号分隔）')+'</label><input class="i" id="hAmen" value="'+esc(H.amen.join(', '))+'" placeholder="Wi-Fi, бассейн, парковка">'
+  +'<label class="f">'+L('Описание','酒店介绍')+'</label><textarea class="i" id="hDescr">'+esc(H.descr)+'</textarea>'
+  +'<label class="f">'+L('Фото гостиницы (первое — главное)','酒店照片（第一张为封面）')+'</label><div class="phs" id="hPhs">'+phsHtml(HPH,'h')+'</div><label class="btn b-line b-sm" style="margin-top:8px">'+ic('photo')+' '+L('Добавить фото','添加照片')+'<input type="file" accept="image/*" multiple id="hFile" class="hidden"></label>'
+  +'<div class="row"><button class="btn b-navy" id="hSave">'+ic('check')+' '+L('Сохранить','保存')+'</button></div></div>';}
+function cabBoss(H){return '<div class="card"><div class="g2"><div><label class="f">Комиссия ИТК, %</label><input class="i" id="bComm" type="number" step="0.5" value="'+H.commission+'"></div><div><label class="f">Валюта цен</label><select class="i" id="bCur">'+['CNY','RUB','USD'].map(function(c){return '<option'+(H.cur===c?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div></div>'
+  +'<div class="g2"><div><label class="f">Страна (2 буквы)</label><input class="i" id="bCc" value="'+esc(H.country)+'" maxlength="2"></div><div><label class="f">Состояние</label><select class="i" id="bSt">'+[['draft','Черновик'],['active','Продаётся'],['off','Выключена']].map(function(x){return '<option value="'+x[0]+'"'+(H.status===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select></div></div>'
+  +'<div class="row"><button class="btn b-navy" id="bSave">'+ic('check')+' Сохранить</button></div></div>'
+  +'<h3>Сотрудники гостиницы</h3><div class="card"><p class="muted small" style="margin-top:0">Входят в «Отели ИТК» по своему телефону (как в магазин) и ведут гостиницу во вкладке «Гостиница».</p>'
+  +(H.staff||[]).map(function(s){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)"><span>'+esc(s.phone)+(s.name?' · '+esc(s.name):'')+'</span><button class="btn b-red b-sm" data-stdel="'+esc(s.phone)+'">'+ic('del')+'</button></div>';}).join('')
+  +'<div class="g2" style="margin-top:8px"><input class="i" id="sPh" placeholder="+86… или +7…"><input class="i" id="sNm" placeholder="Имя"></div><div class="row"><button class="btn b-line" id="sAdd">'+ic('add')+' Добавить сотрудника</button></div></div>'
+  +'<div class="row"><button class="btn b-red" id="hDel">'+ic('del')+' Удалить гостиницу</button></div>';}
+function admHtml(){var c=CAB.cfg||{};
+ return '<div class="card"><b>Новая гостиница</b><label class="f">Название</label><input class="i" id="nName" placeholder="Along Inn Dameisha"><div class="g2"><div><label class="f">Город</label><input class="i" id="nCity" placeholder="Шэньчжэнь"></div><div><label class="f">Валюта цен гостиницы</label><select class="i" id="nCur"><option>CNY</option><option>RUB</option><option>USD</option></select></div></div>'
+  +'<div class="g2"><div><label class="f">Телефон сотрудника гостиницы</label><input class="i" id="nPh" placeholder="+86…"></div><div><label class="f">Комиссия ИТК, %</label><input class="i" id="nComm" type="number" value="'+(c.comm||15)+'"></div></div>'
+  +'<div class="row"><button class="btn b-navy" id="nGo">'+ic('add')+' Создать (черновик)</button></div></div>'
+  +'<div class="card"><b>Настройки</b><div class="g2"><div><label class="f">Запас на курс, %</label><input class="i" id="sFx" type="number" step="0.5" value="'+(c.fx||0)+'"></div><div><label class="f">Комиссия по умолчанию, %</label><input class="i" id="sComm" type="number" step="0.5" value="'+(c.comm||15)+'"></div></div>'
+  +'<p class="muted small">Курс юаня: '+(c.cny||'—')+' ₽, доллара: '+(c.usd||'—')+' ₽ (берутся из настроек магазина). Цена клиенту = цена гостиницы × курс × (1 + запас).</p><div class="row"><button class="btn b-line" id="sSave">'+ic('check')+' Сохранить</button></div></div>'
+  +'<div class="card"><b>Гостиниц: '+CAB.hotels.length+'</b>'+CAB.hotels.map(function(x,i){var hs=HST[x.status]||HST.draft;return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><span>'+esc(x.name)+' · '+esc(x.city)+' <span class="tag '+hs[2]+'">'+hs[0]+'</span></span><button class="btn b-line b-sm" data-openh="'+i+'">Открыть</button></div>';}).join('')+'</div>'
+  +'<div class="card muted small"><b>Поставщики</b><br>«Островок», RateHawk и Ctrip подключатся здесь, когда будут ключи доступа. Их гостиницы появятся в поиске рядом с нашими.</div>';}
+function loadAllB(){apiGet('htl_adm_bookings').then(function(r){if(!r||!r.ok){$('allb').innerHTML='<div class="card">'+esc((r&&r.error)||'Ошибка')+'</div>';return;}
+ $('allb').innerHTML=r.list.length?r.list.map(function(b){var st=BSTH[b.status]||(b.status==='new'?['Ждёт оплаты','','w']:[b.status,'','g']);
+  return '<div class="card"><div style="display:flex;justify-content:space-between"><b>'+esc(b.num)+' · '+esc(b.hotel)+'</b><span class="tag '+st[2]+'">'+st[0]+'</span></div><div class="small">'+esc(b.room)+' · '+esc(b.date_in)+' → '+esc(b.date_out)+' · '+esc(b.guest_name)+' · клиент '+esc(b.client)+'</div><div class="small">Оплачено '+fmtRub(b.rub_total)+' · гостинице '+b.payout+' '+b.cur+' (комиссия '+b.commission+'%)</div>'
+   +(b.status!=='new'?'<div class="row"><select class="i" data-bst="'+esc(b.id)+'" style="flex:1 1 200px"><option value="">Изменить состояние…</option><option value="confirmed">Подтверждена</option><option value="done">Завершена</option><option value="cancelled">Отменена</option><option value="refunded">Деньги возвращены</option></select></div>':'')+'</div>';}).join(''):'<div class="card muted">Броней пока нет.</div>';
+ Array.prototype.forEach.call(document.querySelectorAll('[data-bst]'),function(e){e.onchange=function(){if(!e.value)return;apiPost('htl_adm_bstatus',{id:e.getAttribute('data-bst'),status:e.value}).then(function(r){toast(r&&r.ok?'Сохранено':(r&&r.error)||'Ошибка');loadAllB();});};});});}
+/* ---- календарь: выделить дни → цена / сколько номеров / закрыть ---- */
+function cabCal(H){if(!H.rooms.length)return '<div class="card muted">'+L('Сначала добавьте номер во вкладке «Номера».','请先在「房型」中添加房型。')+'</div>';
+ if(!CROOM||H.rooms.every(function(r){return r.id!==CROOM;}))CROOM=H.rooms[0].id;
+ return '<select class="i" id="calRoom" style="margin-bottom:10px">'+H.rooms.map(function(r){return '<option value="'+esc(r.id)+'"'+(r.id===CROOM?' selected':'')+'>'+esc(r.name)+'</option>';}).join('')+'</select>'
+  +'<div class="card"><p class="muted small" style="margin-top:0">'+L('Нажмите на первый и последний день, затем задайте цену или количество свободных номеров. Жёлтые — своя цена, красные — закрыто, в углу — сколько занято.','点击开始和结束日期，然后设置价格或可售房间数。黄色＝特殊价格，红色＝关房，数字＝已订数量。')+'</p><div id="calG"><div class="load">…</div></div></div>'
+  +'<div class="card" id="calSet"></div>';}
+function loadCal(){if(!CROOM)return;apiGet('htl_cab_cal',{room_id:CROOM,days:63}).then(function(r){if(!r||!r.ok){$('calG').innerHTML=esc((r&&r.error)||'Ошибка');return;}CALD=r;drawCalG();});}
+function drawCalG(){var D=CALD.days,first=new Date(D[0].day+'T12:00:00'),pad=(first.getDay()+6)%7,h='<div class="cal">'+L('Пн Вт Ср Чт Пт Сб Вс','一 二 三 四 五 六 日').split(' ').map(function(w){return '<div class="wd">'+w+'</div>';}).join('');
+ for(var i=0;i<pad;i++)h+='<div class="d x"></div>';
+ var a=CSEL[0],b=CSEL[1]||CSEL[0];
+ D.forEach(function(d){var sel=a&&d.day>=a&&d.day<=b,full=d.busy>=d.avail&&!d.closed;var dd=new Date(d.day+'T12:00:00');
+  h+='<div class="d'+(d.closed?' cl':full?' full':d.own_price?' own':'')+(sel?' sel':'')+'" data-day="'+d.day+'"><b>'+dd.getDate()+(dd.getDate()===1||d===D[0]?'.'+(dd.getMonth()+1):'')+'</b>'+(d.closed?L('закр.','关'):d.price)+'<br><span class="muted">'+d.busy+'/'+d.avail+'</span></div>';});
+ $('calG').innerHTML=h+'</div>';
+ Array.prototype.forEach.call(document.querySelectorAll('[data-day]'),function(e){e.onclick=function(){var k=e.getAttribute('data-day');if(!CSEL.length||CSEL.length===2)CSEL=[k];else CSEL=k<CSEL[0]?[k,CSEL[0]]:[CSEL[0],k];drawCalG();drawCalSet();};});
+ drawCalSet();}
+function drawCalSet(){var box=$('calSet');if(!box)return;if(!CSEL.length){box.innerHTML='<div class="muted small">'+L('Дни не выбраны','未选择日期')+'</div>';return;}
+ var a=CSEL[0],b=CSEL[1]||CSEL[0],H=hotelNow();
+ box.innerHTML='<b>'+a+(b!==a?' → '+b:'')+'</b><div class="g2"><div><label class="f">'+L('Цена за ночь','每晚价格')+', '+H.cur+'</label><input class="i" id="cPr" type="number" min="0"></div><div><label class="f">'+L('Сколько номеров продавать','可售房间数')+'</label><input class="i" id="cAv" type="number" min="0"></div></div>'
+  +'<div class="chips" id="cWd">'+L('Пн Вт Ср Чт Пт Сб Вс','一 二 三 四 五 六 日').split(' ').map(function(w,i){return '<label class="chip"><input type="checkbox" value="'+(i+1)+'" checked> '+w+'</label>';}).join('')+'</div>'
+  +'<div class="row"><button class="btn b-navy" id="cSave">'+ic('check')+' '+L('Применить','应用')+'</button></div><div class="row"><button class="btn b-red b-sm" id="cClose">'+L('Закрыть продажи','关房')+'</button><button class="btn b-line b-sm" id="cOpen">'+L('Открыть продажи','开房')+'</button><button class="btn b-line b-sm" id="cReset">'+L('Как обычно','恢复默认')+'</button></div>';
+ var send=function(x){var wd=[];Array.prototype.forEach.call(document.querySelectorAll('#cWd input'),function(c){if(c.checked)wd.push(+c.value);});x.room_id=CROOM;x.from=a;x.to=b;x.weekdays=wd.length===7?[]:wd;
+  apiPost('htl_cab_cal_set',x).then(function(r){toast(r&&r.ok?L('Сохранено','已保存'):(r&&r.error)||'Ошибка');CSEL=[];loadCal();});};
+ $('cSave').onclick=function(){var p=$('cPr').value,v=$('cAv').value;if(p===''&&v===''){toast(L('Укажите цену или количество','请填写价格或房间数'));return;}send({price:p===''?null:+p,avail:v===''?null:+v});};
+ $('cClose').onclick=function(){send({closed:1});};$('cOpen').onclick=function(){send({closed:0});};$('cReset').onclick=function(){send({reset:1});};}
+function bindCab(){var H=hotelNow();
+ Array.prototype.forEach.call(document.querySelectorAll('[data-ans]'),function(e){e.onclick=function(){var id=e.getAttribute('data-id'),ok=e.getAttribute('data-ans')==='1',n=($('an_'+id)||{}).value||'';
+  if(!ok&&!n.trim()){toast(L('Напишите причину отказа','请填写拒绝原因'));return;}e.disabled=true;
+  apiPost('htl_cab_answer',{id:id,ok:ok?1:0,note:n}).then(function(r){toast(r&&r.ok?L('Готово','完成'):(r&&r.error)||'Ошибка');loadCab();});};});
+ if($('calRoom'))$('calRoom').onchange=function(){CROOM=this.value;CSEL=[];loadCal();};
+ Array.prototype.forEach.call(document.querySelectorAll('[data-newroom]'),function(e){e.onclick=function(){CROOM=null;RPH=[];CS='room';drawCab();};});
+ Array.prototype.forEach.call(document.querySelectorAll('[data-eroom]'),function(e){e.onclick=function(){CROOM=H.rooms.filter(function(r){return r.id===e.getAttribute('data-eroom');})[0];RPH=CROOM.photos.slice();CS='room';drawCab();};});
+ if(CS==='room'){$('rPhs').innerHTML=phsHtml(RPH,'r');bindRm();
+  $('rFile').onchange=function(){upPhotos(this.files,H.id,RPH,'rPhs','r');this.value='';};
+  $('rSave').onclick=function(){var b={hotel_id:H.id,id:CROOM&&CROOM.id||'',name:$('rName').value,beds:$('rBeds').value,area:+$('rArea').value||0,guests:+$('rGuests').value||1,qty:+$('rQty').value||0,price:+$('rPrice').value||0,
+   breakfast:$('rBf').checked?1:0,free_cancel_days:+$('rFc').value||0,amen:$('rAmen').value.split(',').map(function(x){return x.trim();}).filter(Boolean),descr:$('rDescr').value,photos:RPH,active:$('rAct').checked?1:0};
+   apiPost('htl_cab_room',b).then(function(r){if(r&&r.ok){toast(L('Сохранено','已保存'));CS='rooms';CROOM=null;loadCab();}else toast((r&&r.error)||'Ошибка');});};
+  if($('rDel'))$('rDel').onclick=function(){if(!confirm(L('Удалить этот номер?','删除此房型？')))return;apiPost('htl_cab_room_del',{hotel_id:H.id,id:CROOM.id}).then(function(r){toast(r&&r.ok?L('Удалено','已删除'):(r&&r.error)||'Ошибка');if(r&&r.ok){CS='rooms';CROOM=null;loadCab();}});};}
+ if(CS==='info'){bindRm();$('hFile').onchange=function(){upPhotos(this.files,H.id,HPH,'hPhs','h');this.value='';};
+  $('hSave').onclick=function(){apiPost('htl_cab_hotel',{id:H.id,name:$('hName').value,name_local:$('hNameL').value,city:$('hCity').value,city_local:$('hCityL').value,address:$('hAddr').value,address_local:$('hAddrL').value,stars:+$('hStars').value||0,
+   checkin:$('hIn').value,checkout:$('hOut').value,phone:$('hPhone').value,wechat:$('hWx').value,email:$('hMail').value,amen:$('hAmen').value.split(',').map(function(x){return x.trim();}).filter(Boolean),descr:$('hDescr').value,photos:HPH})
+   .then(function(r){toast(r&&r.ok?L('Сохранено','已保存'):(r&&r.error)||'Ошибка');if(r&&r.ok)loadCab();});};}
+ if(CS==='boss'){$('bSave').onclick=function(){apiPost('htl_cab_hotel',{id:H.id,commission:$('bComm').value,cur:$('bCur').value,country:$('bCc').value.toUpperCase(),status:$('bSt').value}).then(function(r){toast(r&&r.ok?'Сохранено':(r&&r.error)||'Ошибка');loadCab();});};
+  $('sAdd').onclick=function(){apiPost('htl_adm_staff',{hotel_id:H.id,phone:$('sPh').value,name:$('sNm').value}).then(function(r){toast(r&&r.ok?'Добавлен':(r&&r.error)||'Ошибка');loadCab();});};
+  Array.prototype.forEach.call(document.querySelectorAll('[data-stdel]'),function(e){e.onclick=function(){apiPost('htl_adm_staff',{hotel_id:H.id,phone:e.getAttribute('data-stdel'),del:1}).then(function(){loadCab();});};});
+  $('hDel').onclick=function(){if(!confirm('Удалить гостиницу «'+H.name+'» вместе с номерами? Это нельзя отменить.'))return;apiPost('htl_adm_del',{id:H.id}).then(function(r){toast(r&&r.ok?'Удалено':(r&&r.error)||'Ошибка');CH=0;loadCab();});};}
+ if(CS==='adm'){$('nGo').onclick=function(){apiPost('htl_adm_new',{name:$('nName').value,city:$('nCity').value,cur:$('nCur').value,phone:$('nPh').value,commission:$('nComm').value}).then(function(r){if(r&&r.ok){toast('Гостиница создана');CS='info';apiGet('htl_cab').then(function(x){CAB=x;CH=x.hotels.map(function(h){return h.id;}).indexOf(r.id);if(CH<0)CH=0;drawCab();});}else toast((r&&r.error)||'Ошибка');});};
+  $('sSave').onclick=function(){apiPost('htl_adm_set',{fx:$('sFx').value,comm:$('sComm').value}).then(function(r){toast(r&&r.ok?'Сохранено':(r&&r.error)||'Ошибка');if(r&&r.ok)CAB.cfg=r.cfg;});};
+  Array.prototype.forEach.call(document.querySelectorAll('[data-openh]'),function(e){e.onclick=function(){CH=+e.getAttribute('data-openh');CS='book';drawCab();};});}}
+/* ---- системная «Назад»: сначала внутренние окна, на первом экране — закрыть программу ---- */
+function fromIcon(){try{if(window.AndroidApp&&AndroidApp.fromIcon&&AndroidApp.fromIcon())return true;}catch(e){}try{return window.matchMedia&&matchMedia('(display-mode: standalone)').matches;}catch(e){return false;}}
+window.itcNativeBack=function(){
+ if(TAB==='Find'&&HOTEL){if(document.getElementById('bBack')){drawHotel();}else{HOTEL=null;drawFind();}return true;}
+ if(TAB==='Cab'&&CS==='room'){CS='rooms';CROOM=null;drawCab();return true;}
+ if(TAB!=='Find'){tab('Find');return true;}
+ try{if(window.AndroidApp&&AndroidApp.close&&(/ITCApp|ITCMini/.test(navigator.userAgent||'')||fromIcon())){AndroidApp.close();return true;}}catch(e){}
+ backToShop();return true;};
+/* ---- старт ---- */
+if(TOK){drawFind();
+ apiGet('htl_cab').then(function(r){if(r&&r.ok&&(r.hotels.length||r.boss)){CAB=r;BOSS=r.boss;setCabT();$('tCab').classList.remove('hidden');if(BOSS&&!HOTEL)drawFind();
+   if(/[?&]cab=1/.test(location.search))tab('Cab');}}).catch(function(){});
+ if(/[?&]my=1/.test(location.search))tab('My');}
+</script>
+<script src="/ptr.js" defer></script>
+</body>
+</html>

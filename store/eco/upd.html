@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Обновления · Экосистема ИТК</title>
+<style>
+:root{--navy:#0a1a5c;--navy2:#13287e;--green:#1a8f0e;--green2:#0b5c02;--red:#b3261e;--bg:#f2f4f8;--card:#fff;--line:#dfe3ec;--mut:#5b6476;--txt:#141a2b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.top{background:var(--navy);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5}
+.top a{color:#fff;display:flex;align-items:center;text-decoration:none}
+.top h1{font-size:18px;margin:0;font-weight:600}
+.wrap{max-width:760px;margin:0 auto;padding:16px}
+.card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(10,26,92,.08)}
+.card h2{font-size:16px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.ok{color:var(--green2)} .bad{color:var(--red)} .mut{color:var(--mut);font-size:13.5px}
+svg{width:20px;height:20px;flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:6px;padding:12px 18px;font:600 15px/1 inherit;cursor:pointer;color:#fff;background:var(--navy);box-shadow:inset 0 -4px 0 #050d33;width:100%;margin-top:8px}
+.btn.g{background:var(--green);box-shadow:inset 0 -4px 0 var(--green2)}
+.btn.w{background:#fff;color:var(--navy);border:1px solid var(--line);box-shadow:inset 0 -4px 0 var(--navy)}
+.btn.r{background:#fff;color:var(--red);border:1px solid #f0c9c6;box-shadow:inset 0 -4px 0 var(--red)}
+.btn:disabled{opacity:.5;cursor:default}
+.bar{height:10px;background:#e7eaf2;border-radius:6px;overflow:hidden;margin:10px 0 4px}
+.bar i{display:block;height:100%;width:0;background:var(--green);transition:width .2s}
+.step{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
+.note{background:#fff7e0;border-left:4px solid #e0a800;padding:10px 12px;border-radius:6px;margin:8px 0}
+.err{background:#fdecea;border-left:4px solid var(--red);padding:10px 12px;border-radius:6px;margin:8px 0}
+.hist{border-top:1px solid var(--line);padding:8px 0;font-size:14px}
+.hist:first-child{border-top:0}
+input[type=text]{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.cat{border-top:1px solid var(--line);padding:10px 0}
+.cat:first-child{border-top:0}
+.hide{display:none}
+.ya h3{font-size:15px;margin:14px 0 6px;display:flex;align-items:center;gap:6px}
+.ya .site{font-weight:600;margin:10px 0 4px}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:6px 0}
+.kv div{background:#f5f7fb;border-radius:8px;padding:8px 10px}
+.kv b{display:block;font-size:20px;color:var(--navy)}
+.kv span{font-size:12.5px;color:var(--mut)}
+table.t{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0}
+table.t th,table.t td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:right}
+table.t th:first-child,table.t td:first-child{text-align:left}
+table.t th{color:var(--mut);font-weight:500;font-size:12.5px}
+.lnk{background:none;border:0;color:var(--navy);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+input[type=password]{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit;margin-top:6px}
+</style>
+<style id="itc-font">/* Шрифт Roboto — как на сайте itcpartner.ru (01.11.2026) */@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-cyrillic-300-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-latin-300-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:'Roboto';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/roboto-cyrillic-400-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/roboto-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:'Roboto';font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/roboto-cyrillic-500-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/roboto-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:'Roboto';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/roboto-cyrillic-700-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/roboto-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}html body,html body *:not(svg):not(path):not(code):not(pre):not(kbd):not(samp){font-family:'Roboto',Arial,sans-serif!important}</style>
+<link rel="stylesheet" href="/apps/fon.css?v=2">
+</head>
+<body>
+<div class="top">
+  <a href="/eco/" aria-label="Назад"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></a>
+  <h1>Обновления</h1>
+</div>
+<div class="wrap">
+
+  <div class="card" id="cState"><div class="mut">Загрузка…</div></div>
+
+  <div class="card hide" id="cSeed">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>Перенос фабрик в базу не закончен</h2>
+    <div class="mut">В папке лежат фабрики, которые ещё не перенесены. Нажмите — перенос продолжится.</div>
+    <button class="btn g" onclick="runSeed()">Завершить перенос</button>
+    <div id="seedLog"></div>
+  </div>
+
+  <div class="card" id="cUp">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>Установить обновление</h2>
+    <div class="mut">Выберите файл obnovlenie_…zip, который прислал Claude. Сайт сам разложит файлы, перенесёт фабрики в базу и покажет отчёт.<br>Можно выбрать сразу несколько файлов (зажмите Ctrl и щёлкайте по файлам) — они встанут в очередь и установятся сами по порядку номеров, вместе с переносом фабрик. Страницу можно свернуть, только не закрывайте её.</div>
+    <input type="file" id="fUp" multiple accept="application/zip,application/x-zip-compressed" class="hide" onchange="upPick(this.files)">
+    <input type="file" id="fUpAll" multiple class="hide" onchange="upPick(this.files)">
+    <button class="btn" id="bPick" onclick="document.getElementById('fUp').click()">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>Выбрать файлы обновлений</button>
+    <div class="mut" style="margin-top:8px;text-align:center">Нет файла в списке? <a href="#" onclick="document.getElementById('fUpAll').click();return false">Показать все файлы</a></div>
+    <div id="upBox"></div>
+  </div>
+
+  <div class="card hide" id="cCats">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3H19v1h1.5V11H19v2h-1.5V7h3v1.5zM9 9.5h1v-1H9v1zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm10 5.5h1v-3h-1v3z"/></svg>Каталоги фабрик в хранилище</h2>
+    <div class="mut">Большие каталоги не помещаются в обновление. Выберите файл каталога (из WeChat или с компьютера) — он уйдёт прямо в хранилище, в карточку фабрики.</div>
+    <div id="catAll" class="hide">
+      <input type="file" id="fCatsAll" class="hide" multiple accept="application/pdf,.pdf,.zip,.rar,.ppt,.pptx,.xls,.xlsx" onchange="catsAll(this.files)">
+      <button class="btn g" id="bCatsAll" onclick="document.getElementById('fCatsAll').click()">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>Загрузить все каталоги сразу</button>
+      <div class="mut" style="margin-top:6px">Откройте папку, где лежат каталоги (обычно «Загрузки» или папка файлов WeChat), выделите все PDF сразу (Ctrl+A) и нажмите «Открыть». Экосистема сама узнает каждый каталог по размеру файла и разложит по карточкам фабрик. Лишние файлы пропустит.</div>
+      <div id="catAllBox"></div>
+    </div>
+    <div id="catList"></div>
+  </div>
+
+  <div class="card" id="cPull">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Файлы для Claude</h2>
+    <div class="mut">Когда Claude просит текущие файлы магазина или «Моего Гуанчжоу» — нажмите, скачается архив. Пароли и ключи в него не попадают. Лучше делать с компьютера.</div>
+    <button class="btn w" id="bPull" onclick="pull()">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Скачать файлы для Claude</button>
+    <div id="pullBox"></div>
+  </div>
+
+  <div class="card" id="cDs">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>Помощник DeepSeek</h2>
+    <div class="mut">Запасной помощник на ноутбуке, когда Claude недоступен. Его обновления подписаны своим ключом, помечаются «сделано DeepSeek», ставятся только вашей кнопкой и снимаются «Вернуть как было». Раздел обновлений и базу фабрик он менять не может.</div>
+    <div id="dsBox"></div>
+  </div>
+  <div class="card" id="cBk">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>Резервные копии базы</h2>
+    <div class="mut">Каждую ночь сервер сам делает копию всей базы и файлов сайта и магазина, закрывает её паролем и кладёт в хранилище. Ноутбук и сервер Aliyun в Китае забирают копии себе — на случай кражи данных или блокировки хостинга.</div>
+    <div id="bkBox"><div class="mut">Загрузка…</div></div>
+  </div>
+
+  <div class="card" id="cSrv">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM20 3H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>Сервер в Китае</h2>
+    <div class="mut">Сервер Aliyun в Гуанчжоу: хранит копии базы и работает для удалённого доступа. Здесь видно, жив ли он, сколько места, баланс Aliyun и до какого числа оплачен сервер.</div>
+    <div id="srvBox"><div class="mut">Загрузка…</div></div>
+  </div>
+
+  <div class="card ya" id="cYa">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>Яндекс</h2>
+    <div class="mut">После каждого обновления Экосистема сама сообщает Яндексу о новых и изменённых страницах сайта, чтобы они быстрее попали в поиск. Кнопка — сделать это вручную.</div>
+    <button class="btn w" id="bYa" onclick="yaPing()">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg>Сообщить Яндексу о страницах</button>
+    <div id="yaBox"></div>
+    <div id="yaKey"></div>
+    <div id="yaStats"></div>
+  </div>
+
+  <div class="card" id="cHist">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>Что уже установлено</h2>
+    <div id="histList" class="mut">—</div>
+    <button class="btn r hide" id="bBack" onclick="rollback()">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>Вернуть как было</button>
+    <div class="mut hide" id="backNote">Вернутся только файлы сайта и Экосистемы. Фабрики, уже перенесённые в базу, останутся.</div>
+  </div>
+
+</div>
+<script>
+var T = (function(){
+  var q = new URLSearchParams(location.search).get('t'); if (q) return q;
+  try { var s = sessionStorage.getItem('eco_t'); if (s) return s; } catch(e){}
+  try { var a = JSON.parse(localStorage.getItem('itc_auth')||'null'); if (a && a.token) return a.token; } catch(e){}
+  return '';
+})();
+var ST = null, PEND = null;
+var IC = {
+  ok:'<svg viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
+  bad:'<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>',
+  wait:'<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8A5.87 5.87 0 0 1 6 12c0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/></svg>'
+};
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function api(file, action, data){
+  var url = '/api/' + file + '?action=' + action + '&t=' + encodeURIComponent(T);
+  var o = data ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({t:T}, data))} : {};
+  return fetch(url, o).then(function(r){ return r.json().catch(function(){ return {ok:false, error:'Сервер ответил не так (код ' + r.status + ')'}; }); });
+}
+function mb(b){ return (b/1048576).toFixed(b < 10485760 ? 1 : 0).replace('.', ',') + ' МБ'; }
+function step(box, cls, text){ var d = document.createElement('div'); d.className = 'step ' + cls; d.innerHTML = (IC[cls==='ok'?'ok':cls==='bad'?'bad':'wait']) + '<div>' + text + '</div>'; box.appendChild(d); return d; }
+
+function yaPing(){
+  var box = document.getElementById('yaBox'); box.innerHTML = ''; var b = document.getElementById('bYa'); b.disabled = true;
+  var s = step(box, 'wait', 'Сообщаю Яндексу…');
+  api('upd.php','upd_indexnow',{}).then(function(y){
+    b.disabled = false;
+    if (y && y.ok && y.skipped) { s.className = 'step ok'; s.innerHTML = IC.ok + '<div>Яндексу уже сообщали минуту назад.</div>'; return; }
+    if (y && y.ok) { s.className = 'step ok'; s.innerHTML = IC.ok + '<div>Яндекс получил ' + (y.sent ? y.sent + ' новых и изменённых страниц' : 'сигнал: новых страниц нет') + '. Всего страниц на сайте: ' + y.total + '.</div>'; return; }
+    s.className = 'step bad'; s.innerHTML = IC.bad + '<div>Не удалось: ' + esc((y && y.error) || 'нет ответа') + '</div>';
+  }).catch(function(){ b.disabled = false; s.className = 'step bad'; s.innerHTML = IC.bad + '<div>Нет ответа от сервера.</div>'; });
+}
+/* ---------- №6 · Яндекс: Вебмастер и Метрика ---------- */
+var IC_WM = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H4V7h16v12zM6 9h12v2H6zm0 4h8v2H6z"/></svg>';
+var IC_MK = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg>';
+var YA_DONE = false, KEY_EDIT = false;
+function n0(x){ return x == null ? '—' : String(x).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
+function yaDraw(){
+  var k = document.getElementById('yaKey');
+  if (!ST.ya || KEY_EDIT) {
+    k.innerHTML = '<h3>' + IC_WM + 'Вебмастер и Метрика</h3>'
+      + '<div class="mut">Чтобы видеть здесь, сколько страниц в поиске и сколько посетителей на сайте, вставьте ключ Яндекса (токен), который вы сохранили в «Блокноте». Ключ хранится только на сервере, на экран он больше не выводится.</div>'
+      + '<input type="password" id="yaTok" placeholder="Вставьте ключ Яндекса" autocomplete="off">'
+      + '<button class="btn g" onclick="yaSave()">' + IC.ok + 'Сохранить ключ</button>'
+      + (ST.ya ? '<div style="margin-top:8px;text-align:center"><button class="lnk" onclick="KEY_EDIT=false;yaDraw()">Отмена</button></div>' : '')
+      + '<div id="yaKeyBox"></div>';
+    document.getElementById('yaStats').innerHTML = '';
+    return;
+  }
+  k.innerHTML = '<div class="row ok" style="margin-top:12px">' + IC.ok + '<div>Ключ Яндекса сохранён · <button class="lnk" onclick="KEY_EDIT=true;yaDraw()">Заменить</button> · <button class="lnk" onclick="yaDel()">Удалить</button></div></div>';
+  if (!YA_DONE) yaStats(false);
+}
+function yaSave(){
+  var v = (document.getElementById('yaTok').value || '').trim(), box = document.getElementById('yaKeyBox'); box.innerHTML = '';
+  if (!v) { step(box, 'bad', 'Сначала вставьте ключ.'); return; }
+  var s = step(box, 'wait', 'Проверяю ключ у Яндекса…');
+  api('upd.php','ya_token',{token:v}).then(function(d){
+    if (!d.ok) { s.className = 'step bad'; s.innerHTML = IC.bad + '<div>' + esc(d.error) + '</div>'; return; }
+    document.getElementById('yaTok').value = ''; ST.ya = true; KEY_EDIT = false; YA_DONE = false; yaDraw();
+  }).catch(function(){ s.className = 'step bad'; s.innerHTML = IC.bad + '<div>Нет ответа от сервера.</div>'; });
+}
+var delArmed = false;
+function yaDel(){
+  if (!delArmed) { delArmed = true; alertBox('yaKey', 'Удалить ключ? Цифры Яндекса перестанут показываться. Нажмите «Удалить» ещё раз.'); setTimeout(function(){ delArmed = false; }, 6000); return; }
+  api('upd.php','ya_token',{token:''}).then(function(){ ST.ya = false; YA_DONE = false; delArmed = false; yaDraw(); });
+}
+function yaStats(fresh){
+  var box = document.getElementById('yaStats'); YA_DONE = true;
+  box.innerHTML = ''; var w = step(box, 'wait', 'Загружаю цифры из Яндекса…');
+  fetch('/api/upd.php?action=ya_stats' + (fresh ? '&fresh=1' : '') + '&t=' + encodeURIComponent(T)).then(function(r){ return r.json(); }).then(function(d){
+    if (!d.ok) { w.className = 'step bad'; w.innerHTML = IC.bad + '<div>' + esc(d.error || 'Не получилось') + '</div>'; YA_DONE = false; return; }
+    var h = '';
+    (d.wm || []).forEach(function(x, i){
+      h += '<h3>' + IC_WM + 'Вебмастер · ' + esc(x.url.replace(/^https?:\/\//, '')) + '</h3>'
+        + '<div class="kv"><div><b>' + n0(x.in) + '</b><span>страниц в поиске</span></div><div><b>' + n0(x.out) + '</b><span>исключено из поиска</span></div><div><b>' + n0(x.sqi) + '</b><span>индекс качества (ИКС)</span></div></div>';
+      var pr = [];
+      if (x.fatal) pr.push('<span class="bad">фатальных: ' + x.fatal + '</span>');
+      if (x.crit) pr.push('<span class="bad">критичных: ' + x.crit + '</span>');
+      if (x.poss) pr.push('возможных: ' + x.poss);
+      if (x.rec) pr.push('рекомендаций: ' + x.rec);
+      h += '<div class="row ' + (x.fatal || x.crit ? 'bad' : 'ok') + '">' + (x.fatal || x.crit ? IC.bad : IC.ok) + '<div>' + (pr.length ? 'Замечания Яндекса к сайту: ' + pr.join(', ') + '. Подробности — в Вебмастере, раздел «Диагностика».' : 'Ошибок на сайте Яндекс не нашёл.') + '</div></div>';
+      if (x.q != null) {
+        h += '<div class="mut">Переобход: Яндекс разрешает отправить ' + x.q + ' страниц в день, сегодня осталось ' + x.ql + '. Кнопка отправит главные страницы и фабрики по очереди — за несколько дней обойдёт весь сайт.</div>'
+          + '<button class="btn w" ' + (x.ql ? '' : 'disabled ') + 'onclick="yaRecrawl(' + i + ', this)"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>Переобойти страницы сайта</button><div id="rc' + i + '"></div>';
+      }
+    });
+    (d.mk || []).forEach(function(x){
+      var p = x.per;
+      h += '<h3>' + IC_MK + 'Метрика · ' + esc(x.site) + '</h3>'
+        + '<table class="t"><tr><th></th><th>Сегодня</th><th>7 дней</th><th>30 дней</th></tr>'
+        + '<tr><td>Посетители</td><td>' + n0(p.d.users) + '</td><td>' + n0(p.w.users) + '</td><td>' + n0(p.m.users) + '</td></tr>'
+        + '<tr><td>Визиты</td><td>' + n0(p.d.visits) + '</td><td>' + n0(p.w.visits) + '</td><td>' + n0(p.m.visits) + '</td></tr>'
+        + '<tr><td>Просмотры страниц</td><td>' + n0(p.d.views) + '</td><td>' + n0(p.w.views) + '</td><td>' + n0(p.m.views) + '</td></tr></table>';
+      var tot = 0; (x.src || []).forEach(function(r){ tot += r.v; });
+      if (x.src && x.src.length) h += '<div class="mut" style="margin-top:8px">Откуда приходят за 30 дней:</div><table class="t">' + x.src.map(function(r){ return '<tr><td>' + esc(r.n) + '</td><td>' + n0(r.v) + '</td><td>' + (tot ? Math.round(r.v / tot * 100) : 0) + '%</td></tr>'; }).join('') + '</table>';
+      if (x.ph && x.ph.length) h += '<div class="mut" style="margin-top:8px">Что искали в поисковиках (30 дней):</div><table class="t">' + x.ph.map(function(r){ return '<tr><td>' + esc(r.n) + '</td><td>' + n0(r.v) + '</td></tr>'; }).join('') + '</table>';
+    });
+    (d.errs || []).forEach(function(e){ h += '<div class="row bad">' + IC.bad + '<div>' + esc(e) + '</div></div>'; });
+    h += '<div class="mut" style="margin-top:10px">Цифры на ' + esc(d.at) + (d.cached ? ' (обновляются раз в 10 минут)' : '') + '</div>'
+      + '<button class="btn w" onclick="yaStats(true)"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>Обновить цифры</button>';
+    box.innerHTML = h; YA_WM = d.wm || [];
+  }).catch(function(){ w.className = 'step bad'; w.innerHTML = IC.bad + '<div>Нет ответа от сервера.</div>'; YA_DONE = false; });
+}
+var YA_WM = [];
+function yaRecrawl(i, b){
+  var box = document.getElementById('rc' + i); box.innerHTML = ''; b.disabled = true;
+  var s = step(box, 'wait', 'Отправляю страницы на переобход…'), total = 0, rounds = 0;
+  function fin(ok, html){ s.className = 'step ' + (ok ? 'ok' : 'bad'); s.innerHTML = (ok ? IC.ok : IC.bad) + '<div>' + html + '</div>'; }
+  function go(){
+    rounds++;
+    api('upd.php','ya_recrawl',{host:YA_WM[i].host}).then(function(d){
+      if (d.note) { fin(true, (total ? 'Отправлено на переобход: ' + total + ' стр. ' : '') + esc(d.note) + '.'); return; }
+      if (!d.ok) { if (total) fin(true, 'Отправлено на переобход: ' + total + ' стр. Остальное — следующим нажатием.'); else { fin(false, esc(d.error)); b.disabled = false; } return; }
+      total += d.sent;
+      var msg = 'Отправлено на переобход: ' + total + ' стр. Сегодня осталось: ' + d.left + '. Ждут своей очереди: ' + d.wait + ' из ' + d.all + '.';
+      /* по 10 страниц за заход, до 100 страниц за одно нажатие */
+      if (d.left > 0 && d.wait > 0 && rounds < 10) { s.innerHTML = IC.wait + '<div>' + msg + ' Продолжаю…</div>'; go(); return; }
+      fin(true, msg); if (d.left && d.wait) b.disabled = false;
+    }).catch(function(){
+      if (total) { fin(true, 'Отправлено на переобход: ' + total + ' стр. Остальное — следующим нажатием.'); b.disabled = false; return; }
+      b.disabled = false; fin(false, 'Нет ответа от сервера.');
+    });
+  }
+  go();
+}
+function pull(){
+  var b = document.getElementById('bPull'), box = document.getElementById('pullBox'); box.innerHTML = ''; b.disabled = true;
+  var w = step(box, 'wait', 'Собираю файлы…');
+  fetch('/api/upd.php?action=upd_pull&t=' + encodeURIComponent(T)).then(function(r){
+    var ct = r.headers.get('Content-Type') || '';
+    if (ct.indexOf('zip') < 0) return r.json().then(function(d){ throw new Error(d.error || 'Не получилось'); });
+    var cd = r.headers.get('Content-Disposition') || '', m = cd.match(/filename="([^"]+)"/);
+    return r.blob().then(function(bl){ return [bl, m ? m[1] : 'faily_dlya_claude.zip']; });
+  }).then(function(x){
+    var a = document.createElement('a'); a.href = URL.createObjectURL(x[0]); a.download = x[1]; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    w.remove(); step(box, 'ok', 'Скачан файл <b>' + esc(x[1]) + '</b> (' + mb(x[0].size) + '). Пришлите его Claude.');
+  }).catch(function(e){ w.remove(); step(box, 'bad', esc(e.message)); }).then(function(){ b.disabled = false; });
+}
+
+/* №159 · ключ помощника DeepSeek */
+function dsDraw(){
+  var d = ST.ds, b = document.getElementById('dsBox');
+  b.innerHTML = d ? '<div class="note" style="margin-top:10px">Ключ создан ' + esc(d.at) + (d.who ? ' · ' + esc(d.who) : '') + '. Обновления DeepSeek принимаются.</div>'
+      + '<button class="btn w" onclick="dsKey(\'new\')">Сделать новый ключ</button><button class="btn w" onclick="dsKey(\'off\')">Отключить помощника</button><div id="dsMsg"></div>'
+    : '<div class="mut" style="margin-top:10px">Ключа нет — обновления DeepSeek не принимаются.</div><button class="btn w" onclick="dsKey(\'new\')">Создать ключ для помощника</button><div id="dsMsg"></div>';
+}
+function dsKey(act){
+  var m = document.getElementById('dsMsg'); m.innerHTML = '';
+  if (act === 'off') { api('upd.php','upd_ds_key',{act:'off'}).then(function(r){ if (!r.ok) { step(m, 'bad', esc(r.error)); return; } ST.ds = null; dsDraw(); step(document.getElementById('dsMsg'), 'ok', 'Помощник отключён: его обновления больше не принимаются'); }); return; }
+  fetch('/api/upd.php?action=upd_ds_key&t=' + encodeURIComponent(T), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({t:T, act:'new'})}).then(function(r){
+    if ((r.headers.get('Content-Type') || '').indexOf('text/plain') < 0) return r.json().then(function(d){ throw new Error(d.error || 'Не получилось'); });
+    return r.blob();
+  }).then(function(bl){
+    var a = document.createElement('a'); a.href = URL.createObjectURL(bl); a.download = 'itc_deepseek_klyuch.txt'; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    ST.ds = {at:'сейчас', who:''}; dsDraw();
+    step(document.getElementById('dsMsg'), 'ok', 'Скачан файл <b>itc_deepseek_klyuch.txt</b> — он в папке «Загрузки». Никому его не пересылайте, Claude сам перенесёт его куда нужно.');
+  }).catch(function(e){ step(m, 'bad', esc(e.message)); });
+}
+/* №35 · резервные копии */
+var BK = null, BK_PULL = '';
+function bkLoad(show, isNew){
+  api('flow.php','bk_status',{show:show?1:0, 'new':isNew?1:0}).then(function(d){ if (!d.ok) { document.getElementById('bkBox').innerHTML = '<div class="err">' + esc(d.error || 'Нет доступа') + '</div>'; return; } BK = d; if (d.pull) BK_PULL = d.pull; bkDraw(); });
+}
+function bkDraw(){
+  var d = BK, h = '';
+  if (!d.aes) h += '<div class="err">На хостинге не работает архив с паролем — напишите Claude.</div>';
+  if (!d.pass) {
+    h += '<div class="note"><b>Задайте пароль копий.</b> Им закрываются все копии. Запишите его на бумаге и храните отдельно: без пароля копию открыть нельзя, восстановить его невозможно. Не меньше 10 знаков.</div>'
+      + '<input type="password" id="bkP1" placeholder="Пароль копий" autocomplete="new-password"><input type="password" id="bkP2" placeholder="Повторите пароль" autocomplete="new-password" style="margin-top:6px">'
+      + '<button class="btn g" onclick="bkPass()">Сохранить пароль</button><div id="bkMsg"></div>';
+    document.getElementById('bkBox').innerHTML = h; return;
+  }
+  var L = d.last;
+  if (d.running) h += '<div class="step wait">' + IC.wait + '<div>Сейчас делается копия — обновите через пару минут.</div></div>';
+  if (L) {
+    h += '<div class="step ok">' + IC.ok + '<div>Последняя копия: <b>' + esc(L.at) + '</b><br>' + L.files.map(function(f){ return esc(f.what) + ' — ' + mb(f.bytes); }).join('<br>')
+      + '<br>Хранилище: ' + (L.s3 === 'ok' ? 'сохранено' : '<span class="bad">' + esc(L.s3) + '</span>') + '</div></div>';
+  } else h += '<div class="mut">Копий ещё не было. Первая будет этой ночью — или нажмите «Сделать копию сейчас».</div>';
+  if (d.err) h += '<div class="err">Последняя ошибка: ' + esc(d.err) + '</div>';
+  h += '<div class="kv"><div><b>' + (d.days || 0) + '</b><span>копий в хранилище</span></div>'
+    + '<div><b>' + (d.seen['ноутбук'] ? esc(d.seen['ноутбук'].substr(0, 5)) : '—') + '</b><span>ноутбук забирал' + (d.seen['ноутбук'] ? ' ' + esc(d.seen['ноутбук'].substr(11)) : '') + '</span></div>'
+    + '<div><b>' + (d.seen.Aliyun ? esc(d.seen.Aliyun.substr(0, 5)) : '—') + '</b><span>Aliyun забирал' + (d.seen.Aliyun ? ' ' + esc(d.seen.Aliyun.substr(11)) : '') + '</span></div></div>';
+  h += '<button class="btn w" onclick="bkNow()" ' + (d.running ? 'disabled' : '') + '>' + IC.wait + 'Сделать копию сейчас</button>';
+  h += '<button class="btn w" onclick="bkLoad(1)"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>Ссылка для копий (ноутбук, Aliyun)</button>';
+  if (BK_PULL) h += '<div class="note">По этой ссылке ноутбук и сервер Aliyun забирают копии. Сами копии закрыты паролем. Ссылку вставляйте только в окно, которое укажет Claude, и не пересылайте в чаты.<br><input type="text" readonly value="' + esc(BK_PULL) + '" onclick="this.select()" style="margin-top:6px"><button class="btn w" onclick="bkCopy()">Скопировать ссылку</button><button class="lnk" onclick="if(confirm(\'Сделать новую ссылку? Старая перестанет работать — её нужно будет заменить на ноутбуке и на Aliyun.\'))bkLoad(1,1)">Сделать новую ссылку</button></div>';
+  h += '<button class="lnk" onclick="bkPassForm()">Сменить пароль копий</button><div id="bkPF"></div><div id="bkMsg"></div>';
+  if (d.log && d.log.length) h += '<div class="mut" style="margin-top:10px">' + d.log.map(esc).join('<br>') + '</div>';
+  document.getElementById('bkBox').innerHTML = h;
+}
+function bkMsg(cls, t){ var b = document.getElementById('bkMsg'); b.innerHTML = ''; step(b, cls, t); }
+function bkPass(){
+  var a = document.getElementById('bkP1').value, b = document.getElementById('bkP2').value, o = document.getElementById('bkOld');
+  if (a.length < 10) { bkMsg('bad', 'Пароль — не короче 10 знаков'); return; }
+  if (a !== b) { bkMsg('bad', 'Пароли не совпадают'); return; }
+  api('flow.php','bk_pass',{pass:a, old:o ? o.value : ''}).then(function(d){ if (!d.ok) { bkMsg('bad', esc(d.error)); return; } BK_PULL = ''; bkLoad(); setTimeout(function(){ bkMsg('ok', 'Пароль сохранён. Новые копии закрываются им; старые — прежним паролем.'); }, 400); });
+}
+function bkPassForm(){ document.getElementById('bkPF').innerHTML = '<input type="password" id="bkOld" placeholder="Старый пароль" autocomplete="off" style="margin-top:8px"><input type="password" id="bkP1" placeholder="Новый пароль" autocomplete="new-password" style="margin-top:6px"><input type="password" id="bkP2" placeholder="Повторите новый пароль" autocomplete="new-password" style="margin-top:6px"><button class="btn g" onclick="bkPass()">Сохранить новый пароль</button>'; }
+function bkNow(){ api('flow.php','bk_now',{}).then(function(d){ if (!d.ok) { bkMsg('bad', esc(d.error)); return; } BK.running = true; bkDraw(); setTimeout(function(){ bkLoad(); }, 20000); }); }
+function bkCopy(){ var v = BK_PULL; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(function(){ bkMsg('ok', 'Ссылка скопирована'); }, function(){ bkMsg('bad', 'Не скопировалась — выделите ссылку и скопируйте вручную'); }); }
+
+/* №39 · сервер в Китае */
+var SRV = null, SRV_LINK = '';
+function srvLoad(show, isNew){ api('flow.php','srv_status',{show:show?1:0,'new':isNew?1:0}).then(function(d){ if (!d.ok) { document.getElementById('srvBox').innerHTML = '<div class="err">' + esc(d.error || 'Нет доступа') + '</div>'; return; } SRV = d; if (d.link) SRV_LINK = d.link; srvDraw(); }); }
+function srvDraw(){
+  var d = SRV, h = '', hb = d.hb || {};
+  var on = d.ago !== null && d.ago < 600;
+  if (d.seen) h += '<div class="step ' + (on ? 'ok' : 'bad') + '">' + (on ? IC.ok : IC.bad) + '<div>' + (on ? 'Помощник на связи' : 'Помощник давно не выходил на связь') + ': ' + esc(d.seen) + '</div></div>';
+  else h += '<div class="note">Помощник на сервере ещё не установлен. Claude пришлёт команду — её нужно один раз вставить в консоль Aliyun.</div>';
+  if (hb.disk_free) {
+    var cp = hb.copies || [], db = cp.filter(function(x){ return /^db_/.test(x.f); });
+    h += '<div class="kv"><div><b>' + esc(hb.disk_free) + '</b><span>свободно на диске из ' + esc(hb.disk_total || '') + '</span></div>'
+      + '<div><b>' + db.length + '</b><span>копий базы на сервере' + (db.length ? ', последняя ' + esc(db[db.length - 1].f.replace(/^db_(\d{4})(\d\d)(\d\d).*/, '$3.$2.$1')) : '') + '</span></div>'
+      + '<div><b>' + esc(hb.uptime || '—') + '</b><span>работает без перезагрузки</span></div></div>';
+  }
+  /* баланс Aliyun */
+  var b = d.bal;
+  if (d.ali && b) {
+    var low = b.avail !== undefined && parseFloat(b.avail) < 50;
+    h += '<h3 style="margin:14px 0 6px;font-size:15px">Баланс Aliyun</h3>';
+    if (b.avail !== undefined) h += '<div class="kv"><div><b' + (low ? ' class="bad"' : '') + '>' + esc(b.avail) + ' ' + (b.cur === 'CNY' ? '¥' : esc(b.cur || '')) + '</b><span>доступно на счёте' + (low ? ' — мало, пополните до продления' : '') + '</span></div>'
+      + (b.inst || []).map(function(i){ var days = i.exp ? Math.round((new Date(i.exp) - new Date()) / 864e5) : null; return '<div><b' + (days !== null && days < 30 ? ' class="bad"' : '') + '>' + esc(i.exp ? i.exp.split('-').reverse().join('.') : '—') + '</b><span>оплачен до · ' + esc(i.name) + (days !== null ? ' (через ' + days + ' дн.)' : '') + '</span></div>'; }).join('') + '</div>';
+    if (b.err) h += '<div class="err">' + esc(b.err) + '</div>'; if (b.err2) h += '<div class="err">' + esc(b.err2) + '</div>';
+    h += '<div class="mut">Проверено: ' + esc(b.at || '') + ' · <button class="lnk" onclick="aliBal()">обновить</button> · <button class="lnk" onclick="aliForm()">сменить ключ</button></div>';
+  } else h += '<h3 style="margin:14px 0 6px;font-size:15px">Баланс Aliyun</h3><div class="mut">Чтобы видеть баланс и срок оплаты сервера, нужен ключ Aliyun только для чтения. Как его получить — подскажет Claude.</div><button class="btn w" onclick="aliForm()">Вставить ключ Aliyun</button>';
+  h += '<div id="aliF"></div>';
+  h += '<button class="btn w" onclick="srvAct(\'pull\')">' + IC.wait + 'Забрать копии на сервер сейчас</button>'
+    + '<button class="btn w" onclick="srvAct(\'check\')">' + IC.ok + 'Проверить сервер</button>';
+  if (d.pending) h += '<div class="mut">Ждёт выполнения: ' + d.pending + ' — помощник выходит на связь раз в 2 минуты.</div>';
+  var res = (d.acts || []).concat((d.jobs || []).filter(function(j){ return j.res; }).map(function(j){ return j.res; }));
+  if (res.length) h += '<h3 style="margin:14px 0 6px;font-size:15px">Что делал сервер</h3>' + res.slice(0, 8).map(function(r){ return '<details class="hist"><summary>' + '<span class="' + (r.code === 0 ? 'ok' : 'bad') + '" style="display:inline-flex;width:16px;height:16px;vertical-align:-3px">' + (r.code === 0 ? IC.ok : IC.bad) + '</span>' + ' ' + esc(r.title) + ' · ' + esc(r.at) + '</summary><pre style="white-space:pre-wrap;font-size:12px;background:#f5f7fb;padding:8px;border-radius:6px;overflow:auto">' + esc(r.out) + '</pre></details>'; }).join('');
+  h += '<button class="lnk" onclick="srvLoad(1)">Ссылка для помощника (для установки)</button>';
+  if (SRV_LINK) h += '<div class="note">Эту ссылку вставляют один раз при установке помощника на сервер. Не пересылайте в чаты.<input type="text" readonly value="' + esc(SRV_LINK) + '" onclick="this.select()" style="margin-top:6px"><button class="btn w" onclick="navigator.clipboard&&navigator.clipboard.writeText(SRV_LINK).then(function(){alert(\'Скопировано\')})">Скопировать ссылку</button></div>';
+  document.getElementById('srvBox').innerHTML = h;
+}
+function srvAct(a){ api('flow.php','srv_act',{act:a}).then(function(r){ if (!r.ok) { alert(r.error); return; } srvLoad(); setTimeout(function(){ srvLoad(); }, 150000); }); }
+function aliBal(){ api('flow.php','ali_bal',{fresh:1}).then(function(){ srvLoad(); }); }
+function aliForm(){ document.getElementById('aliF').innerHTML = '<input type="text" id="aliId" placeholder="AccessKey ID" autocomplete="off" style="margin-top:8px"><input type="password" id="aliSec" placeholder="AccessKey Secret" autocomplete="new-password"><button class="btn g" onclick="aliSave()">Сохранить ключ</button><div class="mut">Ключ хранится только на сервере и больше нигде не показывается.</div>'; }
+function aliSave(){ api('flow.php','ali_key',{id:document.getElementById('aliId').value, secret:document.getElementById('aliSec').value}).then(function(r){ if (!r.ok) { alert(r.error); return; } srvLoad(); }); }
+function load(){
+  if (!T) { document.getElementById('cState').innerHTML = '<div class="err">Войдите в Экосистему как босс, затем откройте этот раздел снова.</div>'; return; }
+  api('upd.php','upd_status').then(function(d){
+    if (!d.ok) { document.getElementById('cState').innerHTML = '<div class="err">' + esc(d.error || 'Нет доступа') + '</div>'; document.getElementById('cUp').classList.add('hide'); document.getElementById('cHist').classList.add('hide'); return; }
+    ST = d; drawState(); drawCats(); drawHist(); yaDraw(); bkLoad(); srvLoad(); dsDraw();
+    document.getElementById('cSeed').classList.toggle('hide', !d.seed_left);
+  });
+}
+function drawState(){
+  var d = ST, h = '<h2>' + IC.ok + 'Сейчас установлено: ' + (d.n ? 'обновление №' + d.n : 'ещё ни одного') + '</h2>';
+  h += '<div class="row ' + (d.site_ok?'ok':'bad') + '">' + (d.site_ok?IC.ok:IC.bad) + (d.site ? 'Папка сайта itcpartner.ru найдена' : 'Папка сайта itcpartner.ru не найдена') + '</div>';
+  if (!d.site) h += '<div class="mut">Пришлите Claude снимок экрана менеджера файлов хостинга, где видны папки itcpartner.ru и itcpartner.store, — он подскажет путь. Путь:</div><input type="text" id="sitePath" placeholder="/var/www/…/data/www/itcpartner.ru"><button class="btn w" onclick="saveSite()">Сохранить путь</button>';
+  h += '<div class="row ' + (d.metro_ok?'ok':'mut') + '">' + (d.metro_ok?IC.ok:IC.wait) + (d.metro ? 'Папка «Мой Гуанчжоу» найдена' : 'Папка «Мой Гуанчжоу» не найдена — нужна только для его обновлений') + '</div>';
+  h += '<div class="row ' + (d.store_ok?'ok':'bad') + '">' + (d.store_ok?IC.ok:IC.bad) + 'Папка Экосистемы ' + (d.store_ok?'доступна для записи':'недоступна для записи') + '</div>';
+  if (!d.zip) h += '<div class="err">На хостинге нет распаковки архивов. Напишите Claude.</div>';
+  if (!d.key) h += '<div class="err">Нет ключа обновлений (api/upd_key.php). Напишите Claude.</div>';
+  h += '<div class="mut">Свободно на хостинге: ' + (d.free_mb >= 1024 ? (d.free_mb/1024).toFixed(1).replace('.', ',') + ' ГБ' : d.free_mb + ' МБ') + '</div>';
+  /* №8 · сервер в Гонконге (торговля): помощник раз в минуту забирает свою часть обновлений и сообщает, что у него стоит */
+  var k = d.hk;
+  if (k) {
+    var ago = k.seen ? Math.round(Date.now()/1000 - k.seen) : 1e9, on = ago < 300, inf = k.info || {};
+    h += '<div class="row ' + (on && !k.err ? 'ok' : 'bad') + '">' + (on && !k.err ? IC.ok : IC.bad) + 'Гонконг: ' + (on ? 'на связи' : 'нет связи ' + (ago < 86400 ? Math.round(ago/60) + ' мин' : 'больше суток')) + (k.n ? ' · установлено №' + k.n : '') + '</div>';
+    if (k.err) h += '<div class="err">Гонконг, ' + esc(k.err_at || '') + ': ' + esc(k.err) + '</div>';
+    h += '<div class="mut">Гонконг: свободно ' + (inf.free_mb >= 1024 ? (inf.free_mb/1024).toFixed(1).replace('.', ',') + ' ГБ' : (inf.free_mb||0) + ' МБ') + ', нагрузка ' + String(inf.load||0).replace('.', ',') + (k.bk ? ' · копия данных ' + k.bk.slice(6,8) + '.' + k.bk.slice(4,6) + ' (' + mb(k.bk_size||0) + ')' : ' · копий данных пока нет') + (k.bk_gz ? ' · копия в Гуанчжоу ' + k.bk_gz.slice(6,8) + '.' + k.bk_gz.slice(4,6) : '') + '</div>';
+  }
+  document.getElementById('cState').innerHTML = h;
+}
+function saveSite(){
+  var p = document.getElementById('sitePath').value;
+  api('upd.php','upd_site',{path:p}).then(function(d){ if (!d.ok) alertBox('cState', d.error); else load(); });
+}
+function alertBox(id, msg, good){ var c = document.getElementById(id); var e = document.createElement('div'); e.className = good ? 'note' : 'err'; e.textContent = msg; c.appendChild(e); }
+
+/* ---------- загрузка файла обновления кусками по 2 МБ ---------- */
+function upStart(file){
+  if (!file) return;
+  if (!/\.zip$/i.test(file.name)) { document.getElementById('upBox').innerHTML = '<div class="err">Это не файл обновления. Выберите файл obnovlenie_…zip (обычно лежит в папке «Загрузки»).</div>'; document.getElementById('fUp').value = ''; document.getElementById('fUpAll').value = ''; return; }
+  var box = document.getElementById('upBox'); box.innerHTML = '';
+  var bp = document.getElementById('bPick'); bp.disabled = true;
+  var s1 = step(box, 'wait', 'Загружаю ' + esc(file.name) + ' (' + mb(file.size) + ')…');
+  var bar = document.createElement('div'); bar.className = 'bar'; bar.innerHTML = '<i></i>'; box.appendChild(bar);
+  var CH = 2*1024*1024, n = Math.ceil(file.size/CH), i = 0, tries = 0;
+  function next(){
+    if (i >= n) { bar.remove(); s1.className = 'step ok'; s1.innerHTML = IC.ok + '<div>Файл загружен (' + mb(file.size) + ')</div>'; return check(file.size); }
+    var r = new FileReader();
+    r.onload = function(){
+      var b64 = r.result.split(',')[1];
+      api('upd.php','upd_chunk',{idx:i, off:i*CH, data:b64}).then(function(d){
+        if (!d.ok) throw new Error(d.error || 'ошибка');
+        i++; tries = 0; bar.firstChild.style.width = Math.round(i/n*100) + '%'; next();
+      }).catch(function(e){
+        if (++tries <= 3) return setTimeout(next, 1500);
+        s1.className = 'step bad'; s1.innerHTML = IC.bad + '<div>Загрузка прервалась: ' + esc(e.message) + '. Проверьте интернет и выберите файл ещё раз.</div>'; bp.disabled = false;
+      });
+    };
+    r.readAsDataURL(file.slice(i*CH, Math.min(file.size, (i+1)*CH)));
+  }
+  next();
+}
+
+/* ---------- №261 · очередь: несколько файлов обновлений, грузятся и ставятся сами, как торрент ---------- */
+var QRUN = false, QLOCK = null, QGAP = 700;
+window.addEventListener('beforeunload', function(e){ if (QRUN) { e.preventDefault(); e.returnValue = 'Идёт установка обновлений'; return e.returnValue; } });
+document.addEventListener('visibilitychange', function(){ if (QRUN && document.visibilityState === 'visible') qWake(); });
+function qWake(){ try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function(l){ QLOCK = l; }).catch(function(){}); } catch(e){} }
+function upPick(fs){
+  fs = [].slice.call(fs || []);
+  if (!fs.length) return;
+  if (fs.length === 1) return upStart(fs[0]);
+  upQueue(fs);
+}
+function qNum(f){ var m = String(f.name).match(/(\d+)/); return m ? +m[1] : 0; }
+/* отправка файла кусками по 2 МБ; при обрыве связи ждёт и продолжает с того же места */
+function upSend(file, onp){
+  var CH = 2*1024*1024, n = Math.ceil(file.size/CH), i = 0, tries = 0;
+  return new Promise(function(res, rej){
+    function next(){
+      if (i >= n) return res();
+      var r = new FileReader();
+      r.onerror = function(){ rej(new Error('файл не читается — возможно, его переместили')); };
+      r.onload = function(){
+        api('upd.php','upd_chunk',{idx:i, off:i*CH, data:r.result.split(',')[1]}).then(function(d){
+          if (!d || !d.ok) { var er = new Error((d && d.error) || 'ошибка'); if (/Пропал кусок/.test(er.message)) { i = 0; tries = 0; return next(); } throw er; }
+          i++; tries = 0; onp(i/n, ''); setTimeout(next, QGAP);   /* №264 · пауза между кусками — защита хостинга не принимает загрузку за атаку */
+        }).catch(function(e){
+          tries++;
+          if (tries > 40) return rej(e);
+          var w = Math.min(60, tries*5);
+          onp(i/n, 'нет связи, повтор через ' + w + ' с…');
+          setTimeout(next, w*1000);
+        });
+      };
+      r.readAsDataURL(file.slice(i*CH, Math.min(file.size, (i+1)*CH)));
+    }
+    next();
+  });
+}
+function upQueue(fs){
+  var box = document.getElementById('upBox'); box.innerHTML = '';
+  var skip = fs.filter(function(f){ return !/\.zip$/i.test(f.name); });
+  fs = fs.filter(function(f){ return /\.zip$/i.test(f.name); }).sort(function(a, b){ return qNum(a) - qNum(b); });
+  if (!fs.length) { box.innerHTML = '<div class="err">Среди выбранных нет файлов обновлений obnovlenie_…zip.</div>'; return; }
+  var total = fs.reduce(function(a, f){ return a + f.size; }, 0);
+  var head = step(box, 'wait', 'Очередь: ' + fs.length + ' файлов, всего ' + mb(total) + '. Страницу можно свернуть — только не закрывайте её.' + (skip.length ? ' Пропущены (не обновления): ' + skip.map(function(f){ return esc(f.name); }).join(', ') : ''));
+  var rows = fs.map(function(f){
+    var w = document.createElement('div'); w.style.cssText = 'border-top:1px solid #e7eaf2;padding:8px 0';
+    w.innerHTML = '<div><b>' + esc(f.name) + '</b> · ' + mb(f.size) + '</div><div class="mut q-st">Ждёт очереди</div><div class="bar"><i></i></div><div class="q-log"></div>';
+    box.appendChild(w); return w;
+  });
+  document.getElementById('bPick').disabled = true; QRUN = true; qWake();
+  var ok = 0, skipped = 0, k = 0;
+  /* №267 · «+ Добавить в очередь»: новые файлы встают в очередь, не сбрасывая то, что уже идёт */
+  var addW = document.createElement('div'); addW.style.cssText = 'margin:6px 0 4px';
+  addW.innerHTML = '<label class="btn w" style="display:inline-flex;align-items:center;gap:6px;width:auto;padding:8px 14px;margin:0;cursor:pointer"><svg viewBox="0 0 24 24" style="width:20px;height:20px"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Добавить в очередь<input type="file" multiple accept="application/zip,application/x-zip-compressed,.zip" style="display:none"></label>';
+  head.parentNode.insertBefore(addW, head.nextSibling);
+  addW.querySelector('input').onchange = function(){
+    var nf = [].slice.call(this.files || []).filter(function(f){ return /\.zip$/i.test(f.name) && !fs.some(function(x){ return x.name === f.name; }); });
+    this.value = '';
+    if (!nf.length) return;
+    nf.forEach(function(f){
+      var w = document.createElement('div'); w.style.cssText = 'border-top:1px solid #e7eaf2;padding:8px 0';
+      w.innerHTML = '<div><b>' + esc(f.name) + '</b> · ' + mb(f.size) + '</div><div class="mut q-st">Ждёт очереди</div><div class="bar"><i></i></div><div class="q-log"></div>';
+      fs.push(f); rows.push(w);
+    });
+    /* то, что ещё не начато, — по порядку номеров */
+    var rest = fs.slice(k + 1).map(function(f, i){ return [f, rows[k + 1 + i]]; }).sort(function(a, b){ return qNum(a[0]) - qNum(b[0]); });
+    rest.forEach(function(x, i){ fs[k + 1 + i] = x[0]; rows[k + 1 + i] = x[1]; box.appendChild(x[1]); });
+    if (!QRUN) return;
+  };
+  function st(w, t){ w.querySelector('.q-st').innerHTML = t; }
+  function finish(stopMsg){
+    QRUN = false; try { if (QLOCK) QLOCK.release(); } catch(e){} if (addW.parentNode) addW.parentNode.removeChild(addW);
+    head.className = 'step ' + (stopMsg ? 'bad' : 'ok');
+    head.innerHTML = (stopMsg ? IC.bad : IC.ok) + '<div><b>' + (stopMsg ? 'Очередь остановлена. ' : 'Очередь готова. ') + '</b>Установлено: ' + ok + (skipped ? ', уже стояли раньше: ' + skipped : '') + (stopMsg ? '. ' + stopMsg : '') + '</div>';
+    document.title = 'Обновления';
+    document.getElementById('bPick').disabled = false; document.getElementById('fUp').value = ''; document.getElementById('fUpAll').value = '';
+    if (ok) api('upd.php','upd_indexnow',{}).catch(function(){});
+    load();
+  }
+  function one(){
+    if (k >= fs.length) return finish('');
+    var f = fs[k], w = rows[k], bar = w.querySelector('.bar i'), log = w.querySelector('.q-log');
+    document.title = '(' + (k+1) + '/' + fs.length + ') Обновления';
+    st(w, 'Загружаю…');
+    upSend(f, function(p, note){ bar.style.width = Math.round(p*100) + '%'; st(w, 'Загружаю… ' + Math.round(p*100) + '%' + (note ? ' — ' + note : '')); }).then(function(){
+      st(w, 'Проверяю подпись…');
+      return api('upd.php','upd_check',{size:f.size});
+    }).then(function(d){
+      if (!d || !d.ok) throw new Error((d && d.error) || 'нет ответа');
+      if (d.have) { skipped++; st(w, IC.ok + ' №' + d.n + ' уже было установлено — пропускаю'); k++; return one(); }
+      if (d.err) throw new Error(d.err);
+      if (d.by === 'deepseek') throw new Error('это обновление от DeepSeek — поставьте его отдельно, по одному');
+      st(w, 'Устанавливаю №' + d.n + (d.title ? ' — ' + esc(d.title) : '') + '…');
+      return api('upd.php','upd_apply',{}).then(function(a){
+        if (!a || !a.ok) throw new Error((a && a.error) || 'нет ответа');
+        return (a.seed ? runSeed(log) : Promise.resolve(true)).then(function(sok){
+          if (sok === false) throw new Error('перенос фабрик не закончился — нажмите «Завершить перенос», потом выберите оставшиеся файлы ещё раз');
+          return runLeads(log);
+        }).then(function(){ ok++; bar.style.width = '100%'; st(w, IC.ok + ' Установлено №' + a.n + ' — пауза минута перед следующим файлом'); k++; setTimeout(one, 60000); });
+      });
+    }).catch(function(e){
+      st(w, '<span class="bad">' + IC.bad + ' ' + esc(e.message || String(e)) + '</span>');
+      finish('Остановилось на файле ' + esc(f.name) + '.');
+    });
+  }
+  one();
+}
+function check(size){
+  var box = document.getElementById('upBox');
+  var s2 = step(box, 'wait', 'Проверяю подпись и состав…');
+  api('upd.php','upd_check',{size:size}).then(function(d){
+    if (!d.ok || d.err) { s2.className = 'step bad'; s2.innerHTML = IC.bad + '<div>' + esc(d.err || d.error) + '</div>'; document.getElementById('bPick').disabled = false; return; }
+    s2.className = 'step ok';
+    var h = '<div><b>Обновление №' + d.n + (d.title ? ' — ' + esc(d.title) : '') + '</b><br>' + (d.by === 'deepseek' ? '<b style="color:#e65100">Сделано DeepSeek</b> (не Claude). Подпись помощника верная. Если после установки что-то не так — нажмите «Вернуть как было».' + (d.files && d.files.length ? '<br>Меняет: ' + d.files.map(esc).join(', ') : '') : 'Подпись верная.') + '</div>';
+    s2.innerHTML = IC.ok + h;
+    var w = document.createElement('div'); w.className = 'mut';
+    var parts = [];
+    if (d.cnt.site) parts.push('сайт itcpartner.ru — файлов: ' + d.cnt.site);
+    if (d.cnt.store) parts.push('Экосистема и магазин — файлов: ' + d.cnt.store);
+    if (d.cnt.metro) parts.push('«Мой Гуанчжоу» — файлов: ' + d.cnt.metro);
+    if (d.cnt.seed) parts.push('новые фабрики для базы — файлов: ' + d.cnt.seed);
+    var lst = (d.what || []).map(function(x){ return '<li>' + esc(x) + '</li>'; }).join('');
+    w.innerHTML = 'Что внутри: ' + parts.join('; ') + '.' + (lst ? '<ul style="margin:6px 0 0 18px;padding:0">' + lst + '</ul>' : '');
+    box.appendChild(w);
+    var b = document.createElement('button'); b.className = 'btn g'; b.innerHTML = IC.ok + 'Установить';
+    b.onclick = function(){ b.disabled = true; apply(); };
+    box.appendChild(b);
+  });
+}
+function apply(){
+  var box = document.getElementById('upBox');
+  var s3 = step(box, 'wait', 'Устанавливаю…');
+  api('upd.php','upd_apply',{}).then(function(d){
+    if (!d.ok) { s3.className = 'step bad'; s3.innerHTML = IC.bad + '<div>' + esc(d.error) + '</div>'; document.getElementById('bPick').disabled = false; return; }
+    s3.className = 'step ok'; s3.innerHTML = IC.ok + '<div>Файлы сайта, магазина и приложений заменены: ' + d.files + ' (старые сохранены)' + (d.seed ? '. Файлов новых фабрик: ' + d.seed_files : '') + '.</div>';
+    (d.seed ? runSeed(box) : Promise.resolve()).then(function(){ return runLeads(box); }).then(done);
+    function done(){
+      step(box, 'ok', '<b>Готово — обновление №' + d.n + ' установлено.</b>');
+      /* №4 · сразу сообщаем Яндексу о новых страницах сайта */
+      var sy = step(box, 'wait', 'Сообщаю Яндексу о новых страницах…');
+      api('upd.php','upd_indexnow',{}).then(function(y){
+        if (y && y.ok && y.skipped) { sy.className = 'step ok'; sy.innerHTML = IC.ok + '<div>Яндексу уже сообщали минуту назад.</div>'; return; }
+        if (y && y.ok) { sy.className = 'step ok'; sy.innerHTML = IC.ok + '<div>Яндекс получил ' + (y.sent ? y.sent + ' новых и изменённых страниц' : 'сигнал: новых страниц нет') + '.</div>'; return; }
+        sy.className = 'step bad'; sy.innerHTML = IC.bad + '<div>Яндексу сообщить не удалось: ' + esc((y && y.error) || 'нет ответа') + '. Страницы всё равно попадут в поиск, только медленнее.</div>';
+      }).catch(function(){ sy.className = 'step bad'; sy.innerHTML = IC.bad + '<div>Яндексу сообщить не удалось — нет ответа.</div>'; });
+      document.getElementById('bPick').disabled = false; document.getElementById('fUp').value = ''; document.getElementById('fUpAll').value = '';
+      load();
+    }
+  });
+}
+/* ---------- база клиентов и фото гостиниц (раздел «Клиенты»): переносится сама после установки ---------- */
+function runLeads(box){
+  var s = null, ph = 0, k = 0;
+  return new Promise(function(res){
+    function go(){
+      api('leads.php','lead_seed_run',{}).then(function(d){
+        if (!d || !d.ok) { if (s) { s.className = 'step bad'; s.innerHTML = IC.bad + '<div>Клиенты: ' + esc((d && d.error) || 'нет ответа') + '. Фото докачаются сами при открытии раздела.</div>'; } return res(); }
+        ph += d.photos || 0;
+        if (!s && (d.added || !d.finished)) s = step(box, 'wait', 'Переношу базу клиентов и фото…');
+        if (s) s.innerHTML = IC.wait + '<div>Переношу базу клиентов' + (d.added ? ': карточек ' + d.added : '') + ' · фото: ' + ph + (d.left ? ', осталось: ' + d.left : '') + '</div>';
+        if (d.finished || ++k > 40) { if (s) { s.className = 'step ok'; s.innerHTML = IC.ok + '<div>База клиентов обновлена, фото сохранено: ' + ph + (d.finished ? '' : '. Остальные фото докачаются сами') + '.</div>'; } return res(); }
+        go();
+      }).catch(function(){ res(); });
+    }
+    go();
+  });
+}
+/* ---------- перенос фабрик в базу (тот же, что кнопка в разделе «Поставщики») ---------- */
+function runSeed(box){
+  box = box || document.getElementById('seedLog');
+  var s = step(box, 'wait', 'Переношу фабрики в базу…');
+  var photos = 0, pages = 0, k = 0;
+  return new Promise(function(res){
+    function go(){
+      api('suppliers.php','sup_seed_run',{}).then(function(d){
+        if (!d.ok) { s.className = 'step bad'; s.innerHTML = IC.bad + '<div>Перенос остановился: ' + esc(d.error) + '. Нажмите «Завершить перенос» ещё раз.</div>'; return res(false); }
+        photos += (d.done || []).length; pages += (d.pages || 0);
+        s.innerHTML = IC.wait + '<div>Переношу фабрики в базу… файлов: ' + photos + (d.left ? ', осталось: ' + d.left : '') + '</div>';
+        if (d.finished || d.note) { s.className = 'step ok'; s.innerHTML = IC.ok + '<div>Фабрики перенесены: файлов ' + photos + ', страниц на сайте ' + pages + '.</div>'; document.getElementById('cSeed').classList.add('hide'); return res(true); }
+        if ((d.errors || []).length || d.missing) { s.className = 'step bad'; s.innerHTML = IC.bad + '<div>Перенос: ' + esc((d.errors||[]).join('; ') || ('нет файлов: ' + d.missing)) + '. Пришлите снимок Claude.</div>'; return res(false); }
+        if (++k > 200) { s.className = 'step bad'; s.innerHTML = IC.bad + '<div>Перенос идёт слишком долго — нажмите «Завершить перенос».</div>'; return res(false); }
+        setTimeout(go, 800);
+      }).catch(function(){ if (++k > 200) return res(false); setTimeout(go, 5000); });
+    }
+    go();
+  });
+}
+/* ---------- каталоги в хранилище ---------- */
+/* №5 · список каталогов сворачивается: свежие сверху, по умолчанию свёрнут */
+var CATS_OPEN = false;
+function catsToggle(){ CATS_OPEN = !CATS_OPEN; drawCats(); }
+function drawCats(){
+  var cs = (ST.cats || []), wait = cs.filter(function(c){ return !c.done; });
+  var card = document.getElementById('cCats'); card.classList.toggle('hide', !cs.length);
+  document.getElementById('catAll').classList.toggle('hide', !wait.length);
+  var order = cs.map(function(c, i){ return i; }).reverse();
+  order = order.filter(function(i){ return !cs[i].done; }).concat(order.filter(function(i){ return cs[i].done; }));
+  var head = '<div class="row" style="justify-content:space-between;gap:10px;align-items:center"><div><b>' + (wait.length ? 'Ждут загрузки: ' + wait.length : 'Все каталоги загружены') + '</b><div class="mut">Всего в списке: ' + cs.length + '</div></div>'
+    + '<button class="btn" style="width:auto;padding:8px 14px" onclick="catsToggle()">' + (CATS_OPEN ? 'Свернуть' : 'Показать') + '</button></div>';
+  document.getElementById('catList').innerHTML = head + (CATS_OPEN ? order.map(function(i){ var c = cs[i];
+    return '<div class="cat"><div class="row ' + (c.done?'ok':'') + '">' + (c.done?IC.ok:IC.wait) + '<div><b>' + esc(c.title || c.name) + '</b><div class="mut">' + esc(c.name) + ' · ' + mb(c.bytes) + (c.done ? ' · загружен' : '') + '</div></div></div>'
+      + (c.done ? '' : '<input type="file" class="hide" id="cf' + i + '" onchange="catUp(' + i + ', this.files[0])"><button class="btn w" onclick="document.getElementById(\'cf' + i + '\').click()">Выбрать файл каталога</button><div id="cs' + i + '"></div>')
+      + '</div>';
+  }).join('') : '');
+}
+function catUp(i, file){
+  var c = ST.cats[i], box = document.getElementById('cs' + i); box.innerHTML = '';
+  if (!file) return;
+  if (c.bytes && file.size !== c.bytes) step(box, 'bad', 'Размер файла другой (' + mb(file.size) + ', ожидался ' + mb(c.bytes) + '). Если это тот же каталог — загрузка всё равно пойдёт.');
+  catUpload(c, file, box).then(function(ok){ if (ok) load(); });
+}
+/* Загрузка одного каталога в хранилище кусками по 2 МБ. Возвращает Promise(true/false) */
+function catUpload(c, file, box, label){
+  return new Promise(function(res){
+    var s = step(box, 'wait', (label ? esc(label) + ': ' : '') + 'загружаю в хранилище…');
+    var bar = document.createElement('div'); bar.className = 'bar'; bar.innerHTML = '<i></i>'; box.appendChild(bar);
+    var up = ''; for (var j = 0; j < 32; j++) up += '0123456789abcdef'[Math.floor(Math.random()*16)];
+    var CH = 2*1024*1024, n = Math.ceil(file.size/CH), k = 0, tries = 0;
+    function fin(ok, msg){ bar.remove(); s.className = 'step ' + (ok ? 'ok' : 'bad'); s.innerHTML = (ok ? IC.ok : IC.bad) + '<div>' + (label ? esc(label) + ': ' : '') + msg + '</div>'; res(ok); }
+    function next(){
+      if (k >= n) {
+        s.innerHTML = IC.wait + '<div>' + (label ? esc(label) + ': ' : '') + 'отправляю в хранилище…</div>';
+        return api('suppliers.php','sup_up_done',{up:up, sup_id:c.sup, kind:'doc', title:c.title || file.name, name:file.name, size:file.size}).then(function(d){
+          if (!d.ok) return fin(false, esc(d.error));
+          api('upd.php','upd_cat_done',{sup:c.sup, bytes:c.bytes}).then(function(){ c.done = true; fin(true, 'в карточке фабрики.'); });
+        }).catch(function(){ fin(false, 'нет ответа от сервера'); });
+      }
+      var r = new FileReader();
+      r.onload = function(){
+        api('suppliers.php','sup_up_chunk',{up:up, idx:k, data:r.result.split(',')[1]}).then(function(d){
+          if (!d.ok) throw new Error(d.error || 'ошибка');
+          k++; tries = 0; bar.firstChild.style.width = Math.round(k/n*100) + '%'; next();
+        }).catch(function(e){
+          if (++tries <= 3) return setTimeout(next, 1500);
+          fin(false, 'загрузка прервалась: ' + esc(e.message) + '. Выберите файл ещё раз.');
+        });
+      };
+      r.readAsDataURL(file.slice(k*CH, Math.min(file.size, (k+1)*CH)));
+    }
+    next();
+  });
+}
+/* №6 · все каталоги сразу: узнаём каждый файл по размеру (или по имени) и грузим по очереди */
+function catNorm(x){ return String(x || '').toLowerCase().replace(/[\s_\-.()（）]+/g, ''); }
+function catsAll(files){
+  var box = document.getElementById('catAllBox'); box.innerHTML = '';
+  var b = document.getElementById('bCatsAll');
+  var wait = (ST.cats || []).filter(function(c){ return !c.done; }), used = {}, plan = [], skip = [];
+  Array.prototype.forEach.call(files || [], function(f){
+    var hit = null;
+    wait.forEach(function(c, i){ if (!hit && !used[i] && c.bytes && c.bytes === f.size) { hit = c; used[i] = 1; } });
+    if (!hit) wait.forEach(function(c, i){ if (!hit && !used[i] && catNorm(c.name) && catNorm(c.name) === catNorm(f.name)) { hit = c; used[i] = 1; } });
+    if (hit) plan.push([hit, f]); else skip.push(f.name);
+  });
+  document.getElementById('fCatsAll').value = '';
+  if (!plan.length) { step(box, 'bad', 'Среди выбранных файлов нет каталогов из списка. Проверьте, та ли папка: нужны именно файлы, которые присылали фабрики.'); return; }
+  var head = step(box, 'wait', 'Узнал каталогов: <b>' + plan.length + '</b> из ' + wait.length + '. Загружаю по очереди — не закрывайте страницу.' + (skip.length ? '<br><span class="mut">Пропущены (не из списка): ' + esc(skip.slice(0, 8).join(', ')) + (skip.length > 8 ? ' и ещё ' + (skip.length - 8) : '') + '</span>' : ''));
+  b.disabled = true; var okN = 0, i = 0;
+  function nx(){
+    if (i >= plan.length) {
+      b.disabled = false; head.className = 'step ok';
+      head.innerHTML = IC.ok + '<div><b>Загружено каталогов: ' + okN + ' из ' + plan.length + '.</b>' + (okN < plan.length ? ' Незагруженные выберите ещё раз — уже загруженные повторно не пойдут.' : '') + (skip.length ? '<br><span class="mut">Пропущены (не из списка): ' + esc(skip.slice(0, 8).join(', ')) + (skip.length > 8 ? ' и ещё ' + (skip.length - 8) : '') + '</span>' : '') + '</div>';
+      return load();
+    }
+    var c = plan[i][0], f = plan[i][1]; i++;
+    catUpload(c, f, box, (i) + ' из ' + plan.length + ' · ' + (c.title || c.name)).then(function(ok){ if (ok) okN++; nx(); });
+  }
+  nx();
+}
+/* ---------- история и возврат ---------- */
+function drawHist(){
+  var h = ST.hist || [];
+  document.getElementById('histList').innerHTML = h.length ? h.map(function(x){
+    return '<div class="hist"><b>№' + x.n + '</b> ' + esc(x.title || '') + '<div class="mut">' + esc(x.at) + ' · ' + esc(x.who) + ' · файлов: ' + x.files + (x.seed ? ' · фабрики в базе' : '') + (x.by === 'deepseek' ? ' · <b style="color:#e65100">сделано DeepSeek</b>' : '') + '</div></div>';
+  }).join('') : 'Пока ничего';
+  var can = ST.n > 0 && h.length && !h[0].back;
+  document.getElementById('bBack').classList.toggle('hide', !can);
+  document.getElementById('backNote').classList.toggle('hide', !can);
+}
+var backArmed = false, BACK0 = '';
+function rollback(){
+  var b = document.getElementById('bBack'); if (!BACK0) BACK0 = b.innerHTML;
+  if (!backArmed) { backArmed = true; b.innerHTML = IC.bad + 'Точно вернуть обновление №' + ST.n + '? Нажмите ещё раз'; setTimeout(function(){ backArmed = false; b.innerHTML = BACK0; }, 6000); return; }
+  b.disabled = true;
+  api('upd.php','upd_rollback',{}).then(function(d){
+    b.disabled = false; backArmed = false; b.innerHTML = BACK0;
+    if (!d.ok) return alertBox('cHist', d.error);
+    alertBox('cHist', 'Возвращено файлов: ' + d.files + '. Сейчас стоит обновление №' + d.n + '.', true);
+    load();
+  });
+}
+load();
+</script>
+</body>
+</html>

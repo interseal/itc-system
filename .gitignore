@@ -1,0 +1,26 @@
+# Секреты не храним никогда — они только в Bitwarden
+config.php
+*config.local.php
+upd_key.php
+hk_auth_token*
+*.pem
+*.key
+*.jks
+*.keystore
+*.p12
+.env
+*.env
+# Данные и тяжёлое: копии баз, загрузки, сборки
+uploads/
+backups/
+*.sql
+*.sql.gz
+*.zip.part
+*.apk
+*.aab
+build/
+.gradle/
+local.properties
+__pycache__/
+*.pyc
+node_modules/

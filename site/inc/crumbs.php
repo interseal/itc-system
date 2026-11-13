@@ -1,0 +1,2 @@
+<?php // Хлебные крошки: задать $crumb (название текущей страницы); $crumbParent = [адрес, название] — промежуточный шаг; $crumbParents = [[адрес, название], ...] — несколько шагов ?>
+<nav class="crumbs wrap"><a href="/">Главная</a><span>→</span><?php foreach (!empty($crumbParents) ? $crumbParents : (!empty($crumbParent) ? [$crumbParent] : []) as $cp): ?><a href="<?= e($cp[0]) ?>"><?= e($cp[1]) ?></a><span>→</span><?php endforeach; ?><b><?= e($crumb) ?></b></nav>
