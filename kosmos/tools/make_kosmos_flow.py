@@ -179,12 +179,17 @@ rep("const SP_ME = ['key' => 'ks_voice', 'def' => 'kirill', 'alt' => 'ermil'];",
 rep("const SP_PEER = ['key' => 'ks_voice', 'def' => 'anton', 'alt' => 'filipp', 'name' => 'Космос', 'gen' => 'Космоса'];",
     "const SP_PEER = ['key' => 'sp_voice', 'def' => 'kirill', 'alt' => 'ermil', 'name' => 'Фил', 'gen' => 'Фила'];   // напарник — «Фил»")
 
+# 12) №538 · навыки: записывает их «Космос» (Claude решает сложное лучше), пользуются оба — таблица itc_skill общая
+rep("const NVK_WRITE = false;", "const NVK_WRITE = true; ")
+
 # проверки
 for bad in ['itc_fil_conv', 'itc_fil_task', "sp_get('ft_cron_key')", 'pl_tick();   // №43 · напоминания планировщика', "'ks_memo'"]:
     if bad in s and not (bad == "'ks_memo'" and s.count(bad) == 1):
         raise SystemExit('осталось: ' + bad)
 if s.count("'sp_voice'") != 1 or "'key' => 'sp_voice', 'def' => 'kirill'" not in s:
     raise SystemExit('голос «Фила» должен остаться только в SP_PEER')
+if "const NVK_WRITE = true; " not in s:
+    raise SystemExit('«Космос» должен записывать навыки')
 if s.count('itc_fc_log') != 1 or "'log' => 'itc_fc_log'" not in s:
     raise SystemExit('журнал «Фила» должен остаться только в AG_PEER')
 open(dst, 'w', encoding='utf-8').write(s)

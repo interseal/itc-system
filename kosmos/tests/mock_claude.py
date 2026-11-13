@@ -60,6 +60,20 @@ def plan(req, key):
         who = 'Космос' if 'Ты — Космос' in sysx else ('Фил' if 'Ты — Фил' in sysx else '?')
         claude = 'Claude компании Anthropic' in sysx
         ans = json.dumps({'do': 'answer', 'say': f'Здравствуйте! Я {who}. На Claude: {"да" if claude else "нет"}. Ключ …{key[-4:]}. Вопрос: {text[-40:]}'}, ensure_ascii=False)
+        # №538: навыки — решил в 2 шага и записал способ; повторно — делает по навыку из правил
+        if 'Проверка навыка повторно' in text:
+            mm = re.search(r'№(\d+)\. КП для гостиницы', sysx)
+            if mm:
+                return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': f'Сделал по навыку №{mm.group(1)}. Я {who}.', 'skill_used': int(mm.group(1))}, ensure_ascii=False)}], 'end_turn'
+            return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': 'Навыка в правилах нет.'}, ensure_ascii=False)}], 'end_turn'
+        if 'Проверка навыка' in text:
+            if 'РЕЗУЛЬТАТ deals' not in text:
+                return [{'type': 'text', 'text': json.dumps({'tool': 'deals', 'args': {'q': 'гостиница'}}, ensure_ascii=False)}], 'end_turn'
+            if 'РЕЗУЛЬТАТ suppliers' not in text:
+                return [{'type': 'text', 'text': json.dumps({'tool': 'suppliers', 'args': {'q': 'полотенца'}}, ensure_ascii=False)}], 'end_turn'
+            return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': 'КП собрал.', 'skill': {
+                'title': 'КП для гостиницы', 'when': 'просят КП или подборку товаров для гостиницы, отеля',
+                'steps': '1) deals — найти сделку гостиницы; 2) suppliers — подобрать фабрики под товар; 3) make_kp — собрать КП; ответить номером КП и суммой'}}, ensure_ascii=False)}], 'end_turn'
         # №536: общая память двух помощников — что делал второй (из правил) и общий журнал (инструмент journal)
         if 'что делал' in text.lower():
             peer = sysx.split('НЕДАВНО У ', 1)[1].split('\n')[1] if 'НЕДАВНО У ' in sysx else 'нет блока общей памяти'

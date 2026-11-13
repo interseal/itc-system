@@ -1929,6 +1929,93 @@ function ag_peer_block($me) {
     . " последние его дела — ниже, остальное — инструмент journal. На вопросы «что делал " . AG_PEER['name'] . "», «мы же это обсуждали», «что решили вчера» смотри journal, не выдумывай."
     . "\nНЕДАВНО У " . mb_strtoupper(AG_PEER['gen']) . ":\n" . ($rows ? implode("\n", array_map(function ($r) { return '- ' . ag_journal_line($r, AG_PEER['name']); }, $rows)) : '- за двое суток ничего');
 }
+/* №538 · ОБЩИЕ НАВЫКИ ДВУХ ПОМОЩНИКОВ. Навык — проверенный способ решить задачу: какими инструментами, в каком порядке,
+   что проверить и что ответить. Записывает навык помощник на Claude (NVK_WRITE — «Космос»), когда решил задачу в несколько
+   шагов; пользуются оба: перед ответом в правила попадают навыки, похожие на запрос, и есть инструмент skills.
+   Руководитель видит и правит навыки в настройках любого из двух помощников. Таблица одна — itc_skill. */
+const NVK_WRITE = true;    // записывает ли этот помощник навыки сам (в копии «Космоса» — true, tools/make_kosmos_flow.py)
+const NVK_MAX = 150;       // больше не храним: лишние — самые давние и неприменявшиеся
+const NVK_STOP = ['для', 'что', 'это', 'как', 'все', 'всё', 'мне', 'нам', 'его', 'она', 'они', 'при', 'про', 'или', 'так', 'там', 'тут', 'уже', 'ещё', 'еще', 'надо', 'нужно', 'можно',
+  'пожалуйста', 'сделай', 'сделать', 'давай', 'найди', 'покажи', 'посмотри', 'скажи', 'напиши', 'ты', 'вы', 'мы', 'по', 'на', 'из', 'от', 'до', 'не', 'да', 'нет', 'за', 'со', 'же', 'ли', 'бы'];
+function nvk_ensure() {
+  static $d = false; if ($d) return; $d = true;
+  db()->exec("CREATE TABLE IF NOT EXISTS itc_skill (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, title VARCHAR(200) NOT NULL DEFAULT '', trig VARCHAR(600) NOT NULL DEFAULT '',
+    steps TEXT NULL, trace VARCHAR(600) NOT NULL DEFAULT '', author VARCHAR(60) NOT NULL DEFAULT '', who VARCHAR(190) NOT NULL DEFAULT '', manual TINYINT NOT NULL DEFAULT 0,
+    uses INT NOT NULL DEFAULT 0, used_at DATETIME NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted TINYINT NOT NULL DEFAULT 0, KEY idx_skill_del (deleted, uses)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+/* слова без окончаний: «гостиницы» и «гостиница», «клиентов» и «клиенты» совпадут */
+function nvk_stems($t) {
+  $o = [];
+  foreach (preg_split('~[^\p{L}\p{N}]+~u', str_replace('ё', 'е', mb_strtolower((string)$t))) as $w) {
+    $n = mb_strlen($w); if ($n < 2 || in_array($w, NVK_STOP, true)) continue;
+    $o[$n >= 6 ? mb_substr($w, 0, 5) : ($n >= 4 ? mb_substr($w, 0, 4) : $w)] = 1;
+  }
+  return $o;
+}
+function nvk_txt($v, $n) { if (is_array($v)) $v = implode('; ', array_map('strval', array_filter($v, 'is_scalar'))); return trim(mb_substr(preg_replace('~[ \t]+~u', ' ', (string)$v), 0, $n)); }
+function nvk_key($t) { return mb_strtolower(preg_replace('~[^\p{L}\p{N}]+~u', '', str_replace('ё', 'е', (string)$t))); }
+function nvk_all() {
+  nvk_ensure();
+  try { return db()->query('SELECT id,title,trig,steps,trace,author,who,manual,uses,used_at,created_at,updated_at FROM itc_skill WHERE deleted=0 ORDER BY uses DESC, id DESC LIMIT ' . NVK_MAX)->fetchAll(); }
+  catch (Throwable $e) { return []; }
+}
+/* навыки, похожие на запрос: совпавшие слова (слова названия весят вдвое) */
+function nvk_pick($text, $n = 4) {
+  $q = nvk_stems(mb_substr((string)$text, 0, 600)); if (!$q) return [];
+  $sc = [];
+  foreach (nvk_all() as $r) {
+    $s = 0; foreach (nvk_stems($r['title']) as $k => $_) if (isset($q[$k])) $s += 2;
+    foreach (nvk_stems($r['trig']) as $k => $_) if (isset($q[$k])) $s += 1;
+    if ($s >= 2) { $r['_s'] = $s; $sc[] = $r; }
+  }
+  usort($sc, function ($a, $b) { return [$b['_s'], (int)$b['uses'], (int)$b['id']] <=> [$a['_s'], (int)$a['uses'], (int)$a['id']]; });
+  return array_slice($sc, 0, $n);
+}
+function nvk_line($r) {
+  return '№' . $r['id'] . '. ' . $r['title'] . ' (записал ' . $r['author'] . ((int)$r['uses'] ? ', применяли ' . (int)$r['uses'] . ' раз' : '') . ")\n  Когда: " . $r['trig'] . "\n  Как: " . $r['steps']
+    . ($r['trace'] !== '' ? "\n  Инструменты по порядку: " . $r['trace'] : '');
+}
+/* в правила каждого ответа: похожие навыки и (у того, кто их пишет) — как записать новый */
+function nvk_block($text) {
+  $rows = nvk_pick($text, 4); $o = '';
+  if ($rows) $o .= "\n\nНАВЫКИ — проверенные способы решать такие задачи (общие для тебя и " . AG_PEER['gen'] . "). Если запрос похож — делай по навыку: те же инструменты в том же порядке, проверь то, что в нём сказано; что к этому запросу не подходит — пропусти. Сделал по навыку — добавь в итоговый JSON \"skill_used\": номер навыка.\n"
+    . implode("\n", array_map('nvk_line', $rows));
+  if (NVK_WRITE) $o .= "\nЗАПИШИ НАВЫК: если ты решил задачу за 2 шага с инструментами или больше, способ пригодится снова, а похожего навыка нет — добавь в итоговый JSON поле \"skill\": {\"title\":\"короткое название задачи\",\"when\":\"когда применять: как обычно об этом просят\",\"steps\":\"1) инструмент — что искать и с какими параметрами; 2) …; что проверить; что сказать в ответе\"}. По навыку будет работать и " . AG_PEER['name'] . " — модель попроще, поэтому шаги пиши конкретно и коротко (до 8). Для разовых мелочей и простых вопросов навык не пиши. Сделал по навыку, но нашёл способ лучше — запиши навык с тем же названием, он заменит старый.";
+  return $o;
+}
+/* записать или обновить навык. $auto — записал помощник сам: навык, поправленный руководителем, он не перезаписывает */
+function nvk_save($a, $author, $who, $id = 0, $auto = false) {
+  nvk_ensure();
+  $t = nvk_txt($a['title'] ?? '', 120); $w = nvk_txt($a['trig'] ?? '', 400); $s = nvk_txt($a['steps'] ?? '', 1500); $tr = nvk_txt($a['trace'] ?? '', 500);
+  if (mb_strlen($t) < 4 || mb_strlen($s) < 15) return ['ok' => false, 'error' => 'У навыка должны быть название и шаги (хотя бы одна строка)'];
+  $man = 0;
+  if (!$id) foreach (nvk_all() as $r) if (nvk_key($r['title']) === nvk_key($t)) { $id = (int)$r['id']; $man = (int)$r['manual']; break; }
+  if ($id) {
+    if ($auto && $man) return ['ok' => true, 'skip' => true, 'id' => $id, 'title' => $t];
+    $q = db()->prepare('UPDATE itc_skill SET title=?, trig=?, steps=?' . ($tr !== '' ? ', trace=?' : '') . ', who=?' . ($auto ? '' : ', manual=1') . ', updated_at=NOW() WHERE id=? AND deleted=0');
+    $q->execute($tr !== '' ? [$t, $w, $s, $tr, $who, $id] : [$t, $w, $s, $who, $id]);
+    if ($q->rowCount() < 1 && !(int)db()->query('SELECT COUNT(*) FROM itc_skill WHERE deleted=0 AND id=' . (int)$id)->fetchColumn()) return ['ok' => false, 'error' => 'Навык не найден — возможно, его уже удалили'];
+    return ['ok' => true, 'id' => $id, 'new' => false, 'title' => $t];
+  }
+  db()->prepare('INSERT INTO itc_skill (title,trig,steps,trace,author,who,manual) VALUES (?,?,?,?,?,?,?)')->execute([$t, $w, $s, $tr, $author, $who, $auto ? 0 : 1]);
+  $id = (int)db()->lastInsertId();
+  $n = (int)db()->query('SELECT COUNT(*) FROM itc_skill WHERE deleted=0')->fetchColumn();
+  if ($n > NVK_MAX) db()->exec('UPDATE itc_skill SET deleted=1 WHERE deleted=0 AND id<>' . $id . ' ORDER BY uses ASC, COALESCE(used_at, created_at) ASC LIMIT ' . ($n - NVK_MAX));
+  return ['ok' => true, 'id' => $id, 'new' => true, 'title' => $t];
+}
+/* итоговый ответ: отметить применённый навык; записать новый (только тот, кто пишет навыки, и только после 2+ шагов) */
+function nvk_take($me, $j, $trace) {
+  try {
+    if (!empty($j['skill_used']) && (int)$j['skill_used'] > 0) { nvk_ensure(); db()->prepare('UPDATE itc_skill SET uses=uses+1, used_at=NOW() WHERE id=? AND deleted=0')->execute([(int)$j['skill_used']]); }
+    if (!NVK_WRITE || empty($j['skill']) || !is_array($j['skill']) || count((array)$trace) < 2) return '';
+    $tr = []; foreach ((array)$trace as $x) { $x = (string)$x; if ($x !== '' && end($tr) !== $x) $tr[] = $x; }
+    $r = nvk_save(['title' => $j['skill']['title'] ?? '', 'trig' => $j['skill']['when'] ?? '', 'steps' => $j['skill']['steps'] ?? '', 'trace' => implode(' → ', array_slice($tr, 0, 12))],
+                  AG_PEER['me'], $me['name'], 0, true);
+  } catch (Throwable $e) { error_log('nvk: ' . $e->getMessage()); return ''; }
+  if (empty($r['ok']) || !empty($r['skip'])) return '';
+  return "\n" . ($r['new'] ? 'Записал навык' : 'Обновил навык') . ' «' . $r['title'] . '» — теперь так сможет и ' . AG_PEER['name'] . '.';
+}
 function ag_like($q) { return '%' . str_replace(['%', '_'], ['\%', '\_'], mb_substr(trim((string)$q), 0, 80)) . '%'; }
 function ag_pick($row, $keys) { $o = []; foreach ($keys as $k) if (array_key_exists($k, $row) && $row[$k] !== null && $row[$k] !== '') $o[$k] = is_string($row[$k]) ? mb_substr($row[$k], 0, 300) : $row[$k]; return $o; }
 function ag_money_ok($me) { return $me['boss'] || in_array($me['role'], ['accountant', 'chief_accountant', 'bossacct'], true); }
@@ -1938,6 +2025,9 @@ function ag_rows($sql, $args = []) { try { $q = db()->prepare($sql); $q->execute
 function ag_tools($me, $ctx) {
   $mine = function ($d) use ($ctx) { foreach ($ctx['deals'] as $x) if ($x['id'] === $d) return true; return false; };
   return [
+    /* №538 · общие навыки двух помощников */
+    'skills' => ['{"q":"о чём задача"} — НАВЫКИ ИТК: проверенные способы решать задачи (какими инструментами и в каком порядке). Посмотри, если задача сложная, а подходящего навыка в правилах нет',
+      function ($a) { $r = nvk_pick((string)($a['q'] ?? ''), 5); return $r ? array_map(function ($x) { return ['№' => (int)$x['id'], 'навык' => $x['title'], 'когда' => $x['trig'], 'как' => $x['steps'], 'инструменты' => $x['trace'], 'записал' => $x['author']]; }, $r) : 'похожих навыков нет'; }],
     /* №536 · общий журнал двух помощников ИТК */
     'journal' => ['{"q":"слово (клиент, товар, тема) или пусто","days":7,"who":"оба|я|второй"} — ОБЩИЙ журнал двух помощников ИТК (твой и ' . AG_PEER['gen'] . '): кто что просил, что ответили и сделали, с датами. Для вопросов «что делал ' . AG_PEER['name'] . '», «что мы решили», «о чём говорили с …», «что было по клиенту вчера»',
       function ($a) use ($me) {
@@ -2121,6 +2211,7 @@ function ag_run($me, $ctx, $text, $talk = '', $opt = []) {
     . "\n\nПАМЯТКА РУКОВОДИТЕЛЯ (правила ИТК — соблюдай всегда):\n" . fil_memo()
     . (fil_learn() !== '' ? "\n\nВЫУЧЕНО ИЗ ПОПРАВОК СОТРУДНИКОВ (применяй всегда):\n" . fil_learn() : '')
     . ag_peer_block($me)   // №536 · общая память двух помощников
+    . nvk_block($text)     // №538 · общие навыки: похожие на запрос
     . "\nУЧИСЬ НА ПОПРАВКАХ: если сотрудник поправляет тебя («нет, я имел в виду…», «это не то», «правильно так…», «это фабрика SNADI») — сделай правильно И добавь в итоговый JSON поле \"learn\":\"правило одной короткой фразой, чтобы не ошибиться снова\" (например: «с Нади», «снади» — это фабрика SNADI). Для разовых просьб и обычных вопросов learn не добавляй."
     . "\nЭто живой разговор: новый вопрос часто продолжает предыдущий («а почему не сказал про…», «а у этой фабрики…», «занеси их») — понимай его в контексте разговора выше."
     . FIL_SEARCH
@@ -2944,6 +3035,7 @@ function ft_run($me, $id) {
   }
   $say = trim((string)($j['say'] ?? '')) ?: 'Задачу закончил.';
   if (!empty($j['learn'])) { $lt = fil_learn_add($me, (string)$j['learn']); if ($lt !== '') $say .= "\nЗапомнил на будущее: " . $lt; }   // №38
+  $say .= nvk_take($me, $j, $trace);   // №538 · навыки
   $st = $now['status'] === 'stop' ? 'stop' : 'done';
   /* №28 · отчёт всегда с цифрами: сколько шагов сделал и сколько занёс */
   $q = db()->prepare('SELECT steps,added FROM itc_ks_task WHERE id=?'); $q->execute([$id]); $cnt = $q->fetch() ?: ['steps' => 0, 'added' => 0];
@@ -3573,6 +3665,25 @@ try {
     fl_out(['ok' => true, 'io' => $io, 'role' => (string)$me['role'], 'boss' => $me['boss'] ? 1 : 0]);
   }
   /* ===== №18 · настройки Космоса: памятка, модель, сравнение моделей (руководитель) ===== */
+  /* №538 · навыки — общие для двух помощников; видит и правит руководитель */
+  case 'nvk_list': {
+    if (!$me['boss']) fl_fail('Навыки — только руководитель', 403);
+    $q = trim((string)fl_in('q'));
+    $wr = NVK_WRITE ? AG_PEER['me'] : AG_PEER['name']; $rd = NVK_WRITE ? AG_PEER['name'] : AG_PEER['me'];
+    fl_out(['ok' => true, 'items' => $q !== '' ? nvk_pick($q, 8) : nvk_all(), 'block' => $q !== '' ? nvk_block($q) : '', 'writer' => $wr, 'reader' => $rd,
+            'note' => 'Навыки — проверенные способы решать задачи. Записывает их ' . $wr . ', когда решает задачу в несколько шагов, а ' . $rd . ' делает по ним так же. Оба видят все навыки. Неточное можно поправить, лишнее — удалить.']);
+  }
+  case 'nvk_save': {
+    if (!$me['boss']) fl_fail('Навыки правит только руководитель', 403);
+    $r = nvk_save(['title' => fl_in('title'), 'trig' => fl_in('when'), 'steps' => fl_in('steps')], $me['name'], $me['name'], (int)fl_in('id', 0));
+    if (empty($r['ok'])) fl_fail($r['error']);
+    fl_out(['ok' => true, 'id' => $r['id'], 'items' => nvk_all()]);
+  }
+  case 'nvk_del': {
+    if (!$me['boss']) fl_fail('Навыки правит только руководитель', 403);
+    nvk_ensure(); db()->prepare('UPDATE itc_skill SET deleted=1, updated_at=NOW() WHERE id=?')->execute([(int)fl_in('id')]);
+    fl_out(['ok' => true, 'items' => nvk_all()]);
+  }
   case 'fil_cfg': {
     if (!$me['boss']) fl_fail('Настройки Космоса — только руководитель', 403);
     if (fl_in('memo', null) !== null && fl_in('memo') !== '') sp_put('fil_memo', mb_substr((string)fl_in('memo'), 0, 12000), $me['name']);   // №536: памятка общая с «Космосом»
@@ -3628,6 +3739,7 @@ try {
     }
     [$say, $deal, $undo] = fc_exec($me, $ctx, $j);
     if (!empty($j['learn'])) { $lt = fil_learn_add($me, (string)$j['learn']); if ($lt !== '') $say .= "\nЗапомнил на будущее: " . $lt; }   // №38
+    $say .= nvk_take($me, $j, $trace);   // №538 · навыки: отметить применённый, записать новый
     $say .= kp_marks() . fe_marks() . dr_marks();     // №36 КП, №42 правки сайта — кнопками под ответом
     db()->prepare('INSERT INTO itc_ks_log (phone,who,said,reply,kind,deal_id) VALUES (?,?,?,?,?,?)')->execute([$me['phone'], $me['name'], $t, $say, (string)($j['do'] ?? ''), $deal]); fm_tag_last($CONV);
     if ($pf) @unlink($pf);
