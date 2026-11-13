@@ -95,11 +95,12 @@ for x in os.listdir(os.path.join(SRC, 'lib')):
 
 # ---------------- sw.js, manifest ----------------
 w = open(os.path.join(SRC, 'sw.js'), encoding='utf-8').read()
-w = re.sub(r"var C = 'itc-fil-v\d+';[^\n]*", "var C = 'itc-kosmos-v1';   // №533", w)
+# №537 · номер версии — как у «Фила»: обновился «Фил» — у «Космоса» тоже свежая копия (иначе телефон держит старый voice.js)
+w = re.sub(r"var C = 'itc-fil-v(\d+)';[^\n]*", lambda m: "var C = 'itc-kosmos-v" + m.group(1) + "';   // номер — как у apps/fil (№537)", w)
 w = w.replace("k.indexOf('itc-fil-') === 0", "k.indexOf('itc-kosmos-') === 0").replace('/apps/fil/', '/apps/kosmos/')
 for a, b in [('fil-face-s.jpg', 'kosmos-face-s.jpg'), ('fil-face.jpg', 'kosmos-face.jpg'), ('fil-splash.jpg', 'kosmos-splash.jpg'), ('fil-cut.png', 'kosmos-cut.png')]:
     w = w.replace(a, b)
-need(w, "'itc-kosmos-v1'")
+if not re.search(r"var C = 'itc-kosmos-v\d+';", w): raise SystemExit('нет версии sw.js')
 open(os.path.join(DST, 'sw.js'), 'w', encoding='utf-8').write(name(w))
 m = open(os.path.join(SRC, 'manifest.webmanifest'), encoding='utf-8').read()
 m = m.replace('"Команды по сделкам голосом"', '"Помощник ИТК на Claude: сделки, клиенты, задачи — голосом и текстом"')

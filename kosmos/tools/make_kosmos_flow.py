@@ -92,8 +92,6 @@ for a, b in [('itc_fc_log', 'itc_ks_log'), ('itc_fil_conv', 'itc_ks_conv'), ('it
 for a, b in [("'fil_model2'", "'ks_model'"), ("'sp_voice'", "'ks_voice'")]:
     if s.count(a) < 1: raise SystemExit('нет ' + a)
     s = s.replace(a, b)
-rep("function sp_voice() { $v = sp_get('ks_voice'); return sp_voice_ok($v) ? $v : 'kirill'; }",
-    "function sp_voice() { $v = sp_get('ks_voice'); return sp_voice_ok($v) ? $v : 'anton'; }   // у «Космоса» свой голос (у «Фила» — Кирилл)")
 
 # 5) фоновые задачи будит сервер «Космоса»; общие дела «Фила» не трогаем
 rep("    $k = sp_get('ft_cron_key'); if ($k === '' || !hash_equals($k, (string)($_GET['k'] ?? ''))) { http_response_code(403); exit('нет доступа'); }\n"
@@ -144,7 +142,6 @@ rep("created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, done_at DATETIME NU
     "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, done_at DATETIME NULL, conv_id VARCHAR(40) NOT NULL DEFAULT '', KEY idx_ft_phone (phone, created_at)) ENGINE=InnoDB")
 # комментарии, которые замена имени сделала бессмысленными
 rep("// «Космос»: тот же вопрос, что задал бы «Космос», уходит", "// «Космос»: тот же вопрос, что задал бы «Фил», уходит")
-rep("// у «Космоса» свой голос (у «Космоса» — Кирилл)", "// у «Космоса» свой голос (у «Фила» — Кирилл)")
 rep("// «Космос»: это делает «Космос»", "// «Космос»: это делает только «Фил»")
 
 # 9) №536: памятка и выученное общие с «Филом». Один раз переносим в общую память то, что «Космос» выучил отдельно
@@ -175,10 +172,19 @@ rep("function fil_memo() { $m = sp_get('fil_memo'); return $m !== '' ? $m : FIL_
 rep("const AG_PEER = ['log' => 'itc_ks_log', 'name' => 'Космос', 'gen' => 'Космоса', 'ins' => 'Космосом', 'me' => 'Космос'];",
     "const AG_PEER = ['log' => 'itc_fc_log', 'name' => 'Фил', 'gen' => 'Фила', 'ins' => 'Филом', 'me' => 'Космос'];")
 
+# 11) №537 · голоса: свой и напарника меняются местами. У «Космоса» по умолчанию Антон (запасной — Филипп),
+#     у «Фила» — Кирилл (запасной — Ермил). Одним голосом им говорить нельзя
+rep("const SP_ME = ['key' => 'ks_voice', 'def' => 'kirill', 'alt' => 'ermil'];",
+    "const SP_ME = ['key' => 'ks_voice', 'def' => 'anton', 'alt' => 'filipp'];   // у «Космоса» свой голос")
+rep("const SP_PEER = ['key' => 'ks_voice', 'def' => 'anton', 'alt' => 'filipp', 'name' => 'Космос', 'gen' => 'Космоса'];",
+    "const SP_PEER = ['key' => 'sp_voice', 'def' => 'kirill', 'alt' => 'ermil', 'name' => 'Фил', 'gen' => 'Фила'];   // напарник — «Фил»")
+
 # проверки
 for bad in ['itc_fil_conv', 'itc_fil_task', "sp_get('ft_cron_key')", 'pl_tick();   // №43 · напоминания планировщика', "'ks_memo'"]:
     if bad in s and not (bad == "'ks_memo'" and s.count(bad) == 1):
         raise SystemExit('осталось: ' + bad)
+if s.count("'sp_voice'") != 1 or "'key' => 'sp_voice', 'def' => 'kirill'" not in s:
+    raise SystemExit('голос «Фила» должен остаться только в SP_PEER')
 if s.count('itc_fc_log') != 1 or "'log' => 'itc_fc_log'" not in s:
     raise SystemExit('журнал «Фила» должен остаться только в AG_PEER')
 open(dst, 'w', encoding='utf-8').write(s)

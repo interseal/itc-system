@@ -128,7 +128,8 @@
   window.addEventListener('blur', function () { V.hush(); });
   V.talking = function (on) { try { document.documentElement.classList.toggle('fil-talk', !!on); } catch (e) {} try { V.syncBtns(); } catch (e) {} };
   /* force — человек сам нажал «послушать» у сообщения: играем даже при выключенном звуке */
-  V.say = function (text, yandexOn, force) {
+  /* voice — каким голосом сказать (№537: послушать голоса в настройках); пусто — голос помощника */
+  V.say = function (text, yandexOn, force, voice) {
     var mute = function () { return !force && V.muted(); };
     if (!text || mute()) return;
     V.hush(); var my = SEQ;
@@ -136,7 +137,7 @@
     function phone() { if (my !== SEQ || mute()) return; est(); try { if (window.AndroidSpeech && AndroidSpeech.say) AndroidSpeech.say(String(text), 'ru-RU'); else if (window.speechSynthesis) { var u = new SpeechSynthesisUtterance(String(text)); u.lang = 'ru-RU'; speechSynthesis.speak(u); } } catch (e) {} }
     // №20 · всегда сначала голос Космоса (Яндекс). Голос телефона — только если ключ Яндекса ещё не вставлен,
     // иначе телефон подставлял свой женский голос, когда Яндекс не успевал.
-    api('sp_say', { text: text }).then(function (r) {
+    api('sp_say', voice ? { text: text, voice: voice } : { text: text }).then(function (r) {
       if (my !== SEQ || mute()) return;          // пока ждали голос — нажали «замолчать»
       if (r && r.ok) { try { cur = new Audio('data:' + (r.type || 'audio/mpeg') + ';base64,' + r.audio); cur.onplaying = function () { clearTimeout(V._t); V.talking(true); }; cur.onended = cur.onpause = function () { V.talking(false); }; cur.play().catch(function () {}); } catch (e) {} }
       else if (r && /не подключ/i.test(r.error || '')) phone();

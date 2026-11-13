@@ -1102,7 +1102,19 @@ function sp_ensure() {
 function sp_get($k) { sp_ensure(); $q = db()->prepare('SELECT v FROM itc_secret WHERE k=?'); $q->execute([$k]); $v = $q->fetchColumn(); return $v === false ? '' : (string)$v; }
 function sp_put($k, $v, $who) { sp_ensure(); db()->prepare('REPLACE INTO itc_secret (k,v,who) VALUES (?,?,?)')->execute([$k, $v, $who]); }
 function sp_voice_ok($v) { foreach (SP_VOICES as $x) if ($x[0] === $v) return true; return false; }
-function sp_voice() { $v = sp_get('ks_voice'); return sp_voice_ok($v) ? $v : 'anton'; }   // у «Космоса» свой голос (у «Фила» — Кирилл)
+/* №537 · у двух помощников разные голоса — на слух сразу понятно, кто говорит. Голос выбирает руководитель
+   (у каждого помощника в его настройках); голосом напарника говорить нельзя. Не выбран — голос по умолчанию,
+   а если им уже говорит напарник — запасной. SP_ME — свой голос, SP_PEER — напарник (в копии tools/make_kosmos_flow.py они меняются местами). */
+const SP_ME = ['key' => 'ks_voice', 'def' => 'anton', 'alt' => 'filipp'];   // у «Космоса» свой голос
+const SP_PEER = ['key' => 'sp_voice', 'def' => 'kirill', 'alt' => 'ermil', 'name' => 'Фил', 'gen' => 'Фила'];   // напарник — «Фил»
+function sp_voice_pair() {
+  $m = sp_get(SP_ME['key']); $p = sp_get(SP_PEER['key']);
+  if (!sp_voice_ok($m)) $m = ''; if (!sp_voice_ok($p)) $p = '';
+  $me = $m !== '' ? $m : (SP_ME['def'] !== ($p !== '' ? $p : SP_PEER['def']) ? SP_ME['def'] : SP_ME['alt']);
+  $peer = $p !== '' ? $p : (SP_PEER['def'] !== ($m !== '' ? $m : SP_ME['def']) ? SP_PEER['def'] : SP_PEER['alt']);
+  return [$me, $peer];
+}
+function sp_voice() { return sp_voice_pair()[0]; }
 
 /* текст → mp3 (байты) или текст ошибки в $err */
 function sp_tts($text, $voice, $key, &$err) {
@@ -3390,7 +3402,9 @@ try {
   /* ===== Банковские выписки ===== */
   /* ===== Голос Космоса ===== */
   case 'sp_status': {
-    fl_out(['ok' => true, 'set' => sp_get('yc_speech') !== '', 'main' => sp_get('yc_main') !== '', 'main_by' => $me['boss'] ? sp_get('yc_main_by') : '', 'voice' => sp_voice(), 'voices' => array_map(function ($x) { return ['id' => $x[0], 'name' => $x[1], 'g' => $x[2]]; }, SP_VOICES),
+    [$vMe, $vPeer] = sp_voice_pair();   // №537 · и голос напарника — чтобы не выбрать тот же
+    fl_out(['ok' => true, 'set' => sp_get('yc_speech') !== '', 'main' => sp_get('yc_main') !== '', 'main_by' => $me['boss'] ? sp_get('yc_main_by') : '', 'voice' => $vMe,
+            'peer' => SP_PEER['name'], 'peer_gen' => SP_PEER['gen'], 'peer_voice' => $vPeer, 'voices' => array_map(function ($x) { return ['id' => $x[0], 'name' => $x[1], 'g' => $x[2]]; }, SP_VOICES),
             'by' => $me['boss'] ? sp_get('yc_speech_by') : '']);
   }
   case 'sp_key_set': {
@@ -3428,7 +3442,10 @@ try {
   case 'sp_voice_set': {
     if (!$me['boss']) fl_fail('Голос выбирает руководитель', 403);
     $v = (string)fl_in('voice'); if (!sp_voice_ok($v)) fl_fail('Нет такого голоса');
-    sp_put('ks_voice', $v, $me['name']); fl_out(['ok' => true, 'voice' => $v]);
+    [, $vPeer] = sp_voice_pair();
+    if ($v === $vPeer) fl_fail('Этим голосом говорит ' . SP_PEER['name'] . '. Выберите другой — так на слух сразу понятно, кто отвечает');   // №537
+    if (sp_get(SP_PEER['key']) === '') sp_put(SP_PEER['key'], $vPeer, $me['name']);   // голос напарника сам не меняется
+    sp_put(SP_ME['key'], $v, $me['name']); fl_out(['ok' => true, 'voice' => $v, 'peer_voice' => $vPeer]);
   }
   case 'sp_say': {
     $k = sp_get('yc_speech'); if ($k === '') fl_fail('Голос ещё не подключён: руководитель вставляет ключ в «Меню → Голос Космоса»');

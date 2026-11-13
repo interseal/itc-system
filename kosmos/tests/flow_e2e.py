@@ -19,7 +19,7 @@ open(f'{TMP}/config.php', 'w').write(f'''<?php return [
   'gw_key_file' => '{TMP}/gw.key', 'claude_url' => 'http://127.0.0.1:8768/v1/messages',
   'dev_users' => ['boss-token' => ['+996555000001', 'Алексей', 'boss', true]],
 ];''')
-subprocess.run(['mysql', '-uroot', 'itc', '-e', 'DROP TABLE IF EXISTS itc_ks_log, itc_ks_conv, itc_ks_task, itc_fc_log, itc_fil_conv, itc_fil_task; DELETE FROM itc_secret WHERE k LIKE "ks_%" OR k LIKE "fil_%"'], capture_output=True)
+subprocess.run(['mysql', '-uroot', 'itc', '-e', 'DROP TABLE IF EXISTS itc_ks_log, itc_ks_conv, itc_ks_task, itc_fc_log, itc_fil_conv, itc_fil_task; DELETE FROM itc_secret WHERE k LIKE "ks_%" OR k LIKE "fil_%" OR k = "sp_voice"'], capture_output=True)
 for f in glob.glob(f'{ST}/uploads/kosmos/*/gw.json'): os.remove(f)
 env = dict(os.environ, KOSMOS_CONFIG=f'{TMP}/config.php', PHP_CLI_SERVER_WORKERS='4')
 procs = [subprocess.Popen([sys.executable, f'{ROOT}/tests/mock_claude.py', '8768', f'{TMP}/mock.log']),
@@ -144,6 +144,30 @@ try:
     check('запросы к «Космосу» лежат в его журнале — их увидит «Фил»', rows == '1', rows)
     src = open(f'{ST}/api/flow.php', encoding='utf-8').read()
     check('«Фил» читает журнал «Космоса» (itc_ks_log) и показывает его дела в правилах', "const AG_PEER = ['log' => 'itc_ks_log', 'name' => 'Космос'" in src and '. ag_peer_block($me)' in src)
+
+    print('9. Голоса: у каждого свой, одним голосом нельзя (№537)')
+    def sql(q): subprocess.run(['mysql', '-uroot', 'itc', '-e', q], check=True)
+    sql("DELETE FROM itc_secret WHERE k IN ('sp_voice','ks_voice')")
+    c, k = kf('sp_status'); c2, f = kf('sp_status', flow='flow')
+    check('«Космос»: Антон, видит голос «Фила» (Кирилл)', k.get('voice') == 'anton' and k.get('peer') == 'Фил' and k.get('peer_gen') == 'Фила' and k.get('peer_voice') == 'kirill', k)
+    check('«Фил»: Кирилл, видит голос «Космоса» (Антон)', f.get('voice') == 'kirill' and f.get('peer') == 'Космос' and f.get('peer_voice') == 'anton', f)
+    c, j = kf('sp_voice_set', data={'voice': 'kirill'})
+    check('«Космосу» нельзя взять голос «Фила» — понятная причина', c == 400 and 'говорит Фил' in j.get('error', ''), (c, j))
+    c, j = kf('sp_voice_set', 'mgr-t', {'voice': 'zahar'}); check('голос выбирает только руководитель', c == 403, (c, j))
+    c, j = kf('sp_voice_set', data={'voice': 'zahar'}); check('«Космос» говорит голосом Захар', c == 200 and j.get('voice') == 'zahar', j)
+    c, k = kf('sp_status'); c, f = kf('sp_status', flow='flow')
+    check('«Фил» видит новый голос «Космоса», свой не изменился', k.get('voice') == 'zahar' and f.get('peer_voice') == 'zahar' and f.get('voice') == 'kirill', (k, f))
+    c, j = kf('sp_voice_set', data={'voice': 'zahar'}, flow='flow'); check('«Филу» нельзя взять голос «Космоса»', c == 400 and 'говорит Космос' in j.get('error', ''), (c, j))
+    c, j = kf('sp_voice_set', data={'voice': 'alena'}, flow='flow'); check('«Фил» говорит голосом Алёна', c == 200 and j.get('voice') == 'alena', j)
+    c, k = kf('sp_status'); check('у «Космоса» голос прежний', k.get('voice') == 'zahar' and k.get('peer_voice') == 'alena', k)
+    # как могло быть до №537: «Филу» когда-то выбрали Антона, а «Космосу» голос не выбирали — совпали бы
+    sql("DELETE FROM itc_secret WHERE k='ks_voice'; REPLACE INTO itc_secret (k,v,who) VALUES ('sp_voice','anton','test')")
+    c, k = kf('sp_status'); check('совпал бы с «Филом» — «Космос» сам берёт запасной (Филипп)', k.get('voice') == 'filipp' and k.get('peer_voice') == 'anton', k)
+    c, j = kf('sp_voice_set', data={'voice': 'kirill'}, flow='flow')
+    c, k = kf('sp_status'); check('«Филу» сменили голос — голос «Космоса» сам не поменялся', k.get('voice') == 'filipp' and k.get('peer_voice') == 'kirill', k)
+    c, j = kf('sp_say', data={'text': 'Проверка', 'voice': 'jane'})
+    check('послушать голос — без ключа Яндекса понятная ошибка', c == 400 and 'не подключ' in j.get('error', ''), (c, j))
+    sql("DELETE FROM itc_secret WHERE k IN ('sp_voice','ks_voice')")
 
     print('7. Claude ответил не по форме — «Космос» всё равно понимает (№535)')
     def ask(q):
