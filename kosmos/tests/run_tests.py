@@ -298,6 +298,58 @@ try:
               open(f'{TMP}/git.json', 'w'), ensure_ascii=False)
     c, j = call('git', B); check('настройки видят состояние копии и ключ сервера', j['git']['ok'] and j['git']['pub'].startswith('ssh-ed25519') and j['git']['files'] == 485, j)
     c, j = call('git', S); check('GitHub — только руководителю', c == 403, (c, j))
+
+    print('12. Деньги Claude: цена ответов, счёт ключа, отчёт агента (0.3.3)')
+    def php(code, cfg=None):
+        return subprocess.run(['php', '-r', f"require '{ROOT}/lib/boot.php'; " + code], env=dict(env, KOSMOS_CONFIG=cfg or f'{TMP}/config.php'), capture_output=True, text=True)
+    r = php("echo json_encode([cost_u('claude-haiku-5-5',100000,0,0,0), cost_u('claude-haiku-5-5',150000,0,0,0), cost_u('claude-haiku-5-5',50000,0,0,60000),"
+            " cost_u('claude-opus-5-5',0,1000000,0,0), cost_u('claude-sonnet-5-5',0,0,1000000,0), cost_u('claude-fable-5-2',0,0,0,1000000),"
+            " cost_u('claude-new-9',1000000,0,0,0), cost_u('claude-sonnet-5-5-20261007',1000,500,300,2000)]);")
+    v = json.loads(r.stdout or 'null') if r.stdout.startswith('[') else None
+    check('цена: Haiku — $0,10 за 1 млн входных токенов (100 000 токенов = $0,01)', v and v[0] == 10000, (r.stdout, r.stderr[-300:]))
+    check('Haiku: запрос больше 100 000 токенов (с кэшем) — по старшей цене', v and v[1] == 75000 and v[2] == 28000, v)
+    check('Opus выход $20, Sonnet запись кэша $2,50, Fable чтение кэша $0,20', v and v[3] == 20000000 and v[4] == 2500000 and v[5] == 200000, v)
+    check('незнакомая модель — по цене Opus, модель с датой узнаётся', v and v[6] == 4000000 and v[7] == 7950, v)
+    P = {'haiku': (0.10, 0.50, 0.125, 0.01), 'haiku+': (0.50, 2.50, 0.625, 0.05), 'sonnet': (2, 10, 2.5, 0.10), 'opus': (4, 20, 5, 0.20), 'fable': (8, 40, 10, 0.20)}
+    def exp_cost(model, calls, ti, to, cr, cw):
+        f = next((x for x in ('fable', 'opus', 'sonnet', 'haiku') if x in model), 'opus')
+        if f == 'haiku' and (ti + cr + cw) // max(1, calls) > 100000: f = 'haiku+'
+        pi, po, pw, pr = P[f]; return ti * pi + to * po + cw * pw + cr * pr
+    db = sqlite3.connect(f'{TMP}/kosmos.sqlite')
+    rows = db.execute('SELECT model, calls, tokens_in, tokens_out, cache_read, cache_write, cost_u FROM usage').fetchall()
+    bad = [x for x in rows if abs(x[6] - exp_cost(*x[:6])) > x[1]]
+    check('у каждого ответа записана стоимость (usage.cost_u)', rows and not bad and all(x[6] > 0 for x in rows), bad or rows)
+    orgs = dict(db.execute('SELECT id, org FROM keys').fetchall()); db.close()
+    check('счёт ключа узнан из заголовка ответа Claude', orgs.get(k_u1) == '11111111-1111-4111-8111-111111111111', orgs)
+    c, j = call('key_add', B, {'name': 'Второй счёт', 'key': 'sk-ant-org2-' + 'h' * 26 + 'HHHH'}); k_o2 = j['key']['id']
+    c, j = call('key_add', B, {'name': 'Пустой счёт', 'key': 'sk-ant-nocredit-' + 'n' * 22 + 'NNNN'}); k_nc = j['key']['id']
+    db = sqlite3.connect(f'{TMP}/kosmos.sqlite'); orgs = dict(db.execute('SELECT id, org FROM keys').fetchall())
+    check('проверка ключа тоже узнаёт счёт (и когда денег нет)', orgs.get(k_o2) == '22222222-2222-4222-8222-222222222222' and orgs.get(k_nc) == '11111111-1111-4111-8111-111111111111', orgs)
+    db.execute("UPDATE keys SET status='На счёте аккаунта этого ключа закончились деньги — пополните или выберите другой ключ' WHERE id=?", (k_u1,)); db.commit(); db.close()
+    c, evs = send(B, 'Вопрос после пополнения счёта')
+    db = sqlite3.connect(f'{TMP}/kosmos.sqlite'); st1 = db.execute('SELECT status FROM keys WHERE id=?', (k_u1,)).fetchone()[0]; db.close()
+    check('ключ снова ответил — «деньги закончились» снято', any(e['t'] == 'done' for e in evs) and st1 == 'ok', (st1, evs[-1:]))
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'dbinfo'], env=env, capture_output=True, text=True, timeout=30)
+    info = json.loads(r.stdout) if r.stdout.startswith('{') else {}; mk = {x['id']: x for x in info.get('money') or []}
+    a1 = mk.get(k_u1, {})
+    check('агент: расход ключа за сегодня, 7 и 30 дней и всего — для отчёта магазину', a1.get('a', 0) > 0 and a1['t'] == a1['w'] == a1['m'] == a1['a'] and a1['org'].startswith('1111') and a1['active'] and a1['d7'] == 1, (a1, r.stderr[-300:]))
+    check('агент: «деньги закончились» видно у пустого счёта, у рабочего — нет', mk.get(k_nc, {}).get('out') is True and a1.get('out') is False, mk.get(k_nc))
+    check('агент: сам ключ в отчёт не попадает', 'sk-ant' not in r.stdout and info.get('worker') is not None, r.stdout[:200])
+    db = sqlite3.connect(f'{TMP}/kosmos.sqlite'); tot = db.execute('SELECT SUM(cost_u) FROM usage WHERE key_id=?', (k_u1,)).fetchone()[0]; db.close()
+    check('агент считает так же, как база', a1.get('a') == tot, (a1.get('a'), tot))
+    # старая база (до 0.3.3): расход без стоимости — пересчитывается один раз по среднему размеру запроса
+    old = f'{TMP}/old_usage.sqlite'
+    db = sqlite3.connect(old)
+    db.execute("CREATE TABLE usage (day TEXT NOT NULL, key_id INTEGER NOT NULL, model TEXT NOT NULL, calls INTEGER NOT NULL DEFAULT 0, tokens_in INTEGER NOT NULL DEFAULT 0,"
+               " tokens_out INTEGER NOT NULL DEFAULT 0, cache_read INTEGER NOT NULL DEFAULT 0, cache_write INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, key_id, model))")
+    db.executemany('INSERT INTO usage VALUES (?,?,?,?,?,?,?,?)', [('2026-11-10', 1, 'claude-sonnet-5-5', 10, 20000, 3000, 50000, 4000),
+                   ('2026-11-11', 1, 'claude-haiku-5-5', 2, 240000, 1000, 0, 0), ('2026-11-12', 2, 'claude-haiku-5-5', 4, 40000, 2000, 0, 0)])
+    db.commit(); db.close()
+    oc2 = f'{TMP}/old_conf2.php'; open(oc2, 'w').write(CONF.replace(f'{TMP}/kosmos.sqlite', old))
+    r1 = php("db(); echo 'ok';", oc2); r2 = php("db(); echo 'ok';", oc2)
+    db = sqlite3.connect(old); got = {d: c for d, c in db.execute('SELECT day, cost_u FROM usage')}; kc = [x[1] for x in db.execute('PRAGMA table_info(keys)')]; db.close()
+    check('старая база: стоимость пересчитана один раз (Sonnet, Haiku большой и малый)', r1.stdout == r2.stdout == 'ok' and got == {'2026-11-10': 85000, '2026-11-11': 122500, '2026-11-12': 5000}, (got, r1.stderr[-300:]))
+    check('у ключей появилась колонка счёта (org)', 'org' in kc, kc)
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

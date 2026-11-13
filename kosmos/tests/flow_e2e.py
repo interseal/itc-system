@@ -248,6 +248,68 @@ try:
     check('совсем не разобрать — понятная ошибка с началом ответа (руководителю)', not j.get('ok') and 'начало ответа' in j.get('error', '') and 'Обрыв' in j.get('error', ''), j)
     c, j = kf('fc_hist')
     check('в истории реплики подписаны «Космос», не «Фил»', 'Фил:' not in open(f'{ST}/api/kosmos_flow.php', encoding='utf-8').read())
+
+    print('11. Сингапур и деньги Claude на странице обновлений (№541)')
+    def agent_money():
+        r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'dbinfo'], env=env, capture_output=True, text=True, timeout=30)
+        return json.loads(r.stdout).get('money') if r.stdout.startswith('{') else ('ERR', r.stdout[:200], r.stderr[-300:])
+    def report(money):
+        body = {'ver': '0.3.3', 'https': True, 'dns_ok': True, 'worker': True, 'key': True, 'disk_free_gb': 31.4, 'backup': '20261114', 'up': '3 дн 04:10',
+                'load': 0.21, 'git': {'ok': True, 'hash': 'e14a275', 'at': '2026-11-14 00:40:00', 'err': ''}}
+        if money is not None: body['money'] = money
+        return http(f'{STORE}/api/kosmos.php?a=report', body, {'X-Kosmos-Token': tok})
+    def status(t='boss-t'):
+        c, s = http(f'{STORE}/api/kosmos.php?a=status&t={t}', {}); return c, s, s.get('detail', {})
+    def bal(data, t='boss-t'):
+        return http(f'{STORE}/api/kosmos.php?a=claude_bal&t={t}', data)
+    def kdb(sql, args=()):
+        db = sqlite3.connect(f'{TMP}/kosmos.sqlite'); r = db.execute(sql, args).fetchall(); db.commit(); db.close(); return r
+    for f in glob.glob(f'{ST}/uploads/kosmos/*/claude_bal.json'): os.remove(f)   # отметки остатка прошлого прогона
+    report(None); c, j = bal({'g': 'x', 'amount': '10'})
+    check('сервер ещё старый (без расхода) — понятный отказ', not j.get('ok') and '0.3.3' in j.get('error', ''), j)
+    c, s, x = status(); check('старый сервер: денег в состоянии нет (страница так и скажет)', x.get('money') is None and x.get('load') == 0.21, x)
+    m = agent_money(); report(m); c, s, x = status()
+    check('Сингапур: версия, нагрузка, свободное место, копия GitHub, без перезагрузки', s.get('online') and s.get('ver') == '0.3.3' and x.get('disk_free_gb') == 31.4
+          and x.get('git', {}).get('hash') == 'e14a275' and x.get('up') == '3 дн 04:10' and x.get('at_ts', 0) > 0, x)
+    g = x.get('money') or []
+    names = sorted(k['name'] for k in (g[0]['keys'] if g else []))
+    check('ключи одного счёта — одной строкой (счёт узнан из ответа Claude)', len(g) == 1 and names == ['Аккаунт 1', 'Запасной', 'Сломанный'] and g[0]['g'].startswith('1111'), g)
+    t_sum = sum(k['t'] for k in m) / 1e6
+    check('потрачено сегодня = сумма по ключам с сервера', g and g[0]['today'] == round(t_sum, 2) and t_sum > 0 and g[0]['mark'] is None, (g, t_sum))
+    c, j, _ = status('mgr-t'); check('сотруднику деньги и детали сервера не показываются', 'detail' not in j, j)
+    c, j = bal({'g': g[0]['g'], 'amount': '50'}, 'mgr-t'); check('остаток указывает только руководитель', c == 403, (c, j))
+    c, j = bal({'g': g[0]['g'], 'amount': 'много'}); check('не сумма — понятная ошибка', not j.get('ok') and 'долларах' in j.get('error', ''), j)
+    c, j = bal({'g': 'чужой', 'amount': '5'}); check('чужой счёт — отказ', not j.get('ok'), j)
+    # счёт ключа ещё не известен (ключ не отвечал после обновления сервера) — свой отдельный счёт «k<id>»
+    kz = kdb("SELECT id FROM keys WHERE name='Запасной'")[0][0]; org1 = kdb('SELECT org FROM keys WHERE id=?', (kz,))[0][0]
+    kdb("UPDATE keys SET org='' WHERE id=?", (kz,)); report(agent_money()); c, s, x = status()
+    gz = next((q for q in x['money'] if q['g'] == f'k{kz}'), None)
+    check('ключ без известного счёта — отдельной строкой', len(x['money']) == 2 and gz and [k['name'] for k in gz['keys']] == ['Запасной'], x['money'])
+    c, j = bal({'g': f'k{kz}', 'amount': '10'}); check('остаток для него сохраняется', j.get('ok') and next(q for q in j['money'] if q['g'] == f'k{kz}')['mark']['amount'] == 10, j)
+    kdb('UPDATE keys SET org=? WHERE id=?', (org1, kz)); report(agent_money()); c, s, x = status()
+    check('счёт узнали позже — отметка остатка не потерялась', len(x['money']) == 1 and x['money'][0]['mark']['amount'] == 10, x['money'])
+    c, j = bal({'g': x['money'][0]['g'], 'amount': '37,50'}); g = j.get('money', [{}])[0]
+    check('указан остаток «37,50» — осталось $37,50, потрачено $0', j.get('ok') and g['mark']['amount'] == 37.5 and g['mark']['left'] == 37.5 and g['mark']['spent'] == 0, j)
+    ka = kdb("SELECT id FROM keys WHERE name='Аккаунт 1'")[0][0]
+    kdb("UPDATE usage SET cost_u = cost_u + 1234567 WHERE key_id=? AND rowid = (SELECT MAX(rowid) FROM usage WHERE key_id=?)", (ka, ka))
+    m2 = agent_money(); report(m2); c, s, x = status(); g = x['money'][0]
+    span = max(k['d7'] for k in m2); w7 = sum(k['w'] for k in m2) / 1e6 / span
+    check('Космос потратил $1,23 — остаток $36,27', g['mark']['spent'] == 1.23 and g['mark']['left'] == 36.27, g)
+    check('в среднем в день (счёт работает 1 день — делим на 1, не на 7) и «хватит примерно на N дней»',
+          span == 1 and g['span'] == 1 and g['per_day'] == round(w7, 2) and g['mark']['days'] == int(36.265433 // w7), (g, w7, span))
+    import datetime, zoneinfo   # дни расхода — по времени Бишкека, как на сервере
+    d3 = (datetime.datetime.now(zoneinfo.ZoneInfo('Asia/Bishkek')).date() - datetime.timedelta(days=3)).isoformat()
+    kdb("INSERT INTO usage (day, key_id, model, calls, tokens_in, tokens_out, cache_read, cache_write, cost_u) VALUES (?, ?, 'claude-sonnet-5-5', 1, 1, 1, 0, 0, 1)", (d3, ka))
+    m3 = agent_money(); report(m3); c, s, x = status(); g = x['money'][0]
+    check('ключ работает 4-й день — среднее за 4 дня', max(k['d7'] for k in m3) == 4 and g['span'] == 4, (g, [k['d7'] for k in m3]))
+    c, j = bal({'g': g['g'], 'amount': '', 'clear': 1}); check('остаток можно убрать', j.get('ok') and j['money'][0]['mark'] is None, j)
+    c, j = bal({'g': g['g'], 'amount': '$36.27'}); check('сумма со знаком доллара и точкой тоже понимается', j.get('ok') and j['money'][0]['mark']['amount'] == 36.27, j)
+    kdb("UPDATE keys SET status='На счёте аккаунта этого ключа закончились деньги — пополните или выберите другой ключ' WHERE id=?", (kz,))
+    report(agent_money()); c, s, x = status()
+    check('«деньги закончились» у ключа — видно на странице', x['money'][0]['out'] is True and any(k['out'] for k in x['money'][0]['keys']), x['money'])
+    kdb("UPDATE keys SET deleted=1 WHERE id=?", (kz,)); report(agent_money()); c, s, x = status()
+    check('удалённый ключ не показывается, но его траты в остатке учтены', [k['name'] for k in x['money'][0]['keys']] == ['Аккаунт 1', 'Сломанный'] and x['money'][0]['mark']['amount'] == 36.27, x['money'])
+    kdb("UPDATE keys SET deleted=0, status='ok' WHERE id=?", (kz,)); report(agent_money())
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

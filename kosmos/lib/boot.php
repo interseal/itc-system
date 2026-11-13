@@ -5,7 +5,7 @@ declare(strict_types=1);
 // на сервере «Космоса» (база SQLite). В аккаунте Anthropic не хранится ничего,
 // поэтому ключ Claude можно менять — «Космос» продолжает с того же места.
 
-const KOSMOS_VERSION = '0.3.2';
+const KOSMOS_VERSION = '0.3.3';
 
 // Модели Claude на выбор руководителю (настройки «Космоса»). Можно вписать и другую — по её названию в API.
 const MODEL_LIST = [
@@ -40,6 +40,7 @@ function cfg(?string $k = null, $def = null) {
 
 require_once __DIR__ . '/util.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/price.php';   // 0.3.3 · цены Claude и расход по ключам
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/keys.php';
 require_once __DIR__ . '/claude.php';

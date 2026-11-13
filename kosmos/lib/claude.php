@@ -26,8 +26,12 @@ function claude_request(string $key, int $keyId, array $payload, ?callable $onTe
     if ($pick !== '') { $ws = $pick; $res = claude_once($key, $payload, $onText, $ws); }
   }
   if (empty($res['error'])) usage_add($keyId, (string)($res['model'] ?? $payload['model']), (array)($res['usage'] ?? []));
+  if ($keyId > 0 && claude_last_org() !== '') key_org_seen($keyId, claude_last_org());   // 0.3.3 · счёт ключа (lib/price.php)
   return $res;
 }
+
+/* 0.3.3 · счёт (организация Claude) из заголовка последнего ответа — anthropic-organization-id есть в каждом ответе */
+function claude_last_org(?string $set = null): string { static $o = ''; if ($set !== null) $o = $set; return $o; }
 
 function claude_once(string $key, array $payload, ?callable $onText, string $ws = ''): array {
   $ch = curl_init((string)cfg('claude_url'));
@@ -52,6 +56,11 @@ function claude_once(string $key, array $payload, ?callable $onText, string $ws 
   } else {
     $opts[CURLOPT_RETURNTRANSFER] = true;
   }
+  claude_last_org('');
+  $opts[CURLOPT_HEADERFUNCTION] = function ($c, $h) {
+    if (stripos($h, 'anthropic-organization-id:') === 0) claude_last_org(trim(substr($h, 26)));
+    return strlen($h);
+  };
   curl_setopt_array($ch, $opts);
   $out = curl_exec($ch);
   $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -177,11 +186,13 @@ function claude_err_kind(string $type, string $msg): string {
 }
 
 function usage_add(int $keyId, string $model, array $u): void {
-  db()->prepare("INSERT INTO usage (day, key_id, model, calls, tokens_in, tokens_out, cache_read, cache_write) VALUES (?,?,?,1,?,?,?,?)
+  $in = (int)($u['input_tokens'] ?? 0); $out = (int)($u['output_tokens'] ?? 0);
+  $cr = (int)($u['cache_read_input_tokens'] ?? 0); $cw = (int)($u['cache_creation_input_tokens'] ?? 0);
+  // 0.3.3 · cost_u — сколько стоил этот ответ (lib/price.php), для остатка денег на счёте
+  db()->prepare("INSERT INTO usage (day, key_id, model, calls, tokens_in, tokens_out, cache_read, cache_write, cost_u) VALUES (?,?,?,1,?,?,?,?,?)
     ON CONFLICT(day, key_id, model) DO UPDATE SET calls=calls+1, tokens_in=tokens_in+excluded.tokens_in, tokens_out=tokens_out+excluded.tokens_out,
-      cache_read=cache_read+excluded.cache_read, cache_write=cache_write+excluded.cache_write")
-    ->execute([date('Y-m-d'), $keyId, $model, (int)($u['input_tokens'] ?? 0), (int)($u['output_tokens'] ?? 0),
-               (int)($u['cache_read_input_tokens'] ?? 0), (int)($u['cache_creation_input_tokens'] ?? 0)]);
+      cache_read=cache_read+excluded.cache_read, cache_write=cache_write+excluded.cache_write, cost_u=cost_u+excluded.cost_u")
+    ->execute([date('Y-m-d'), $keyId, $model, $in, $out, $cr, $cw, cost_u($model, $in, $out, $cw, $cr)]);
 }
 
 /* Текст из блоков ответа. */

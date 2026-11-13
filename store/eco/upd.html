@@ -45,6 +45,8 @@ table.t th,table.t td{padding:6px 4px;border-bottom:1px solid var(--line);text-a
 table.t th:first-child,table.t td:first-child{text-align:left}
 table.t th{color:var(--mut);font-weight:500;font-size:12.5px}
 .lnk{background:none;border:0;color:var(--navy);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+.kv b.bad{color:#c62828}
+.mbox{border-top:1px solid #e6eaf2;margin-top:10px;padding-top:8px}
 input[type=password]{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit;margin-top:6px}
 </style>
 <style id="itc-font">/* Шрифт Roboto — как на сайте itcpartner.ru (01.11.2026) */@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-cyrillic-300-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-latin-300-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:'Roboto';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/roboto-cyrillic-400-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/roboto-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:'Roboto';font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/roboto-cyrillic-500-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/roboto-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:'Roboto';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/roboto-cyrillic-700-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/roboto-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}html body,html body *:not(svg):not(path):not(code):not(pre):not(kbd):not(samp){font-family:'Roboto',Arial,sans-serif!important}</style>
@@ -378,7 +380,7 @@ function load(){
   if (!T) { document.getElementById('cState').innerHTML = '<div class="err">Войдите в Экосистему как босс, затем откройте этот раздел снова.</div>'; return; }
   api('upd.php','upd_status').then(function(d){
     if (!d.ok) { document.getElementById('cState').innerHTML = '<div class="err">' + esc(d.error || 'Нет доступа') + '</div>'; document.getElementById('cUp').classList.add('hide'); document.getElementById('cHist').classList.add('hide'); return; }
-    ST = d; drawState(); drawCats(); drawHist(); yaDraw(); bkLoad(); srvLoad(); dsDraw();
+    ST = d; drawState(); drawCats(); drawHist(); yaDraw(); bkLoad(); srvLoad(); dsDraw(); sgLoad();
     document.getElementById('cSeed').classList.toggle('hide', !d.seed_left);
   });
 }
@@ -399,7 +401,79 @@ function drawState(){
     if (k.err) h += '<div class="err">Гонконг, ' + esc(k.err_at || '') + ': ' + esc(k.err) + '</div>';
     h += '<div class="mut">Гонконг: свободно ' + (inf.free_mb >= 1024 ? (inf.free_mb/1024).toFixed(1).replace('.', ',') + ' ГБ' : (inf.free_mb||0) + ' МБ') + ', нагрузка ' + String(inf.load||0).replace('.', ',') + (k.bk ? ' · копия данных ' + k.bk.slice(6,8) + '.' + k.bk.slice(4,6) + ' (' + mb(k.bk_size||0) + ')' : ' · копий данных пока нет') + (k.bk_gz ? ' · копия в Гуанчжоу ' + k.bk_gz.slice(6,8) + '.' + k.bk_gz.slice(4,6) : '') + '</div>';
   }
+  /* №541 · сервер «Космоса» в Сингапуре и деньги Claude — свои данные из api/kosmos.php, отдельно от upd.php */
+  h += '<div id="sgBox">' + sgSafe() + '</div>';
   document.getElementById('cState').innerHTML = h;
+}
+
+/* ---------- №541 · Сингапур («Космос») и деньги Claude ----------
+   Ошибка здесь не должна мешать остальной странице: всё в try/catch, данные — отдельным запросом. */
+var SG = null;
+function sgLoad(){
+  fetch('/api/kosmos.php?a=status&t=' + encodeURIComponent(T), {cache:'no-store'}).then(function(r){ return r.json(); })
+    .then(function(d){ SG = d || {ok:false}; sgDraw(); }).catch(function(){ SG = {ok:false}; sgDraw(); });
+}
+function sgDraw(){ var b = document.getElementById('sgBox'); if (b) b.innerHTML = sgSafe(); }
+function sgSafe(){ try { return sgHtml(); } catch (e) { return '<div class="mut">Сингапур: не получилось показать состояние (' + esc(e.message) + ')</div>'; } }
+function tsLocal(ts){ var d = new Date(ts * 1000), z = function(n){ return (n < 10 ? '0' : '') + n; }; return z(d.getDate()) + '.' + z(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+function usd(v){ v = Number(v) || 0; return (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace('.', ','); }
+function dtShort(s){ var m = /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)/.exec(String(s || '')); return m ? m[3] + '.' + m[2] + ' ' + m[4] + ':' + m[5] : String(s || ''); }
+function sgHtml(){
+  var d = SG, h = '';
+  if (!d) return '<div class="row mut">' + IC.wait + 'Сингапур: проверяю…</div>';
+  if (!d.ok) return '<div class="row bad">' + IC.bad + 'Сингапур: не удалось узнать состояние' + (d.error ? ' — ' + esc(d.error) : '') + '</div>';
+  var x = d.detail || {};
+  if (!x.at_ts && !d.ver) return '<div class="row mut">' + IC.wait + 'Сингапур: сервер «Космоса» ещё не присылал отчётов</div>';
+  var ago = x.at_ts ? Math.max(0, (x.now || Date.now() / 1000) - x.at_ts) : 1e9, on = !!d.online, probs = [];
+  if (on) {
+    if (!x.https) probs.push('нет защищённого адреса (HTTPS)');
+    if (!x.dns_ok) probs.push('адрес ' + esc(x.host || '') + ' указывает не на сервер');
+    if (!x.worker) probs.push('фоновые задачи не работают');
+    if (!x.key) probs.push('нет рабочего ключа Claude');
+  }
+  var good = on && !probs.length;
+  h += '<div class="row ' + (good ? 'ok' : 'bad') + '">' + (good ? IC.ok : IC.bad) + 'Сингапур («Космос»): ' + (on ? 'на связи' : 'нет связи ' + (ago < 86400 ? Math.round(ago / 60) + ' мин' : 'больше суток')) + (d.ver ? ' · сервер ' + esc(d.ver) : '') + '</div>';
+  if (probs.length) h += '<div class="err">Сингапур: ' + probs.join('; ') + '</div>';
+  var p = [], g = x.git;
+  if (x.disk_free_gb !== null && x.disk_free_gb !== undefined) p.push('свободно ' + String(x.disk_free_gb).replace('.', ',') + ' ГБ');
+  if (x.load !== null && x.load !== undefined) p.push('нагрузка ' + String(x.load).replace('.', ','));
+  p.push(x.backup ? 'копия данных ' + String(x.backup).slice(6, 8) + '.' + String(x.backup).slice(4, 6) : 'копий данных пока нет');
+  if (g) p.push(g.ok ? 'копия кода с GitHub ' + esc(g.hash || '') + (g.at ? ' (проверена ' + esc(dtShort(g.at)) + ')' : '') : 'GitHub: ' + esc(g.err || 'не обновляется'));
+  if (x.up) p.push('без перезагрузки ' + esc(x.up));
+  h += '<div class="mut">Сингапур: ' + p.join(' · ') + '</div>';
+  return h + moneyHtml(x);
+}
+function moneyHtml(x){
+  if (!('money' in x)) return '';
+  var m = x.money, h = '<h3 style="margin:14px 0 6px;font-size:15px">Claude — деньги на счёте</h3>';
+  if (!m) return h + '<div class="mut">Расход по ключам сервер начнёт присылать с версии 0.3.3 — она поставится сама в течение 10 минут после установки обновления.</div>';
+  if (!m.length) return h + '<div class="mut">Ключей Claude на сервере нет — добавьте ключ в настройках «Космоса».</div>';
+  m.forEach(function(g){
+    var mk = g.mark, low = mk && (mk.left < 5 || (mk.days !== null && mk.days < 3));
+    h += '<div class="mbox"><div class="mut">' + (g.keys.length > 1 ? 'Один счёт, ключи ' : 'Ключ ') + g.keys.map(function(k){ return '«' + esc(k.name) + '»' + (k.last4 ? ' …' + esc(k.last4) : '') + (k.active ? ' — работает сейчас' : ''); }).join(', ') + '</div>';
+    if (g.out) h += '<div class="err">Claude ответил: на счёте закончились деньги. Пополните на platform.claude.com → Settings → Billing — после первого же ответа «Космоса» эта надпись уйдёт.</div>';
+    if (mk) h += '<div class="kv"><div><b' + (low ? ' class="bad"' : '') + '>≈ ' + usd(Math.max(0, mk.left)) + '</b><span>осталось' + (mk.days !== null ? ', хватит примерно на ' + mk.days + ' дн.' : '') + (low ? ' — пора пополнить' : '') + '</span></div>'
+      + '<div><b>' + usd(g.today) + '</b><span>потрачено сегодня</span></div><div><b>' + usd(g.per_day) + '</b><span>в среднем в день' + (g.span && g.span < 7 ? ' (за ' + g.span + ' дн.)' : ' за 7 дней') + '</span></div></div>'
+      + '<div class="mut">На счёте было ' + usd(mk.amount) + ' (' + esc(mk.at_ts ? tsLocal(mk.at_ts) : mk.at) + '), с тех пор потрачено ' + usd(mk.spent) + '.</div>';
+    else h += '<div class="kv"><div><b>' + usd(g.today) + '</b><span>потрачено сегодня</span></div><div><b>' + usd(g.week) + '</b><span>за 7 дней</span></div><div><b>' + usd(g.month) + '</b><span>за 30 дней</span></div></div>'
+      + '<div class="mut">Чтобы здесь был виден остаток, один раз укажите, сколько сейчас на счёте.</div>';
+    h += '<button class="lnk" onclick="balForm(\'' + esc(g.g) + '\')">' + (mk ? 'Пополнили счёт? Указать новый остаток' : 'Указать остаток на счёте') + '</button><div id="bal_' + esc(g.g) + '"></div></div>';
+  });
+  return h + '<div class="mut" style="margin-top:8px">Остаток считает сам «Космос»: он знает цену каждого своего ответа. Claude отдаёт баланс только на своём сайте, поэтому если этим же счётом пользуется кто-то ещё, точная сумма — на platform.claude.com в разделе Billing.</div>';
+}
+function balForm(g){
+  var b = document.getElementById('bal_' + g); if (!b) return;
+  b.innerHTML = '<div class="note">Откройте platform.claude.com → Settings → Billing и впишите сумму из строки Credit balance (в долларах):'
+    + '<input type="text" id="balIn_' + g + '" inputmode="decimal" placeholder="например 37,50" autocomplete="off" style="margin-top:6px">'
+    + '<button class="btn g" onclick="balSave(\'' + g + '\')">Сохранить остаток</button><div id="balMsg_' + g + '"></div></div>';
+}
+function balSave(g){
+  var inp = document.getElementById('balIn_' + g), msg = document.getElementById('balMsg_' + g);
+  fetch('/api/kosmos.php?a=claude_bal&t=' + encodeURIComponent(T), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({t:T, g:g, amount:inp ? inp.value : ''})})
+    .then(function(r){ return r.json(); }).then(function(r){
+      if (!r.ok) { if (msg) msg.innerHTML = '<div class="err">' + esc(r.error || 'Не сохранилось') + '</div>'; return; }
+      if (SG && SG.detail) SG.detail.money = r.money; sgDraw();
+    }).catch(function(){ if (msg) msg.innerHTML = '<div class="err">Нет связи с магазином — попробуйте ещё раз</div>'; });
 }
 function saveSite(){
   var p = document.getElementById('sitePath').value;

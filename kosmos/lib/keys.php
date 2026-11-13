@@ -221,6 +221,10 @@ function claude_call(array $payload, ?callable $onText = null, ?callable $onSwit
   while (true) {
     $res = claude_request($key, (int)$krow['id'], $payload, $onText);
     $res['key_id'] = (int)$krow['id'];
+    // 0.3.3 · ключ ответил — старая ошибка у него больше не правда (например, счёт пополнили): снимаем её,
+    // иначе страница обновлений магазина продолжит писать «деньги закончились»
+    if (empty($res['error']) && !in_array((string)($krow['status'] ?? ''), ['', 'ok'], true))
+      db()->prepare("UPDATE keys SET status='ok', checked_at=? WHERE id=?")->execute([now(), $krow['id']]);
     if (empty($res['error']) || !key_is_dead($res) || setting('auto_switch', '1') !== '1') return $res;
     $tried[] = (int)$krow['id'];
     db()->prepare('UPDATE keys SET status=?, checked_at=? WHERE id=?')->execute([mb_substr((string)$res['error'], 0, 200), now(), $krow['id']]);

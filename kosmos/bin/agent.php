@@ -86,8 +86,38 @@ function a_dbinfo(): array {
     $d = new SQLite3($C['db'], SQLITE3_OPEN_READONLY); $d->busyTimeout(5000);
     $beat = (int)$d->querySingle("SELECT v FROM settings WHERE k='worker_beat'");
     $key = (int)$d->querySingle("SELECT COUNT(*) FROM keys WHERE active=1 AND deleted=0");
-    return ['worker' => $beat > 0 && time() - $beat < 120, 'key' => $key > 0];
+    return ['worker' => $beat > 0 && time() - $beat < 120, 'key' => $key > 0, 'money' => a_money($d)];
   } catch (Throwable $e) { return ['worker' => false, 'key' => false]; }
+}
+
+/* 0.3.3 · расход денег Claude по ключам: стоимость ответов пишет lib/price.php в usage.cost_u
+   (миллионные доли доллара). Сегодня, 7 и 30 дней, всего. Удалённые ключи — только если по ним был расход
+   (их траты нужны, чтобы правильно считать остаток счёта). Сами ключи отсюда не читаются — только название и 4 знака. */
+function a_money(SQLite3 $d): ?array {
+  try {
+    $cols = function (string $t) use ($d) { $o = []; $r = $d->query('PRAGMA table_info(' . $t . ')'); while ($r && ($c = $r->fetchArray(SQLITE3_ASSOC))) $o[] = $c['name']; return $o; };
+    if (!in_array('cost_u', $cols('usage'), true)) return null;
+    $org = in_array('org', $cols('keys'), true) ? 'k.org' : "''";
+    $q = $d->prepare("SELECT k.id, k.name, k.last4, k.active, k.status, k.deleted, $org AS org,
+        (SELECT COALESCE(SUM(cost_u),0) FROM usage u WHERE u.key_id=k.id AND u.day=:d1) t,
+        (SELECT COALESCE(SUM(cost_u),0) FROM usage u WHERE u.key_id=k.id AND u.day>=:d7) w,
+        (SELECT COALESCE(SUM(cost_u),0) FROM usage u WHERE u.key_id=k.id AND u.day>=:d30) m,
+        (SELECT COALESCE(SUM(cost_u),0) FROM usage u WHERE u.key_id=k.id) a,
+        (SELECT MIN(day) FROM usage u WHERE u.key_id=k.id AND u.cost_u>0) f
+      FROM keys k WHERE k.deleted=0 OR EXISTS (SELECT 1 FROM usage u WHERE u.key_id=k.id AND u.cost_u>0) ORDER BY k.id LIMIT 30");
+    $q->bindValue(':d1', date('Y-m-d')); $q->bindValue(':d7', date('Y-m-d', time() - 6 * 86400)); $q->bindValue(':d30', date('Y-m-d', time() - 29 * 86400));
+    $r = $q->execute(); $out = []; $today = strtotime(date('Y-m-d'));
+    while ($r && ($k = $r->fetchArray(SQLITE3_ASSOC))) {
+      $st = (string)$k['status'];
+      // d7 — сколько из последних 7 дней ключ уже работал: среднее в день не занижается в первую неделю
+      $f = (string)($k['f'] ?? ''); $d7 = $f !== '' && strtotime($f) ? max(1, min(7, (int)floor(($today - strtotime($f)) / 86400) + 1)) : 0;
+      $out[] = ['id' => (int)$k['id'], 'name' => mb_substr((string)$k['name'], 0, 60), 'last4' => substr((string)$k['last4'], -4),
+                'active' => (bool)$k['active'], 'del' => (bool)$k['deleted'], 'org' => (string)$k['org'],
+                'out' => mb_stripos($st, 'деньги') !== false, 'st' => ($st !== '' && $st !== 'ok') ? mb_substr($st, 0, 200) : '',
+                't' => (int)$k['t'], 'w' => (int)$k['w'], 'm' => (int)$k['m'], 'a' => (int)$k['a'], 'd7' => $d7];
+    }
+    return $out;
+  } catch (Throwable $e) { return null; }
 }
 
 function a_dbbackup(string $to): bool {
@@ -142,6 +172,13 @@ function a_report(): void {
   $rep = ['ver' => a_ver(), 'ip' => $ip, 'dns_ok' => a_dns_ok($ip), 'https' => a_https(), 'worker' => !empty($db['worker']), 'key' => !empty($db['key']),
           'disk_free_gb' => $free ? round($free / 1073741824, 1) : null, 'backup' => (string)(a_state()['backup_day'] ?? ''),
           'up' => $up ? floor($up / 86400) . ' дн ' . gmdate('H:i', $up % 86400) : ''];
+  // 0.3.3 · для страницы обновлений магазина: нагрузка, рабочая копия GitHub, расход денег Claude по ключам
+  $la = function_exists('sys_getloadavg') ? sys_getloadavg() : false;
+  $rep['load'] = is_array($la) ? round((float)$la[0], 2) : null;
+  $g = is_file(a_git_file()) ? (array)json_decode((string)file_get_contents(a_git_file()), true) : [];
+  if ($g) $rep['git'] = ['ok' => !empty($g['ok']), 'hash' => substr((string)($g['head']['hash'] ?? ''), 0, 7),
+                         'at' => (string)($g['pulled_at'] ?? ''), 'err' => mb_substr((string)($g['err'] ?? ''), 0, 160)];
+  if (isset($db['money']) && is_array($db['money'])) $rep['money'] = $db['money'];
   [$code, $body] = a_store('a=report', json_encode($rep, JSON_UNESCAPED_UNICODE), null, 20);
   if ($code !== 200) { a_log('магазин не принял отчёт: ' . $code); return; }
   $j = json_decode((string)$body, true); if (!is_array($j)) return;

@@ -48,7 +48,8 @@ function db_schema(PDO $d): void {
   // 0.2.1 · личные ключи Claude (созданы без рабочей области): ID рабочей области (workspace) и её название —
   // «Космос» указывает её в каждом запросе (заголовок anthropic-workspace-id)
   $cols = array_column($d->query('PRAGMA table_info(keys)')->fetchAll(PDO::FETCH_ASSOC), 'name');
-  foreach (['ws', 'ws_name'] as $c) {
+  // 0.3.3 · org — счёт (организация Claude) ключа, из заголовка ответа; ключи одного счёта тратят одни деньги
+  foreach (['ws', 'ws_name', 'org'] as $c) {
     if (in_array($c, $cols, true)) continue;
     try { $d->exec("ALTER TABLE keys ADD COLUMN $c TEXT NOT NULL DEFAULT ''"); }
     catch (PDOException $e) { if (stripos($e->getMessage(), 'duplicate column') === false) throw $e; }   // другой процесс успел раньше
@@ -70,6 +71,8 @@ function db_schema(PDO $d): void {
     id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, trig TEXT NOT NULL DEFAULT '', steps TEXT NOT NULL DEFAULT '',
     trace TEXT NOT NULL DEFAULT '', author TEXT NOT NULL DEFAULT '', who TEXT NOT NULL DEFAULT '', manual INTEGER NOT NULL DEFAULT 0,
     uses INTEGER NOT NULL DEFAULT 0, used_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)");
+  // 0.3.3 · стоимость ответов в usage.cost_u (lib/price.php) — для остатка денег на счёте Claude
+  price_migrate($d);
 }
 
 function setting(string $k, string $def = ''): string {

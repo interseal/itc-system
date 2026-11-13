@@ -117,15 +117,23 @@ def plan(req, key):
     return [{'type': 'text', 'text': f'Ответ на «{text[:60]}». Ключ …{key[-4:]}. Записей памяти: {len(mem_lines)}. Сообщений в запросе: {len(msgs)}.'}], 'end_turn'
 
 
+ORG1 = '11111111-1111-4111-8111-111111111111'
+ORG2 = '22222222-2222-4222-8222-222222222222'
+
 class H(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
 
     def log_message(self, *a):
         pass
 
+    def org_header(self):   # как у настоящего Claude: счёт (организация) ключа — в каждом ответе (0.3.3)
+        key = self.headers.get('x-api-key', '')
+        if key: self.send_header('anthropic-organization-id', ORG2 if 'org2' in key else ORG1)
+
     def send_json(self, code, obj):
         b = json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(code)
+        self.org_header()
         self.send_header('content-type', 'application/json')
         self.send_header('content-length', str(len(b)))
         self.end_headers()
@@ -194,6 +202,7 @@ class H(BaseHTTPRequestHandler):
             return self.send_json(200, {'id': 'msg_1', 'type': 'message', 'role': 'assistant', 'model': model,
                                         'content': blocks, 'stop_reason': stop, 'usage': usage})
         self.send_response(200)
+        self.org_header()
         self.send_header('content-type', 'text/event-stream')
         self.send_header('connection', 'close')
         self.end_headers()

@@ -36,6 +36,62 @@ function ks_staff() {
 function ks_boss($s) { $r = (string)($s['staff_role'] ?? ''); return $r === 'boss' || $r === ''; }
 function ks_online($st) { return !empty($st['at']) && time() - (int)$st['at'] < 180; }
 
+/* №541 · деньги Claude. Остатка на счёте Claude не отдаёт (в API такого запроса нет), поэтому сервер «Космоса»
+   считает расход каждого ключа сам (стоимость каждого ответа по ценам Claude, в миллионных долях доллара) и раз
+   в минуту присылает его в отчёте. Руководитель один раз указывает остаток со страницы Billing на
+   platform.claude.com — дальше отсюда вычитается расход. Ключи одного счёта (организации) тратят одни деньги,
+   поэтому остаток — по счёту. Отметки остатка — claude_bal.json: {счёт: {amount_u, base: {id ключа: расход всего}, at, by}}. */
+function ks_money_clean($list) {
+  $out = [];
+  foreach (array_slice(is_array($list) ? $list : [], 0, 30) as $k) {
+    if (!is_array($k) || (int)($k['id'] ?? 0) <= 0) continue;
+    $r = ['id' => (int)$k['id'], 'name' => mb_substr((string)($k['name'] ?? ''), 0, 60), 'last4' => preg_replace('~[^A-Za-z0-9_\-]~', '', substr((string)($k['last4'] ?? ''), -4)),
+          'active' => !empty($k['active']), 'del' => !empty($k['del']), 'org' => preg_replace('~[^a-f0-9\-]~', '', strtolower(substr((string)($k['org'] ?? ''), 0, 64))),
+          'out' => !empty($k['out']), 'st' => mb_substr((string)($k['st'] ?? ''), 0, 200)];
+    foreach (['t', 'w', 'm', 'a'] as $f) $r[$f] = max(0, (int)($k[$f] ?? 0));
+    $r['d7'] = max(0, min(7, (int)($k['d7'] ?? 7)));   // сколько из последних 7 дней ключ уже работал
+    $out[] = $r;
+  }
+  return $out;
+}
+function ks_money_groups($money) {
+  $g = [];
+  foreach ($money as $k) { $id = $k['org'] !== '' ? $k['org'] : 'k' . $k['id']; $g[$id][] = $k; }
+  return $g;
+}
+function ks_money_mark($marks, $gid, $keys) {
+  if (isset($marks[$gid])) return $marks[$gid];
+  foreach ($keys as $k) if (isset($marks['k' . $k['id']])) return $marks['k' . $k['id']];   // отметили до того, как стал известен счёт
+  return null;
+}
+function ks_money_view($st) {
+  if (!isset($st['money']) || !is_array($st['money'])) return null;
+  $marks = ks_json(ks_dir() . '/claude_bal.json');
+  $usd = function ($u) { return round($u / 1000000, 2); };
+  $out = [];
+  foreach (ks_money_groups(ks_money_clean($st['money'])) as $gid => $keys) {   // ещё раз через проверку: в файле могут быть старые записи
+    $live = array_values(array_filter($keys, function ($k) { return !$k['del']; }));
+    if (!$live) continue;
+    $sum = ['t' => 0, 'w' => 0, 'm' => 0]; $span = 1;
+    foreach ($keys as $k) { foreach ($sum as $f => $v) $sum[$f] += $k[$f]; $span = max($span, (int)$k['d7']); }
+    $daily = $sum['w'] / $span;   // в среднем в день: за 7 дней, а если счёт работает меньше недели — за эти дни
+    $g = ['g' => (string)$gid, 'keys' => array_map(function ($k) { return ['id' => $k['id'], 'name' => $k['name'], 'last4' => $k['last4'], 'active' => $k['active'], 'out' => $k['out'], 'st' => $k['st']]; }, $live),
+          'active' => (bool)array_filter($live, function ($k) { return $k['active']; }), 'out' => (bool)array_filter($live, function ($k) { return $k['out']; }),
+          'today' => $usd($sum['t']), 'week' => $usd($sum['w']), 'month' => $usd($sum['m']), 'per_day' => $usd($daily), 'span' => $span, 'mark' => null];
+    $m = ks_money_mark($marks, $gid, $keys);
+    if ($m) {
+      $spent = 0;
+      foreach ($keys as $k) $spent += max(0, $k['a'] - (int)($m['base'][(string)$k['id']] ?? 0));
+      $left = ((int)$m['amount_u'] - $spent) / 1000000;
+      $g['mark'] = ['amount' => $usd((int)$m['amount_u']), 'at' => date('d.m.Y H:i', (int)$m['at']), 'at_ts' => (int)$m['at'], 'spent' => $usd($spent), 'left' => round($left, 2),
+                    'days' => $daily > 0 ? (int)floor(max(0, $left) / ($daily / 1000000)) : null];
+    }
+    $out[] = $g;
+  }
+  usort($out, function ($a, $b) { return (int)$b['active'] - (int)$a['active']; });
+  return $out;
+}
+
 $a = (string)($_GET['a'] ?? '');
 
 switch ($a) {
@@ -66,9 +122,35 @@ switch ($a) {
       $out['detail'] = ['at' => !empty($st['at']) ? date('d.m.Y H:i', (int)$st['at']) : '', 'ip' => (string)($st['ip'] ?? ''),
         'dns_ok' => !empty($st['dns_ok']), 'https' => !empty($st['https']), 'worker' => !empty($st['worker']), 'key' => !empty($st['key']),
         'disk_free_gb' => $st['disk_free_gb'] ?? null, 'backup' => (string)($st['backup'] ?? ''), 'host' => KS_HOST,
-        'pkgs' => array_values(array_map(function ($m) { return $m['ver']; }, ks_pkgs()))];
+        'pkgs' => array_values(array_map(function ($m) { return $m['ver']; }, ks_pkgs())),
+        // №541 · для строки «Сингапур» на странице обновлений и денег Claude
+        'at_ts' => (int)($st['at'] ?? 0), 'now' => time(), 'load' => $st['load'] ?? null, 'up' => (string)($st['up'] ?? ''),
+        'git' => $st['git'] ?? null, 'money' => ks_money_view($st)];
     }
     ks_out($out);
+  }
+
+  case 'claude_bal': {                               // №541 · руководитель указывает остаток на счёте Claude
+    $S = ks_staff();
+    if (!ks_boss($S)) ks_out(['ok' => false, 'error' => 'Только для руководителя'], 403);
+    $b = ks_body();
+    $st = ks_json(ks_dir() . '/status.json');
+    if (!isset($st['money']) || !is_array($st['money'])) ks_out(['ok' => false, 'error' => 'Сервер «Космоса» ещё не прислал расход по ключам — подождите пару минут после его обновления до 0.3.3']);
+    $gid = (string)($b['g'] ?? '');
+    $groups = ks_money_groups($st['money']);
+    if (!isset($groups[$gid])) ks_out(['ok' => false, 'error' => 'Такого счёта нет — обновите страницу']);
+    $marks = ks_json(ks_dir() . '/claude_bal.json');
+    foreach ($groups[$gid] as $k) unset($marks['k' . $k['id']]);
+    $raw = trim(str_replace([' ', ',', '$'], ['', '.', ''], (string)($b['amount'] ?? '')));
+    if ($raw === '' || !empty($b['clear'])) unset($marks[$gid]);
+    else {
+      if (!is_numeric($raw) || (float)$raw < 0 || (float)$raw > 100000) ks_out(['ok' => false, 'error' => 'Напишите сумму в долларах, например 37.50']);
+      $base = [];
+      foreach ($st['money'] as $k) $base[(string)$k['id']] = $k['a'];
+      $marks[$gid] = ['amount_u' => (int)round((float)$raw * 1000000), 'base' => $base, 'at' => time(), 'by' => (string)($S['phone'] ?? $S['login'] ?? '')];
+    }
+    ks_put(ks_dir() . '/claude_bal.json', $marks);
+    ks_out(['ok' => true, 'money' => ks_money_view($st)]);
   }
 
   case 'connect': {
@@ -119,6 +201,11 @@ switch ($a) {
     foreach (['ver', 'ip', 'backup', 'up'] as $k) $st[$k] = mb_substr((string)($b[$k] ?? ''), 0, 80);
     foreach (['dns_ok', 'https', 'worker', 'key'] as $k) $st[$k] = !empty($b[$k]);
     $st['disk_free_gb'] = isset($b['disk_free_gb']) ? round((float)$b['disk_free_gb'], 1) : null;
+    // №541 · нагрузка, рабочая копия GitHub и расход денег Claude по ключам — для страницы обновлений
+    $st['load'] = isset($b['load']) && is_numeric($b['load']) ? round((float)$b['load'], 2) : null;
+    if (is_array($b['git'] ?? null)) $st['git'] = ['ok' => !empty($b['git']['ok']), 'hash' => preg_replace('~[^a-f0-9]~', '', substr((string)($b['git']['hash'] ?? ''), 0, 12)),
+      'at' => mb_substr((string)($b['git']['at'] ?? ''), 0, 20), 'err' => mb_substr((string)($b['git']['err'] ?? ''), 0, 160)];
+    if (is_array($b['money'] ?? null)) $st['money'] = ks_money_clean($b['money']);
     ks_put(ks_dir() . '/status.json', $st);
     // №533 · в ответ — ключ шлюза (им магазин спрашивает Claude от имени «Космоса») и адрес, по которому сервер раз в минуту будит фоновые задачи
     $g = ks_gw();
