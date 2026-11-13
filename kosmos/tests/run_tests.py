@@ -265,6 +265,14 @@ try:
     r = subprocess.run(['php', '-r', f"require '{ROOT}/lib/boot.php'; db(); db(); echo 'ok';"], env=dict(env, KOSMOS_CONFIG=oc), capture_output=True, text=True)
     db = sqlite3.connect(old); cols = [x[1] for x in db.execute('PRAGMA table_info(keys)')]; nm = db.execute('SELECT name FROM keys').fetchone()[0]; db.close()
     check('старая база получила колонки ws и ws_name, ключи на месте', r.stdout.endswith('ok') and 'ws' in cols and 'ws_name' in cols and nm == 'Старый', (r.stdout[-300:], r.stderr[-300:], cols))
+
+    print('11. GitHub: рабочая копия на сервере (0.3.0)')
+    c, j = call('git', B); check('пока агент не заводил копию — честно «ещё нет»', c == 200 and j['ok'] and j['git'] is None, j)
+    json.dump({'repo': 'git@github.com:interseal/itc-system.git', 'dir': '/srv/itc-system', 'ok': True, 'pub': 'ssh-ed25519 AAAATEST kosmos-sg',
+               'head': {'hash': 'abc1234', 'date': '2026-11-13T21:00:00+06:00', 'msg': 'первый'}, 'checked_at': '2026-11-13 21:10:00', 'pulled_at': '2026-11-13 21:10:00', 'files': 485},
+              open(f'{TMP}/git.json', 'w'), ensure_ascii=False)
+    c, j = call('git', B); check('настройки видят состояние копии и ключ сервера', j['git']['ok'] and j['git']['pub'].startswith('ssh-ed25519') and j['git']['files'] == 485, j)
+    c, j = call('git', S); check('GitHub — только руководителю', c == 403, (c, j))
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

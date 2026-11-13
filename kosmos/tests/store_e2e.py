@@ -108,7 +108,12 @@ try:
     for p in ['/opt/kosmos', '/etc/kosmos', '/var/backups/kosmos', '/var/lib/kosmos-agent.json']:
         subprocess.run(['rm', '-rf', p])
     os.makedirs('/etc/kosmos', exist_ok=True)
+    # 0.3.0 · «GitHub» для проверки — местное хранилище с одним изменением
+    shutil.rmtree(f'{T}/gh', ignore_errors=True); os.makedirs(f'{T}/gh')
+    subprocess.run(['git', 'init', '-q', '--bare', '-b', 'main', f'{T}/gh/itc-system.git'], check=True)
+    subprocess.run(['bash', '-c', f"cd {T}/gh && git clone -q itc-system.git w 2>/dev/null; cd w && git config user.email t@t && git config user.name t && echo '# ИТК' > README.md && git add -A && git commit -qm 'проверка рабочей копии' && git push -q origin HEAD:main"], check=True)
     open('/etc/kosmos/config.php', 'w').write(f"""<?php return [
+  'git_repo' => 'file://{T}/gh/itc-system.git', 'git_dir' => '{T}/srv/itc-system', 'git_key' => '{T}/gh_deploy',
   'store_url' => '{STORE}', 'db' => '/opt/kosmos/data/kosmos.sqlite', 'tz' => 'Asia/Bishkek',
   'claude_url' => 'http://127.0.0.1:8767/v1/messages', 'meta_url' => 'http://127.0.0.1:9/', 'agent_state' => '{T}/agent.json',
   'dev_users' => ['boss-token' => ['+996555000001', 'Алексей', 'boss', true], 'staff-token' => ['+996555000002', 'Айгуль', 'manager', false]],
@@ -180,20 +185,24 @@ try:
     c, j = http('http://127.0.0.1/api.php?a=gw', {'a': 'ask', 'user': 'Сколько сделок?', 'who': {'phone': '+996555000002', 'name': 'Айгуль', 'role': 'manager'}}, {'X-Kosmos-GW': gw})
     check('вопрос к Claude через шлюз (nginx, PHP-FPM)', c == 200 and j.get('ok') and 'NEW1' in j.get('text', ''), (c, j))
     c, j = http('http://127.0.0.1/api.php?a=gw', {'a': 'status'}, {'X-Kosmos-GW': 'f' * 64}); check('чужой ключ шлюза — отказ', c == 403, c)
+    gj = json.load(open('/opt/kosmos/data/git.json')) if os.path.exists('/opt/kosmos/data/git.json') else {}
+    check('агент завёл рабочую копию GitHub и ключ сервера', gj.get('ok') and gj.get('head', {}).get('msg') == 'проверка рабочей копии' and gj.get('pub', '').startswith('ssh-ed25519') and os.path.isfile(f'{T}/srv/itc-system/README.md'), (gj, r.stdout[-400:]))
+    check('закрытая часть ключа сервера — только root (600)', oct(os.stat(f'{T}/gh_deploy').st_mode)[-3:] == '600')
+    c, j = http(API + 'git', {}, H); check('вкладка GitHub через nginx видит копию', c == 200 and j.get('git', {}).get('ok') is True, (c, j))
     r = subprocess.run(['php', '/opt/kosmos/bin/agent.php', 'backup'], capture_output=True, text=True, timeout=120)
     c, j = ks('backups', srv=tok2); check('ночная копия ушла в магазин', len(j['backups']) == 2, (j, r.stdout))
     check('после копии база по-прежнему у www-data', pwd.getpwuid(os.stat('/opt/kosmos/data/kosmos.sqlite').st_uid).pw_name == 'www-data')
     # новая версия 0.1.1 — копия исходников с поднятым номером
     src2 = f'{T}/src2'; shutil.copytree(ROOT, src2, ignore=shutil.ignore_patterns('tests', 'store'))
-    bp = f'{src2}/lib/boot.php'; txt = open(bp, encoding='utf-8').read(); open(bp, 'w', encoding='utf-8').write(txt.replace(f"KOSMOS_VERSION = '{pk['ver']}'", "KOSMOS_VERSION = '0.2.99'"))
+    bp = f'{src2}/lib/boot.php'; txt = open(bp, encoding='utf-8').read(); open(bp, 'w', encoding='utf-8').write(txt.replace(f"KOSMOS_VERSION = '{pk['ver']}'", "KOSMOS_VERSION = '0.3.99'"))
     bad = f'{T}/bad.pem'; subprocess.run(['openssl', 'genpkey', '-algorithm', 'ed25519', '-out', bad], check=True)
     pk_bad = json.loads(subprocess.run([sys.executable, f'{src2}/tools/build_pkg.py', '--key', bad, '--out', f'{T}/store/uploads/kosmos/pkg'], check=True, capture_output=True, text=True).stdout)
     r = subprocess.run(['php', '/opt/kosmos/bin/agent.php', 'update'], capture_output=True, text=True, timeout=300)
     check('пакет с чужой подписью не ставится', 'подпись не сходится' in r.stdout and open('/opt/kosmos/VERSION').read().strip() == pk['ver'], r.stdout)
     pk2 = json.loads(subprocess.run([sys.executable, f'{src2}/tools/build_pkg.py', '--key', f'{T}/sign.pem', '--out', f'{T}/store/uploads/kosmos/pkg'], check=True, capture_output=True, text=True).stdout)
     r = subprocess.run(['php', '/opt/kosmos/bin/agent.php', 'update'], capture_output=True, text=True, timeout=300)
-    check('новая версия с верной подписью поставилась', open('/opt/kosmos/VERSION').read().strip() == '0.2.99', r.stdout[-800:])
-    c, j = http(API + 'me', {}, H); check('после обновления всё работает, память цела', j.get('version') == '0.2.99' and len(http(API + 'memory', {}, H)[1]['items']) == 2, j)
+    check('новая версия с верной подписью поставилась', open('/opt/kosmos/VERSION').read().strip() == '0.3.99', r.stdout[-800:])
+    c, j = http(API + 'me', {}, H); check('после обновления всё работает, память цела', j.get('version') == '0.3.99' and len(http(API + 'memory', {}, H)[1]['items']) == 2, j)
 finally:
     for p in procs: p.terminate()
     subprocess.run(['nginx', '-s', 'stop'], capture_output=True); subprocess.run(['pkill', '-f', 'php-fpm'], capture_output=True)

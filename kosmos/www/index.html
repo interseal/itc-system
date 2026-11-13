@@ -234,6 +234,7 @@ table.t td.n{text-align:right;font-variant-numeric:tabular-nums}
       <button class="tab" data-t="users" onclick="setTab('users')">Сотрудники</button>
       <button class="tab" data-t="memory" onclick="setTab('memory')">Память компании</button>
       <button class="tab" data-t="usage" onclick="setTab('usage')">Расход</button>
+      <button class="tab" data-t="git" onclick="setTab('git')">GitHub</button>
     </div>
     <div class="win-b" id="setBody"></div>
   </div>
@@ -552,7 +553,7 @@ function setTab(t){
   SET.tab = t;
   Array.prototype.forEach.call(document.querySelectorAll('#setTabs .tab'), function(b){ b.classList.toggle('on', b.getAttribute('data-t') === t); });
   $('setBody').innerHTML = '<div class="note">Загружаю…</div>';
-  ({ keys: setKeys, models: setModels, users: setUsers, memory: setMemory, usage: setUsage })[t]();
+  ({ keys: setKeys, models: setModels, users: setUsers, memory: setMemory, usage: setUsage, git: setGit })[t]();
 }
 function keyStatus(k){ if (!k.status) return '<span class="tag">не проверен</span>'; return k.status === 'ok' ? '<span class="tag ok">работает</span>' : '<span class="tag err">' + esc(k.status) + '</span>'; }
 function setKeys(){
@@ -677,6 +678,26 @@ function setMemory(){
     $('setBody').innerHTML = h;
   });
 }
+/* 0.3.0 · рабочая копия хранилища кода ИТК (GitHub) на этом сервере */
+function setGit(){
+  api('git').then(function(d){
+    if (!d.ok) { $('setBody').innerHTML = '<div class="note">' + esc(d.error) + '</div>'; return; }
+    var g = d.git;
+    if (!g) { $('setBody').innerHTML = '<p class="note">Рабочая копия ещё не заводилась: агент сервера сделает это в ближайшие 10 минут. Загляните сюда чуть позже.</p>'; return; }
+    var repo = String(g.repo || '').replace(/^git@github\.com:/, '').replace(/\.git$/, '');
+    var h = '<p class="note">Главная копия кода ИТК — закрытое хранилище <b>' + esc(repo) + '</b> на GitHub. На этом сервере — его рабочая копия (' + esc(g.dir || '') + '), сервер обновляет её сам раз в 10 минут. Ключей и паролей в хранилище нет.</p>';
+    h += '<div class="card' + (g.ok ? ' act' : '') + '"><div class="kh"><b>Рабочая копия</b>' + (g.ok ? '<span class="tag ok">в порядке</span>' : '<span class="tag err">' + esc(g.err || 'ещё не готова') + '</span>') + '</div>'
+      + (g.head && g.head.hash ? '<div class="ks">Последнее изменение: <b>' + esc(g.head.msg || '') + '</b> · ' + esc(g.head.hash) + (g.head.date ? ' · ' + dmy(String(g.head.date).replace('T', ' ').slice(0, 19)) : '') + '</div>' : '')
+      + '<div class="ks">' + (g.pulled_at ? 'Обновлена ' + dmy(g.pulled_at) + ' ' + hm(g.pulled_at) + ' · ' : '') + 'проверена ' + dmy(g.checked_at) + ' ' + hm(g.checked_at) + (g.files ? ' · файлов: ' + num(g.files) : '') + '</div></div>';
+    if (g.pub) {
+      h += '<h4 style="margin:16px 0 8px">Ключ сервера для GitHub</h4>'
+        + '<p class="note">Один раз: GitHub → хранилище ' + esc(repo) + ' → Settings (Настройки) → Deploy keys → Add deploy key. Title: «Сервер Сингапур», Key: вставьте строку ниже, галочку записи не ставьте → Add key. Это открытая часть ключа, её можно показывать; закрытая хранится только на сервере.</p>'
+        + '<div class="row"><input class="inp" id="gitPub" readonly style="flex:1;min-width:240px;font-family:monospace;font-size:12px" value="' + esc(g.pub) + '"><button class="btn sm" onclick="gitCopy()">Скопировать</button></div>';
+    }
+    $('setBody').innerHTML = h;
+  });
+}
+function gitCopy(){ var e = $('gitPub'); e.select(); try { navigator.clipboard.writeText(e.value).then(function(){ toast('Ключ скопирован'); }, function(){ document.execCommand('copy'); toast('Ключ скопирован'); }); } catch (x) { document.execCommand('copy'); toast('Ключ скопирован'); } }
 function setUsage(){
   api('usage').then(function(d){
     if (!d.ok) { $('setBody').innerHTML = '<div class="note">' + esc(d.error) + '</div>'; return; }

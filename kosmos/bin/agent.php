@@ -5,11 +5,14 @@
 //     в ответ магазин даёт ключ шлюза (0.2.0) и адрес, по которому агент будит фоновые задачи «Космоса»;
 //   — раз в 10 минут проверяет новую версию «Космоса» в магазине, сверяет подпись и ставит её;
 //   — пока нет https: когда DNS-запись kosmos.itcpartner.store указывает сюда, получает сертификат (certbot);
-//   — ночью (03:00–04:59 по Бишкеку) делает копию базы и отправляет в магазин (там хранятся 7 последних).
-// Подкоманды: ip | update | backup | restore [force] | dbinfo | dbbackup <файл>  (две последние — от www-data).
+//   — ночью (03:00–04:59 по Бишкеку) делает копию базы и отправляет в магазин (там хранятся 7 последних);
+//   — 0.3.0: раз в 10 минут обновляет рабочую копию хранилища кода ИТК из GitHub (/srv/itc-system, только чтение).
+// Подкоманды: ip | update | backup | git | restore [force] | dbinfo | dbbackup <файл>  (две последние — от www-data).
 
 if (PHP_SAPI !== 'cli') exit;
 const A_HOST = 'kosmos.itcpartner.store';
+// 0.3.0 · опубликованный ключ github.com (сверяем при входе в GitHub; константы — до первого exit)
+const A_GIT_HOSTKEY = 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl';
 
 $cfgFile = getenv('KOSMOS_CONFIG') ?: '/etc/kosmos/config.php';
 $C = (is_file($cfgFile) ? (array)(require $cfgFile) : []) + [
@@ -17,6 +20,8 @@ $C = (is_file($cfgFile) ? (array)(require $cfgFile) : []) + [
   'store_token_file' => '/etc/kosmos/store_token', 'sign_pub_file' => '/etc/kosmos/sign.pub', 'gw_key_file' => '/etc/kosmos/gw.key',
   'app_dir' => '/opt/kosmos', 'agent_state' => '/var/lib/kosmos-agent.json', 'backup_dir' => '/var/backups/kosmos',
   'db_user' => 'www-data', 'meta_url' => 'http://100.100.100.200/latest/meta-data/',
+  // 0.3.0 · хранилище кода ИТК на GitHub и его рабочая копия на этом сервере
+  'git_repo' => 'git@github.com:interseal/itc-system.git', 'git_dir' => '/srv/itc-system', 'git_key' => '/etc/kosmos/github_deploy',
 ];
 date_default_timezone_set((string)$C['tz']);
 $cmd = (string)($argv[1] ?? '');
@@ -27,6 +32,7 @@ switch ($cmd) {
   case 'ip':       echo a_ip(), "\n"; exit;
   case 'update':   a_lock(); a_update(true); exit;
   case 'backup':   a_lock(); exit(a_backup(true) ? 0 : 1);
+  case 'git':      a_lock(); exit(a_git(true) ? 0 : 1);
   case 'restore':  a_lock(); exit(a_restore(($argv[2] ?? '') === 'force') ? 0 : 1);
   case '':
     a_lock();
@@ -35,6 +41,7 @@ switch ($cmd) {
     a_cert();
     a_backup(false);
     a_report();
+    a_git(false);
     exit;
 }
 fwrite(STDERR, "неизвестная команда\n"); exit(2);
@@ -240,5 +247,78 @@ function a_restore(bool $force): bool {
   if ($C['db_user'] !== '' && function_exists('posix_geteuid') && posix_geteuid() === 0) { @chown($C['db'], (string)$C['db_user']); @chgrp($C['db'], (string)$C['db_user']); }
   @chmod($C['db'], 0640);
   a_log('восстановлена память «Космоса» из копии ' . $b['day'] . '. Ключи Claude, если сервер новый, нужно добавить заново (они зашифрованы ключом старого сервера)');
+  return true;
+}
+
+/* ---------------- 0.3.0 · рабочая копия GitHub ----------------
+   Главная копия кода ИТК — закрытое хранилище на GitHub (interseal/itc-system). Здесь — его рабочая копия, только чтение:
+   раз в 10 минут агент забирает изменения. Вход в GitHub — ключом этого сервера (deploy key): агент создаёт его сам,
+   руководитель один раз добавляет открытую часть в GitHub (itc-system → Settings → Deploy keys), её показывают
+   настройки «Космоса» → GitHub. Состояние — в <папка базы>/git.json. Ключей и паролей в хранилище нет. */
+
+function a_git_file(): string { global $C; return dirname((string)$C['db']) . '/git.json'; }
+function a_git_save(array $g): void {
+  $f = a_git_file(); @mkdir(dirname($f), 0755, true);
+  @file_put_contents($f, json_encode($g, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX); @chmod($f, 0644);
+}
+function a_git_err(string $out): string {
+  if (stripos($out, 'Permission denied') !== false || stripos($out, 'Repository not found') !== false || stripos($out, 'Could not read from remote') !== false)
+    return 'GitHub пока не пускает сервер: добавьте ключ сервера в хранилище (itc-system → Settings → Deploy keys)';
+  if (stripos($out, 'Host key verification failed') !== false) return 'не сходится ключ github.com — проверьте сеть сервера';
+  if (stripos($out, "couldn't find remote ref") !== false || stripos($out, 'empty repository') !== false || stripos($out, 'unknown revision') !== false) return 'хранилище на GitHub пока пустое';
+  if (stripos($out, 'уже занята') !== false) return trim($out);
+  if (stripos($out, 'timed out') !== false || stripos($out, 'Could not resolve') !== false) return 'нет связи с GitHub';
+  return 'git: ' . mb_substr(trim(preg_replace('~\s+~u', ' ', $out)), 0, 240);
+}
+function a_git(bool $force): bool {
+  global $C;
+  if (!$force && time() - (int)(a_state()['git_at'] ?? 0) < 600) return true;
+  a_state_put(['git_at' => time()]);
+  $g = ['repo' => (string)$C['git_repo'], 'dir' => (string)$C['git_dir'], 'checked_at' => date('Y-m-d H:i:s'), 'ok' => false];
+  $old = is_file(a_git_file()) ? (array)json_decode((string)file_get_contents(a_git_file()), true) : [];
+  foreach (['pulled_at', 'head'] as $k) if (isset($old[$k])) $g[$k] = $old[$k];
+  $have = function (string $b): bool { return trim((string)shell_exec('command -v ' . escapeshellarg($b) . ' 2>/dev/null')) !== ''; };
+  if (!$have('git') || !$have('ssh-keygen')) {
+    a_log('ставлю git');
+    exec('DEBIAN_FRONTEND=noninteractive apt-get install -y -q git openssh-client 2>&1', $o, $rc);
+    if (!$have('git') || !$have('ssh-keygen')) { $g['err'] = 'не удалось поставить git'; a_git_save($g); a_log($g['err']); return false; }
+  }
+  $key = (string)$C['git_key'];
+  if (!is_file($key)) {
+    @mkdir(dirname($key), 0750, true);
+    exec('ssh-keygen -q -t ed25519 -N "" -C ' . escapeshellarg('kosmos-sg ' . date('Y-m-d')) . ' -f ' . escapeshellarg($key) . ' 2>&1', $o, $rc);
+    if (!is_file($key)) { $g['err'] = 'не удалось создать ключ сервера'; a_git_save($g); a_log($g['err']); return false; }
+    a_log('создан ключ сервера для GitHub');
+  }
+  @chmod($key, 0600);
+  $g['pub'] = trim((string)@file_get_contents($key . '.pub'));
+  $kh = dirname($key) . '/github_known_hosts';
+  if (!is_file($kh)) @file_put_contents($kh, A_GIT_HOSTKEY . "\n");
+  $ssh = 'ssh -i ' . escapeshellarg($key) . ' -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=' . escapeshellarg($kh) . ' -o ConnectTimeout=20';
+  $env = 'GIT_SSH_COMMAND=' . escapeshellarg($ssh) . ' GIT_TERMINAL_PROMPT=0 ';
+  $dir = (string)$C['git_dir']; $q = escapeshellarg($dir); $o = [];
+  if (!is_dir($dir . '/.git')) {   // первый раз: клон во временную папку, потом — на место
+    @mkdir(dirname($dir), 0755, true);
+    $tmp = $dir . '.new-' . bin2hex(random_bytes(3)); $qt = escapeshellarg($tmp);
+    exec($env . 'timeout 900 git clone -q ' . escapeshellarg((string)$C['git_repo']) . ' ' . $qt . ' 2>&1', $o, $rc);
+    if ($rc === 0 && trim((string)shell_exec('git -C ' . $qt . ' rev-parse --verify -q HEAD 2>/dev/null')) === ''
+        && trim((string)shell_exec('git -C ' . $qt . ' rev-parse --verify -q origin/main 2>/dev/null')) !== '') exec('git -C ' . $qt . ' checkout -q -B main origin/main 2>&1', $o);   // у хранилища нет ветки по умолчанию — берём main
+    if ($rc === 0 && trim((string)shell_exec('git -C ' . $qt . ' rev-parse --verify -q HEAD 2>/dev/null')) === '') { $rc = 1; $o[] = 'empty repository'; }
+    if ($rc === 0 && (is_dir($dir) || !@rename($tmp, $dir))) { $rc = 1; $o[] = 'папка ' . $dir . ' уже занята чем-то другим'; }
+    if (is_dir($tmp)) exec('rm -rf ' . $qt);
+  } else {
+    exec($env . 'timeout 900 git -C ' . $q . ' fetch -q origin 2>&1', $o, $rc);
+    if ($rc === 0) {
+      $br = trim((string)shell_exec('git -C ' . $q . ' symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null')) ?: 'origin/main';
+      exec('git -C ' . $q . ' reset -q --hard ' . escapeshellarg($br) . ' 2>&1 && git -C ' . $q . ' clean -qfdx 2>&1', $o, $rc);   // копия только для чтения: всегда как на GitHub
+    }
+  }
+  if ($rc !== 0) { $g['err'] = a_git_err(implode("\n", $o)); a_git_save($g); a_log('GitHub: ' . $g['err']); return false; }
+  $h = explode("\t", trim((string)shell_exec('git -C ' . $q . ' log -1 --format=%h%x09%cI%x09%s 2>/dev/null')), 3);
+  $new = ['hash' => $h[0] ?? '', 'date' => $h[1] ?? '', 'msg' => $h[2] ?? ''];
+  if (($g['head']['hash'] ?? '') !== $new['hash']) a_log('рабочая копия GitHub: ' . $new['hash'] . ' ' . $new['msg']);
+  $g['head'] = $new; $g['ok'] = true; $g['pulled_at'] = date('Y-m-d H:i:s'); unset($g['err']);
+  $g['files'] = (int)trim((string)shell_exec('git -C ' . $q . ' ls-files | wc -l'));
+  a_git_save($g);
   return true;
 }

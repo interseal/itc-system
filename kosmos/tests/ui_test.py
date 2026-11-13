@@ -116,6 +116,14 @@ try:
         check('единственную рабочую область «Космос» выбрал сам', not pg.is_visible('select[id^=wsSel]'))
         pg.screenshot(path=f'{TMP}/7c_ws_auto.png')
 
+        print('2б. GitHub: рабочая копия (0.3.0)')
+        json.dump({'repo': 'git@github.com:interseal/itc-system.git', 'dir': '/srv/itc-system', 'ok': False, 'pub': 'ssh-ed25519 AAAAC3NzaTESTKEY kosmos-sg 2026-11-13',
+                   'err': 'GitHub пока не пускает сервер: добавьте ключ сервера в хранилище (itc-system → Settings → Deploy keys)', 'checked_at': '2026-11-13 21:10:00'},
+                  open(f'{TMP}/git.json', 'w'), ensure_ascii=False)
+        pg.click('[data-t=git]'); pg.wait_for_selector('#gitPub')
+        check('вкладка GitHub: ключ сервера и что сделать', 'AAAAC3NzaTESTKEY' in pg.eval_on_selector('#gitPub', 'e => e.value') and pg.is_visible('text=Deploy keys'))
+        pg.screenshot(path=f'{TMP}/7d_github.png')
+
         print('3. Сотрудник на телефоне')
         ph = page_for(390, 780, 'staff-token')
         ph.wait_for_selector('text=Чем заняться?')

@@ -132,6 +132,13 @@ try {
       jout(['ok' => true, 'test' => $test, 'keys' => keys_list()]);
     }
 
+    case 'git': {   // 0.3.0 · рабочая копия хранилища кода на GitHub (её ведёт агент)
+      me_boss();
+      $f = dirname((string)cfg('db')) . '/git.json';
+      $g = is_file($f) ? json_decode((string)file_get_contents($f), true) : null;
+      jout(['ok' => true, 'git' => is_array($g) ? $g : null]);
+    }
+
     case 'key_rename': {
       $m = me_boss();
       key_rename((int)($in['id'] ?? 0), (string)($in['name'] ?? ''), $m['phone']);
