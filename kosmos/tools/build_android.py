@@ -204,10 +204,34 @@ def main():
         env = dict(os.environ, ITC_KEYSTORE_FILE=ks, ITC_KEYSTORE_PASSWORD=os.environ['ITC_KEYSTORE_PASSWORD'], ANDROID_HOME=SDK, ANDROID_SDK_ROOT=SDK)
         env.pop('ITC_KEYSTORE_B64', None)
         open(f'{a.project}/local.properties', 'w').write(f'sdk.dir={SDK}\n')
+        # №604 · имя ключа внутри файла: в сейфе было «key», а в файле ключ называется иначе — сборка падала на подписи.
+        # Смотрим, какие ключи реально лежат в файле (keytool, по паролю файла); если указанного нет, а ключ один — берём его.
+        kt = os.path.join(os.environ.get('JAVA_HOME', ''), 'bin', 'keytool') if os.environ.get('JAVA_HOME') else 'keytool'
+        try:
+            lr = subprocess.run([kt, '-list', '-v', '-keystore', ks, '-storepass:env', 'ITC_KEYSTORE_PASSWORD'], capture_output=True, text=True,
+                                env=dict(env, LANG='C', LC_ALL='C'), timeout=60)
+            aliases = re.findall(r'^Alias name:\s*(.+?)\s*$', lr.stdout, re.M)
+        except Exception as e:
+            lr = None; aliases = []; log('keytool не запустился:', e)
+        want = os.environ['ITC_KEY_ALIAS']
+        if lr is not None and lr.returncode != 0:
+            if re.search(r'password was incorrect|keystore password', (lr.stdout or '') + (lr.stderr or ''), re.I):
+                raise SystemExit('файл ключа подписи не открылся паролем ANDROID_KEYSTORE_PASSWORD из сейфа «Авто» — проверьте пароль')
+            log('keytool не прочитал файл ключа — дальше решит Gradle:', (lr.stderr or lr.stdout or '')[-200:])
+        if aliases and want not in aliases:
+            if len(aliases) == 1:
+                log(f'имя ключа в сейфе «{want}», в файле — «{aliases[0]}»: беру из файла'); env['ITC_KEY_ALIAS'] = aliases[0]
+            else:
+                raise SystemExit(f'в файле ключа нет имени «{want}» (ANDROID_KEY_ALIAS в сейфе «Авто»). В файле есть: ' + ', '.join(aliases))
         tasks = [f'assemble{x[0].upper()}{x[1:]}Release' for x in apps]
         step('собираю: ' + ', '.join(apps) + ' (первый раз Gradle качает библиотеки — до 15 минут)')
-        r = subprocess.run([gradle, '--no-daemon', '-q', f'-PitcVersionCode={a.code}', f'-PitcVersionName={a.name}'] + tasks,
-                           cwd=a.project, env=env, capture_output=True, text=True, timeout=3000)
+        run = lambda e: subprocess.run([gradle, '--no-daemon', '-q', f'-PitcVersionCode={a.code}', f'-PitcVersionName={a.name}'] + tasks,
+                                       cwd=a.project, env=e, capture_output=True, text=True, timeout=3000)
+        r = run(env)
+        # №604 · у ключей формата PKCS12 пароль ключа = пароль файла: если пароль ключа не подошёл — пробуем пароль файла
+        if r.returncode != 0 and re.search(r'Cannot recover key|Given final block not properly padded|keyPassword|wrong password', (r.stderr or '') + (r.stdout or ''), re.I) \
+                and env.get('ITC_KEY_PASSWORD') != env.get('ITC_KEYSTORE_PASSWORD'):
+            log('пароль ключа не подошёл — пробую пароль файла'); r = run(dict(env, ITC_KEY_PASSWORD=env['ITC_KEYSTORE_PASSWORD']))
         if r.returncode != 0:
             msg = (r.stderr or r.stdout)
             for k in ['ITC_KEYSTORE_PASSWORD', 'ITC_KEY_PASSWORD']: msg = msg.replace(os.environ[k], '…')
