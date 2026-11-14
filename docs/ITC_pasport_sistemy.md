@@ -226,6 +226,7 @@ def build(n, title, what, files, upd_key, out):   # files: {"store/apps/fil/inde
   - состояние — `/opt/kosmos/data/git.json`; ключ github.com сверяется (`/etc/kosmos/github_known_hosts`).
 - С 0.3.1 — навыки «Космоса» и «Фила»: таблица skills в kosmos.sqlite, lib/skills.php, шлюз {a: skills, op: pick|list|save|del|used|import}; с 0.3.2 копия навыков есть и в магазине (раздел 12), удалённые руководителем навыки из копии не воскресают.
 - С 0.3.3 — учёт денег Claude: цена каждого ответа (lib/price.php, цены с platform.claude.com/docs/en/about-claude/pricing на 14.11.2026) пишется в usage.cost_u в миллионных долях доллара; счёт ключа — keys.org из заголовка ответа anthropic-organization-id; агент раз в минуту присылает магазину ещё нагрузку, состояние копии GitHub и расход по ключам. Цены Claude поменялись — править lib/price.php и выпускать новую версию сервера.
+- С 14.11.2026, 11:46 сервер «Космоса» — Aliyun «轻量应用服务器» (Simple Application Server) Ubuntu-ahdv, ID dfde8ae94cbe4dad92619a67902982fb: 4 vCPU, 8 ГБ, ESSD 70 ГБ, 200 Мбит/с, ¥156/мес (было 2 vCPU/4 ГБ/50 ГБ, ¥78), оплачен до 13.11.2027. Повышение оплачено руководителем через Alipay ¥947,74 (баланс Aliyun ¥249,20 оставлен для «Рисовалки»). Понизить тариф Aliyun не даёт. Зачем: сборка Android-приложений на сервере.
 
 ## 6. Хостинг reg.ru
 
@@ -321,6 +322,8 @@ def build(n, title, what, files, upd_key, out):   # files: {"store/apps/fil/inde
 ---
 
 ## 10а. Сроки оплаты (на 13.11.2026)
+
+- Сервер «Космоса» (Сингапур, Aliyun): оплачен до 13.11.2027, ¥156/мес после повышения 14.11.2026.
 
 | Что | Где | Оплачено до |
 |---|---|---|
