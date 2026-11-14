@@ -30,6 +30,8 @@ $C = (is_file($cfgFile) ? (array)(require $cfgFile) : []) + [
   'git_repo' => 'git@github.com:interseal/itc-system.git', 'git_dir' => '/srv/itc-system', 'git_key' => '/etc/kosmos/github_deploy',
   // 0.3.4 · сейф Bitwarden: программа bws (Secrets Manager CLI) и ключ шифрования базы (его копия — в сейф)
   'bws_bin' => '/usr/local/bin/bws', 'master_key_file' => '/etc/kosmos/master.key',
+  // 0.3.7 · сервер сам собирает и подписывает обновления магазина из GitHub (releases/N.json)
+  'upd_key_file' => '/etc/kosmos/upd_key.php', 'own_sign_key' => '/etc/kosmos/sign_own.pem', 'release_dir' => '/var/lib/kosmos-releases', 'python' => 'python3',
 ];
 date_default_timezone_set((string)$C['tz']);
 $cmd = (string)($argv[1] ?? '');
@@ -40,6 +42,7 @@ switch ($cmd) {
   case 'bwinfo':   echo json_encode(a_bwinfo()); exit;   // 0.3.4 · от www-data: токен сейфа и ключи Claude (расшифровка — ключом базы)
   case 'bw':       a_lock(); exit(a_bw(true) ? 0 : 1);
   case 'skills':   a_lock(); exit(a_claude_skills(true) ? 0 : 1);
+  case 'release':  a_lock(); exit(a_release(true) ? 0 : 1);
   case 'dbbackup': exit(a_dbbackup((string)($argv[2] ?? '')) ? 0 : 1);
   case 'ip':       echo a_ip(), "\n"; exit;
   case 'update':   a_lock(); a_update(true); exit;
@@ -55,6 +58,7 @@ switch ($cmd) {
     a_report();
     a_git(false);
     a_claude_skills(false);
+    a_release(false);
     a_bw(false);
     exit;
 }
@@ -197,10 +201,18 @@ function a_report(): void {
   $bw = is_file(a_bw_file()) ? (array)json_decode((string)file_get_contents(a_bw_file()), true) : [];
   if ($bw) $rep['bw'] = ['set' => !empty($bw['set']), 'ok' => !empty($bw['ok']), 'at' => (string)($bw['saved_at'] ?? $bw['checked_at'] ?? ''),
                          'err' => mb_substr((string)($bw['err'] ?? ''), 0, 200), 'n' => count((array)($bw['items'] ?? [])), 'project' => mb_substr((string)($bw['project'] ?? ''), 0, 60)];
+  $rep['want_upd_key'] = !is_file((string)$C['upd_key_file']);   // 0.3.7 · ключ обновлений магазин отдаёт серверу один раз
+  $rep['releases'] = a_release_state();
   [$code, $body] = a_store('a=report', json_encode($rep, JSON_UNESCAPED_UNICODE), null, 20);
   if ($code !== 200) { a_log('магазин не принял отчёт: ' . $code); return; }
   $j = json_decode((string)$body, true); if (!is_array($j)) return;
   // 0.2.0 · ключ шлюза: им магазин подписывает вопросы к Claude («Космос» в Экосистеме, CRM и приложении)
+  $uk = (string)($j['upd_key'] ?? '');
+  if (preg_match('~^[a-f0-9]{64}$~', $uk) && !is_file((string)$C['upd_key_file'])) {
+    @mkdir(dirname((string)$C['upd_key_file']), 0750, true);
+    file_put_contents((string)$C['upd_key_file'], "<?php define('UPD_KEY', '" . $uk . "');\n"); @chmod((string)$C['upd_key_file'], 0600);
+    a_log('получен ключ обновлений магазина');
+  }
   $gw = (string)($j['gw'] ?? '');
   if (preg_match('~^[a-f0-9]{64}$~', $gw)) a_gw_save($gw);
   // 0.2.0 · раз в минуту будим фоновые задачи «Космоса» в магазине (большие поручения доделываются без открытого экрана)
@@ -239,9 +251,9 @@ function a_update(bool $force): void {
   $tgz = $tmp . '/p.tgz';
   [$code] = a_store('a=pkg&f=' . rawurlencode((string)$new['file']), null, $tgz, 300);
   if ($code !== 200 || !is_file($tgz) || !hash_equals((string)$new['sha256'], hash_file('sha256', $tgz))) { a_log('версия ' . $new['ver'] . ': пакет не скачался или повреждён'); a_rm($tmp); return; }
-  $pub = base64_decode(trim((string)@file_get_contents($C['sign_pub_file'])), true);
-  $sig = base64_decode((string)$new['sig'], true);
-  if (!$pub || strlen($pub) !== 32 || !$sig || !sodium_crypto_sign_verify_detached($sig, "kosmos\n" . $new['ver'] . "\n" . $new['sha256'], $pub)) {
+  $sig = base64_decode((string)$new['sig'], true); $ok = false;   // 0.3.7 · ключей подписи может быть несколько (ноутбук, сам сервер)
+  foreach (preg_split('~\s+~', trim((string)@file_get_contents($C['sign_pub_file']))) as $l) { $pub = base64_decode($l, true); if ($pub && strlen($pub) === 32 && $sig && sodium_crypto_sign_verify_detached($sig, "kosmos\n" . $new['ver'] . "\n" . $new['sha256'], $pub)) $ok = true; }
+  if (!$ok) {
     a_log('версия ' . $new['ver'] . ': подпись не сходится — не ставлю'); a_rm($tmp); return;
   }
   exec('tar -xzf ' . escapeshellarg($tgz) . ' -C ' . escapeshellarg($tmp) . ' 2>&1', $o, $rc);
@@ -489,7 +501,10 @@ function a_bw(bool $force): bool {
   $files = ['KOSMOS_MASTER_KEY' => [(string)$C['master_key_file'], true, 'Ключ шифрования базы «Космоса» (/etc/kosmos/master.key, base64). Без него ключи Claude из копии базы не читаются.'],
             'KOSMOS_GITHUB_DEPLOY_KEY' => [(string)$C['git_key'], false, 'Ключ сервера «Космоса» для GitHub (/etc/kosmos/github_deploy), только чтение хранилища itc-system.'],
             'KOSMOS_GW_KEY' => [(string)$C['gw_key_file'], false, 'Ключ шлюза магазин → «Космос» (/etc/kosmos/gw.key). Магазин выдаёт его сам.'],
-            'KOSMOS_STORE_TOKEN' => [(string)$C['store_token_file'], false, 'Служебный ключ сервера «Космоса» для магазина (/etc/kosmos/store_token).']];
+            'KOSMOS_STORE_TOKEN' => [(string)$C['store_token_file'], false, 'Служебный ключ сервера «Космоса» для магазина (/etc/kosmos/store_token).'],
+            // 0.3.7 · ключи, которыми сервер сам подписывает обновления
+            'UPD_KEY' => [(string)$C['upd_key_file'], false, 'Ключ подписи обновлений магазина (upd_key.php). Сервер «Космоса» получил его от магазина и подписывает им обновления.'],
+            'KOSMOS_SIGN_KEY_SERVER' => [(string)$C['own_sign_key'], false, 'Свой ключ сервера «Космоса» для подписи его пакетов (Ed25519, /etc/kosmos/sign_own.pem). Открытая часть — в /etc/kosmos/sign.pub рядом с ключом ноутбука.']];
   foreach ($files as $n => [$f, $bin, $note]) {
     if (!is_file($f)) continue;
     $v = (string)file_get_contents($f); $v = $bin ? base64_encode($v) : trim($v);
@@ -524,4 +539,85 @@ function a_claude_skills(bool $force): bool {
   if ($r['new'] || $r['upd'] || $r['del']) a_log('навыки Claude: новых ' . $r['new'] . ', обновлено ' . $r['upd'] . ', убрано ' . $r['del']);
   if ($r['bad']) a_log('навыки Claude: не разобраны (нет «# название» / «---» или шаги длиннее 1500 знаков): ' . implode(', ', $r['bad']));
   return true;
+}
+
+/* ---------------- 0.3.7 · обновления магазина собирает и подписывает сам сервер ----------------
+   Claude кладёт в GitHub код и releases/<N>.json: {"n": N, "title": "…", "what": ["…"], "files": ["store/…"], "kosmos": true|false}.
+   Агент (раз в 10 минут, после рабочей копии GitHub) собирает obnovlenie_N.zip тем же kosmos/tools/build_store_update.py,
+   подписывает ключом обновлений (магазин отдал его серверу) и своим ключом «Космоса» (сервер создал его сам,
+   открытая часть — в /etc/kosmos/sign.pub рядом с ключом ноутбука) и отдаёт в магазин. Руководитель ставит одной кнопкой
+   на странице «Обновления». Ноутбук для сборки больше не нужен. */
+function a_release_state(): array {
+  global $C; $f = rtrim((string)$C['release_dir'], '/') . '/state.json';
+  $j = is_file($f) ? json_decode((string)file_get_contents($f), true) : null; return is_array($j) ? $j : [];
+}
+function a_release_save(array $s): void { global $C; @mkdir((string)$C['release_dir'], 0700, true); file_put_contents(rtrim((string)$C['release_dir'], '/') . '/state.json', json_encode($s, JSON_UNESCAPED_UNICODE)); }
+function a_own_key(): string {   // свой ключ подписи пакетов «Космоса»: создаётся один раз, открытая часть — в список доверенных
+  global $C; $k = (string)$C['own_sign_key'];
+  if (!is_file($k)) {
+    exec('openssl genpkey -algorithm ed25519 -out ' . escapeshellarg($k) . ' 2>&1', $o, $rc);
+    if ($rc !== 0 || !is_file($k)) return '';
+    @chmod($k, 0600); a_log('создан свой ключ подписи пакетов «Космоса»');
+  }
+  $der = (string)shell_exec('openssl pkey -in ' . escapeshellarg($k) . ' -pubout -outform DER 2>/dev/null');
+  $pub = base64_encode(substr($der, -32));
+  $pf = (string)$C['sign_pub_file']; $have = trim((string)@file_get_contents($pf));
+  if (strlen($der) >= 32 && strpos($have, $pub) === false) { file_put_contents($pf, ($have !== '' ? $have . "\n" : '') . $pub . "\n"); @chmod($pf, 0644); a_log('свой ключ добавлен в доверенные'); }
+  return $k;
+}
+function a_release(bool $force): bool {
+  global $C;
+  $dir = rtrim((string)$C['git_dir'], '/');
+  $g = is_file(a_git_file()) ? (array)json_decode((string)file_get_contents(a_git_file()), true) : [];
+  $head = (string)($g['head']['hash'] ?? '');
+  $st = a_release_state();
+  if (!is_dir("$dir/releases") || (!$force && ($head === '' || ($st['head'] ?? '') === $head))) return true;
+  $st['head'] = $head; $st['done'] = (array)($st['done'] ?? []);
+  $todo = [];
+  foreach (glob("$dir/releases/*.json") ?: [] as $f) {
+    $r = json_decode((string)file_get_contents($f), true);
+    if (!is_array($r) || (int)($r['n'] ?? 0) < 1 || isset($st['done'][(string)$r['n']])) continue;
+    $todo[(int)$r['n']] = $r;
+  }
+  ksort($todo);
+  foreach ($todo as $n => $r) {
+    $err = a_release_one($n, $r, $dir);
+    $st['done'][(string)$n] = ['at' => date('Y-m-d H:i:s'), 'ok' => $err === '', 'err' => $err, 'title' => mb_substr((string)($r['title'] ?? ''), 0, 120)];
+    if ($err !== '') { a_log("обновление №$n: $err"); unset($st['done'][(string)$n]['ok']); $st['done'][(string)$n]['ok'] = false; $st['last_err'] = "№$n: $err"; break; }
+    a_log("обновление №$n собрано, подписано и отдано в магазин");
+    unset($st['last_err']);
+  }
+  if (count($st['done']) > 40) $st['done'] = array_slice($st['done'], -40, null, true);
+  a_release_save($st);
+  return empty($st['last_err']);
+}
+function a_release_one(int $n, array $r, string $dir): string {
+  global $C;
+  if (!is_file((string)$C['upd_key_file'])) return 'ещё нет ключа обновлений (магазин передаст его в ближайшую минуту)';
+  if (trim((string)shell_exec('command -v ' . escapeshellarg((string)$C['python']) . ' 2>/dev/null')) === '') {
+    exec('DEBIAN_FRONTEND=noninteractive apt-get install -y -q python3 2>&1', $o, $rc);
+    if (trim((string)shell_exec('command -v python3 2>/dev/null')) === '') return 'не удалось поставить python3';
+  }
+  $key = a_own_key(); if ($key === '') return 'не удалось создать ключ подписи';
+  $tmp = sys_get_temp_dir() . '/kosmos-rel-' . bin2hex(random_bytes(4)); @mkdir("$tmp/extra", 0700, true);
+  foreach ((array)($r['files'] ?? []) as $p) {
+    $p = ltrim(str_replace('\\', '/', (string)$p), '/');
+    if ($p === '' || strpos($p, '..') !== false || !preg_match('~^(store|site|metro)/~', $p) || !is_file("$dir/$p")) { a_rm($tmp); return 'нет файла ' . $p; }
+    @mkdir(dirname("$tmp/extra/$p"), 0700, true); copy("$dir/$p", "$tmp/extra/$p");
+  }
+  $cmd = [(string)$C['python'], "$dir/kosmos/tools/build_store_update.py", '--n', (string)$n, '--upd-key', (string)$C['upd_key_file'], '--sign-key', $key,
+          '--out', "$tmp/obnovlenie_$n.zip", '--title', mb_substr((string)($r['title'] ?? ('Обновление №' . $n)), 0, 200)];
+  if ((array)($r['files'] ?? [])) array_push($cmd, '--extra', "$tmp/extra");
+  foreach ((array)($r['what'] ?? []) as $w) array_push($cmd, '--what', mb_substr((string)$w, 0, 600));
+  if (empty($r['kosmos'])) $cmd[] = '--no-pkg';
+  $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $dir);
+  $out = stream_get_contents($pipes[1]); $e = stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]); $rc = proc_close($p);
+  if ($rc !== 0 || !is_file("$tmp/obnovlenie_$n.zip")) { a_rm($tmp); return 'сборка не удалась: ' . mb_substr(trim($e . ' ' . $out), -300); }
+  $zip = (string)file_get_contents("$tmp/obnovlenie_$n.zip");
+  @copy("$tmp/obnovlenie_$n.zip", rtrim((string)$C['release_dir'], '/') . "/obnovlenie_$n.zip");
+  a_rm($tmp);
+  [$code, $body] = a_store('a=upd_put&n=' . $n, $zip, null, 120);
+  $j = json_decode($body, true);
+  if ($code !== 200 || empty($j['ok'])) return 'магазин не принял файл: ' . (is_array($j) ? (string)($j['error'] ?? '') : '') . ' (' . $code . ')';
+  return '';
 }

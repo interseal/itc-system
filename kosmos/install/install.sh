@@ -23,10 +23,10 @@ fi
 
 say "проверяю подпись пакета"
 php -r '
-  $pub = base64_decode(trim((string)@file_get_contents("/etc/kosmos/sign.pub")), true);
-  $sig = base64_decode($argv[1], true);
+  $sig = base64_decode($argv[1], true); $ok = false;   // 0.3.7 · в sign.pub может быть несколько ключей (ноутбук и сам сервер)
   $msg = "kosmos\n" . $argv[2] . "\n" . $argv[3];
-  if (!$pub || strlen($pub) !== 32 || !$sig || !sodium_crypto_sign_verify_detached($sig, $msg, $pub)) { fwrite(STDERR, "Подпись пакета не сходится — установка остановлена\n"); exit(1); }
+  foreach (preg_split("~\\s+~", trim((string)@file_get_contents("/etc/kosmos/sign.pub"))) as $l) { $pub = base64_decode($l, true); if ($pub && strlen($pub) === 32 && $sig && sodium_crypto_sign_verify_detached($sig, $msg, $pub)) $ok = true; }
+  if (!$ok) { fwrite(STDERR, "Подпись пакета не сходится — установка остановлена\n"); exit(1); }
 ' "$SIG" "$VER" "$SHA"
 
 say "раскладываю файлы версии $VER"

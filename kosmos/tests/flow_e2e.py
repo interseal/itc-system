@@ -313,6 +313,52 @@ try:
     c, j = http(f'{STORE}/api/kosmos.php?a=report', {'ver': '0.3.4', 'bw': {'set': True, 'ok': True, 'at': '2026-11-14 11:00:00', 'err': '', 'n': 9, 'project': 'Авто', 'token': 'не должен сохраниться'}}, {'X-Kosmos-Token': tok})
     c, s, x = status(); check('№542: состояние сейфа Bitwarden видно руководителю (без лишних полей)', x.get('bw') == {'set': True, 'ok': True, 'at': '2026-11-14 11:00:00', 'err': '', 'n': 9, 'project': 'Авто'}, x.get('bw'))
     report(agent_money())
+
+    print('12. Сервер сам собирает и подписывает обновления (№545, сервер 0.3.7)')
+    import secrets as _sc
+    uk = _sc.token_hex(32); open(f'{ST}/api/upd_key.php', 'w').write(f"<?php define('UPD_KEY', '{uk}');\n")
+    c, j = http(f'{STORE}/api/kosmos.php?a=report', {'ver': '0.3.7', 'want_upd_key': True}, {'X-Kosmos-Token': tok})
+    check('сервер попросил — магазин отдал ключ обновлений (только своему серверу)', j.get('upd_key') == uk, list(j))
+    c, j = http(f'{STORE}/api/kosmos.php?a=report', {'ver': '0.3.7'}, {'X-Kosmos-Token': tok}); check('не просил — не отдаёт', 'upd_key' not in j, list(j))
+    R = os.path.dirname(ROOT); GD = f'{TMP}/git'; shutil.rmtree(GD, ignore_errors=True)
+    for d in ('kosmos', 'store/api', 'store/apps/kosmos', 'store/eco'): shutil.copytree(f'{R}/{d}', f'{GD}/{d}', ignore=shutil.ignore_patterns('tests', 'pdfjs', '*.png', '*.jpg'))
+    os.makedirs(f'{GD}/releases'); json.dump({'n': 9001, 'title': 'Проба сборки на сервере', 'what': ['страница навыков'], 'files': ['store/eco/skills.html'], 'kosmos': True}, open(f'{GD}/releases/9001.json', 'w'), ensure_ascii=False)
+    open(f'{TMP}/upd_key.php', 'w').write(f"<?php define('UPD_KEY', '{uk}');\n"); open(f'{TMP}/store_token', 'w').write(tok)
+    open(f'{TMP}/sign.pub', 'w').write('bpxDwrFCyrjCqBZF7hGEqLdfDYmxzHphsJtF1CNsc/k=\n')
+    ac = f'{TMP}/agent_rel.php'
+    open(ac, 'w').write(open(f'{TMP}/config.php').read().replace('];', f"  'store_url' => '{STORE}', 'store_token_file' => '{TMP}/store_token', 'git_dir' => '{GD}', 'upd_key_file' => '{TMP}/upd_key.php', 'own_sign_key' => '{TMP}/sign_own.pem',"
+        f" 'sign_pub_file' => '{TMP}/sign.pub', 'release_dir' => '{TMP}/rel', 'db_user' => '', 'agent_state' => '{TMP}/agent_state.json', 'git_key' => '{TMP}/nokey',\n];"))
+    aenv = dict(env, KOSMOS_CONFIG=ac, NO_PROXY='127.0.0.1,localhost')
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'release'], env=aenv, capture_output=True, text=True, timeout=180)
+    c, j = http(f'{STORE}/api/kosmos.php?a=upd_ready&t=boss-t', {})
+    it = (j.get('items') or [{}])[-1]
+    check('сервер собрал №9001 и отдал в магазин: «готово к установке»', r.returncode == 0 and it.get('n') == 9001 and it.get('title') == 'Проба сборки на сервере' and it.get('needs') == 9000, (r.stdout[-500:], r.stderr[-500:], j))
+    c, j = http(f'{STORE}/api/kosmos.php?a=upd_ready&t=mgr-t', {}); check('список — только руководителю', c == 403, c)
+    req = urllib.request.Request(f'{STORE}/api/kosmos.php?a=upd_get&n=9001&t=boss-t')
+    zb = urllib.request.urlopen(req, timeout=30).read()
+    import zipfile, io, hmac as _hm, tarfile, base64
+    z = zipfile.ZipFile(io.BytesIO(zb)); man = z.read('manifest.json'); names = z.namelist()
+    check('архив подписан ключом обновлений, внутри страница и пакет сервера', _hm.compare_digest(_hm.new(uk.encode(), man, hashlib.sha256).hexdigest(), z.read('sig.txt').decode().strip())
+          and 'store/eco/skills.html' in names and any(n.endswith('.tar.gz') for n in names), names)
+    pubs = open(f'{TMP}/sign.pub').read().split()
+    meta = json.loads(z.read(next(n for n in names if n.endswith('.json') and '/pkg/' in n)))
+    vr = subprocess.run(['php', '-r', 'foreach (array_slice($argv,1) as $p) if (sodium_crypto_sign_verify_detached(base64_decode(getenv("S")), getenv("M"), base64_decode($p))) { echo "ok"; exit; } echo "no";'] + pubs,
+                        env=dict(os.environ, S=meta['sig'], M='kosmos\n' + meta['ver'] + '\n' + meta['sha256']), capture_output=True, text=True)
+    check('пакет «Космоса» подписан своим ключом сервера, он в доверенных рядом с ключом ноутбука', len(pubs) == 2 and pubs[0].startswith('bpxD') and vr.stdout == 'ok' and os.stat(f'{TMP}/sign_own.pem').st_mode & 0o077 == 0, (pubs, vr.stdout))
+    n1 = len(os.listdir(f'{TMP}/rel'))
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'release'], env=aenv, capture_output=True, text=True, timeout=60)
+    check('повторно то же обновление не собирается', 'собрано' not in r.stdout and len(os.listdir(f'{TMP}/rel')) == n1, r.stdout[-200:])
+    c, j = http(f'{STORE}/api/kosmos.php?a=upd_put&n=9002', None, {'X-Kosmos-Token': tok})
+    req = urllib.request.Request(f'{STORE}/api/kosmos.php?a=upd_put&n=9001', data=zb.replace(b'Proba', b'Proba'), headers={'X-Kosmos-Token': 'alien' * 10}, method='POST')
+    try: urllib.request.urlopen(req, timeout=20); cc = 200
+    except urllib.error.HTTPError as e: cc = e.code
+    check('чужой сервер обновление подложить не может', cc == 403, cc)
+    bad = io.BytesIO(); zz = zipfile.ZipFile(bad, 'w'); zz.writestr('manifest.json', man.replace(b'9001', b'9003')); zz.writestr('sig.txt', z.read('sig.txt')); zz.close()
+    req = urllib.request.Request(f'{STORE}/api/kosmos.php?a=upd_put&n=9003', data=bad.getvalue(), headers={'X-Kosmos-Token': tok}, method='POST')
+    try: urllib.request.urlopen(req, timeout=20); cc = 200
+    except urllib.error.HTTPError as e: cc = e.code
+    check('архив с неверной подписью магазин не принимает', cc == 400, cc)
+    os.remove(f'{ST}/api/upd_key.php')
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

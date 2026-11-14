@@ -41,6 +41,18 @@ function ks_online($st) { return !empty($st['at']) && time() - (int)$st['at'] < 
    в минуту присылает его в отчёте. Руководитель один раз указывает остаток со страницы Billing на
    platform.claude.com — дальше отсюда вычитается расход. Ключи одного счёта (организации) тратят одни деньги,
    поэтому остаток — по счёту. Отметки остатка — claude_bal.json: {счёт: {amount_u, base: {id ключа: расход всего}, at, by}}. */
+/* №545 · обновления, собранные сервером «Космоса»: лежат в закрытой папке ready/, ставит руководитель одной кнопкой */
+function ks_upd_key() {
+  $f = __DIR__ . '/upd_key.php';
+  return is_file($f) && preg_match('~([0-9a-f]{64})~', (string)file_get_contents($f), $m) ? $m[1] : '';
+}
+function ks_ready_dir() { $d = ks_dir() . '/ready'; if (!is_dir($d)) @mkdir($d, 0700, true); return $d; }
+function ks_ready_list() {
+  $o = [];
+  foreach (glob(ks_ready_dir() . '/obnovlenie_*.json') ?: [] as $f) { $m = ks_json($f); if ((int)($m['n'] ?? 0) > 0 && is_file(ks_ready_dir() . '/obnovlenie_' . (int)$m['n'] . '.zip')) $o[] = $m; }
+  usort($o, function ($a, $b) { return (int)$a['n'] - (int)$b['n']; });
+  return $o;
+}
 function ks_money_clean($list) {
   $out = [];
   foreach (array_slice(is_array($list) ? $list : [], 0, 30) as $k) {
@@ -130,6 +142,36 @@ switch ($a) {
     ks_out($out);
   }
 
+  case 'upd_put': {                                  // №545 · сервер отдаёт собранное и подписанное обновление
+    ks_server();
+    $n = (int)($_GET['n'] ?? 0); $zip = (string)file_get_contents('php://input'); $uk = ks_upd_key();
+    if ($n < 1 || strlen($zip) < 100 || strlen($zip) > 60 * 1048576) ks_out(['ok' => false, 'error' => 'нет файла'], 400);
+    if ($uk === '') ks_out(['ok' => false, 'error' => 'в магазине нет ключа обновлений'], 500);
+    $tmp = tempnam(sys_get_temp_dir(), 'ksu'); file_put_contents($tmp, $zip);
+    $z = new ZipArchive(); if ($z->open($tmp) !== true) { @unlink($tmp); ks_out(['ok' => false, 'error' => 'это не архив'], 400); }
+    $man = (string)$z->getFromName('manifest.json'); $sig = trim((string)$z->getFromName('sig.txt')); $z->close();
+    $m = json_decode($man, true);
+    if (!is_array($m) || (int)($m['n'] ?? 0) !== $n || !hash_equals(hash_hmac('sha256', $man, $uk), $sig)) { @unlink($tmp); ks_out(['ok' => false, 'error' => 'подпись или номер не сходятся'], 400); }
+    $d = ks_ready_dir(); rename($tmp, "$d/obnovlenie_$n.zip"); @chmod("$d/obnovlenie_$n.zip", 0600);
+    ks_put("$d/obnovlenie_$n.json", ['n' => $n, 'needs' => (int)($m['needs'] ?? 0), 'title' => (string)($m['title'] ?? ''), 'what' => array_values(array_map('strval', (array)($m['what'] ?? []))), 'size' => strlen($zip), 'at' => time()]);
+    $all = ks_ready_list(); foreach (array_slice($all, 0, max(0, count($all) - 10)) as $old) { @unlink("$d/obnovlenie_{$old['n']}.zip"); @unlink("$d/obnovlenie_{$old['n']}.json"); }
+    ks_out(['ok' => true]);
+  }
+
+  case 'upd_ready': {                                // №545 · что сервер подготовил к установке (только руководитель)
+    $S = ks_staff(); if (!ks_boss($S)) ks_out(['ok' => false, 'error' => 'Только для руководителя'], 403);
+    $r = ks_json(ks_dir() . '/releases.json');
+    ks_out(['ok' => true, 'items' => ks_ready_list(), 'err' => (string)($r['last_err'] ?? '')]);
+  }
+
+  case 'upd_get': {
+    $S = ks_staff(); if (!ks_boss($S)) ks_out(['ok' => false, 'error' => 'Только для руководителя'], 403);
+    $n = (int)($_GET['n'] ?? 0); $f = ks_ready_dir() . "/obnovlenie_$n.zip";
+    if ($n < 1 || !is_file($f)) ks_out(['ok' => false, 'error' => 'Такого обновления нет'], 404);
+    header('Content-Type: application/zip'); header('Content-Length: ' . filesize($f)); header('Cache-Control: no-store');
+    header('Content-Disposition: attachment; filename="obnovlenie_' . $n . '.zip"'); readfile($f); exit;
+  }
+
   case 'claude_bal': {                               // №541 · руководитель указывает остаток на счёте Claude
     $S = ks_staff();
     if (!ks_boss($S)) ks_out(['ok' => false, 'error' => 'Только для руководителя'], 403);
@@ -212,7 +254,11 @@ switch ($a) {
     ks_put(ks_dir() . '/status.json', $st);
     // №533 · в ответ — ключ шлюза (им магазин спрашивает Claude от имени «Космоса») и адрес, по которому сервер раз в минуту будит фоновые задачи
     $g = ks_gw();
-    ks_out(['ok' => true, 'gw' => $g['gw'], 'cron' => ks_cron_url()]);
+    // №545 · сервер сам собирает обновления: ключ обновлений отдаём ему, пока он его не получил
+    $out = ['ok' => true, 'gw' => $g['gw'], 'cron' => ks_cron_url()];
+    if (!empty($b['want_upd_key']) && ($uk = ks_upd_key()) !== '') $out['upd_key'] = $uk;
+    if (is_array($b['releases'] ?? null)) ks_put(ks_dir() . '/releases.json', ['at' => time(), 'last_err' => mb_substr((string)($b['releases']['last_err'] ?? ''), 0, 300)]);
+    ks_out($out);
   }
 
   case 'backup': {                                   // ночная копия базы частями: ?day=ГГГГММДД&off=N&last=1

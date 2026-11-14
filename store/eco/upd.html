@@ -382,7 +382,7 @@ function load(){
   if (!T) { document.getElementById('cState').innerHTML = '<div class="err">Войдите в Экосистему как босс, затем откройте этот раздел снова.</div>'; return; }
   api('upd.php','upd_status').then(function(d){
     if (!d.ok) { document.getElementById('cState').innerHTML = '<div class="err">' + esc(d.error || 'Нет доступа') + '</div>'; document.getElementById('cUp').classList.add('hide'); document.getElementById('cHist').classList.add('hide'); return; }
-    ST = d; drawState(); drawCats(); drawHist(); yaDraw(); bkLoad(); srvLoad(); dsDraw(); sgLoad();
+    ST = d; drawState(); drawCats(); drawHist(); yaDraw(); bkLoad(); srvLoad(); dsDraw(); sgLoad(); rdLoad();
     document.getElementById('cSeed').classList.toggle('hide', !d.seed_left);
   });
 }
@@ -404,12 +404,38 @@ function drawState(){
     h += '<div class="mut">Гонконг: свободно ' + (inf.free_mb >= 1024 ? (inf.free_mb/1024).toFixed(1).replace('.', ',') + ' ГБ' : (inf.free_mb||0) + ' МБ') + ', нагрузка ' + String(inf.load||0).replace('.', ',') + (k.bk ? ' · копия данных ' + k.bk.slice(6,8) + '.' + k.bk.slice(4,6) + ' (' + mb(k.bk_size||0) + ')' : ' · копий данных пока нет') + (k.bk_gz ? ' · копия в Гуанчжоу ' + k.bk_gz.slice(6,8) + '.' + k.bk_gz.slice(4,6) : '') + '</div>';
   }
   /* №541 · сервер «Космоса» в Сингапуре и деньги Claude — свои данные из api/kosmos.php, отдельно от upd.php */
+  h += '<div id="rdBox"></div>';   // №545 · обновления, собранные сервером
   h += '<div id="sgBox">' + sgSafe() + '</div>';
   document.getElementById('cState').innerHTML = h;
+  try { rdDraw(); } catch (e) {}
 }
 
 /* ---------- №541 · Сингапур («Космос») и деньги Claude ----------
    Ошибка здесь не должна мешать остальной странице: всё в try/catch, данные — отдельным запросом. */
+/* №545 · сервер «Космоса» сам собирает и подписывает обновления — здесь они ждут установки одной кнопкой */
+var RD = null;
+function rdLoad(){
+  fetch('/api/kosmos.php?a=upd_ready&t=' + encodeURIComponent(T), {cache:'no-store'}).then(function(r){ return r.json(); })
+    .then(function(d){ RD = d; rdDraw(); }).catch(function(){});
+}
+function rdDraw(){
+  var b = document.getElementById('rdBox'); if (!b || !RD || !RD.ok) return;
+  var cur = (ST && ST.n) || 0, list = (RD.items || []).filter(function(x){ return x.n > cur; }), h = '';
+  if (list.length) {
+    var x = list[0], can = !x.needs || x.needs === cur;
+    h += '<div class="note" style="margin-top:12px"><b>Готово к установке: обновление №' + x.n + '</b> — ' + esc(x.title) + (x.what && x.what.length ? '<ul style="margin:6px 0 0 18px;padding:0">' + x.what.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '')
+      + (can ? '<button class="btn g" style="margin-top:10px;width:100%" onclick="rdInstall(' + x.n + ')">Установить №' + x.n + '</button>' : '<div class="mut">Сначала нужно обновление №' + x.needs + '.</div>')
+      + (list.length > 1 ? '<div class="mut">После него ждут: ' + list.slice(1).map(function(y){ return '№' + y.n; }).join(', ') + '</div>' : '') + '</div>';
+  }
+  if (RD.err) h += '<div class="err">Сервер не смог собрать обновление: ' + esc(RD.err) + '</div>';
+  b.innerHTML = h;
+}
+function rdInstall(n){
+  var b = document.getElementById('rdBox'); b.innerHTML = '<div class="mut">Беру обновление №' + n + ' с сервера…</div>';
+  fetch('/api/kosmos.php?a=upd_get&n=' + n + '&t=' + encodeURIComponent(T), {cache:'no-store'}).then(function(r){ if (!r.ok) throw new Error('код ' + r.status); return r.blob(); })
+    .then(function(bl){ var f = new File([bl], 'obnovlenie_' + n + '.zip', {type:'application/zip'}); var u = document.getElementById('cUp'); if (u) u.scrollIntoView({block:'start'}); upStart(f); })
+    .catch(function(e){ b.innerHTML = '<div class="err">Не получилось взять обновление: ' + esc(e.message) + '</div>'; });
+}
 var SG = null;
 function sgLoad(){
   fetch('/api/kosmos.php?a=status&t=' + encodeURIComponent(T), {cache:'no-store'}).then(function(r){ return r.json(); })

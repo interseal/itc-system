@@ -48,6 +48,10 @@ try:
         pg.reload(); pg.wait_for_function("document.getElementById('sgBox').innerText.indexOf('≈ $50,00') >= 0", timeout=10000)
         check('после перезагрузки страницы остаток тот же', '≈ $50,00' in pg.inner_text('#sgBox'))
         pg.screenshot(path=f'{OUT}/sg_2.png', full_page=True)
+        pg.route('**/api/kosmos.php?a=upd_ready*', lambda r: r.fulfill(status=200, content_type='application/json', body=json.dumps({'ok': True, 'err': '', 'items': [{'n': 99999, 'needs': 0, 'title': 'Проба с сервера', 'what': ['пункт один'], 'size': 1000, 'at': 1}]})))
+        pg.reload(); pg.wait_for_selector('text=Установить №99999')
+        check('№545: обновление, собранное сервером, — «Готово к установке» и одна кнопка', 'Готово к установке: обновление №99999' in pg.inner_text('#cState') and 'пункт один' in pg.inner_text('#cState'))
+        pg.unroute('**/api/kosmos.php?a=upd_ready*')
         check('ошибок на странице нет', not errs, errs)
         # сервер старый (расход не присылает) и сбой ответа — остальная страница работает
         def fake(route, body): route.fulfill(status=200, content_type='application/json', body=json.dumps(body))
