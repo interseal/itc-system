@@ -1,0 +1,23 @@
+{
+ "n": 564,
+ "needs": 561,
+ "title": "Всё накопившееся одним обновлением + новая страница «Обновления»",
+ "what": [
+  "Ставится сразу после №561. Внутри всё, что ждало (№565–572): Alex Trade — проверка стопов на истории, кнопки «Торговли» в меню, стеклянные шапки, «Работа ботов» без каши; баланс Selectel.",
+  "И новая страница «Обновления»: всегда одна кнопка «Установить» — она сама берёт то, что можно поставить сейчас, а устаревшее прячет."
+ ],
+ "files": [
+  "store/api/tdemo.php",
+  "store/api/tdemo_bt.php",
+  "store/apps/trade/app65.js",
+  "store/apps/trade/index.html",
+  "store/api/flow.php",
+  "store/api/kosmos_flow.php",
+  "store/eco/upd.html",
+  "store/apps/trade/app66.js",
+  "store/apps/trade/app67.js",
+  "store/apps/trade/app50.js",
+  "store/apps/trade/app68.js"
+ ],
+ "kosmos": false
+}
