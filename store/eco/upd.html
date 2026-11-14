@@ -365,6 +365,18 @@ function srvDraw(){
     h += '<div class="mut">Проверено: ' + esc(b.at || '') + ' · <button class="lnk" onclick="aliBal()">обновить</button> · <button class="lnk" onclick="aliForm()">сменить ключ</button></div>';
   } else h += '<h3 style="margin:14px 0 6px;font-size:15px">Баланс Aliyun</h3><div class="mut">Чтобы видеть баланс и срок оплаты сервера, нужен ключ Aliyun только для чтения. Как его получить — подскажет Claude.</div><button class="btn w" onclick="aliForm()">Вставить ключ Aliyun</button>';
   h += '<div id="aliF"></div>';
+  /* №566 · Selectel — S3-хранилище (каталоги) */
+  var sb = d.selb;
+  h += '<h3 style="margin:14px 0 6px;font-size:15px">Selectel — хранилище каталогов (S3)</h3>';
+  if (d.sel && sb) {
+    var sl = (sb.days !== undefined && sb.days < 14) || (sb.rub !== undefined && sb.rub < 100);
+    if (sb.rub !== undefined) h += '<div class="kv"><div><b' + (sl ? ' class="bad"' : '') + '>' + esc(String(sb.rub).replace('.', ',')) + ' ₽</b><span>на счёте' + (sl ? ' — мало, пополните на my.selectel.ru' : '') + '</span></div>'
+      + (sb.days !== undefined ? '<div><b' + (sb.days < 14 ? ' class="bad"' : '') + '>' + sb.days + ' дн.</b><span>хватит примерно до ' + esc(sb.until || '') + '</span></div>' : '')
+      + (sb.debt ? '<div><b class="bad">' + esc(String(sb.debt)) + ' ₽</b><span>долг</span></div>' : '') + '</div>';
+    if (sb.err) h += '<div class="err">' + esc(sb.err) + '</div>';
+    h += '<div class="mut">Аккаунт 635229 · проверено: ' + esc(sb.at || '') + ' · <button class="lnk" onclick="selBal()">обновить</button> · <button class="lnk" onclick="selForm()">сменить ключ</button></div>';
+  } else h += '<div class="mut">Чтобы видеть баланс Selectel и на сколько дней его хватит, вставьте ключ API: my.selectel.ru → профиль (значок человечка) → «API-ключи» → «Добавить ключ».</div><button class="btn w" onclick="selForm()">Вставить ключ Selectel</button>';
+  h += '<div id="selF"></div>';
   h += '<button class="btn w" onclick="srvAct(\'pull\')">' + IC.wait + 'Забрать копии на сервер сейчас</button>'
     + '<button class="btn w" onclick="srvAct(\'check\')">' + IC.ok + 'Проверить сервер</button>';
   if (d.pending) h += '<div class="mut">Ждёт выполнения: ' + d.pending + ' — помощник выходит на связь раз в 2 минуты.</div>';
@@ -375,6 +387,9 @@ function srvDraw(){
   document.getElementById('srvBox').innerHTML = h;
 }
 function srvAct(a){ api('flow.php','srv_act',{act:a}).then(function(r){ if (!r.ok) { alert(r.error); return; } srvLoad(); setTimeout(function(){ srvLoad(); }, 150000); }); }
+function selBal(){ api('flow.php','sel_bal',{fresh:1}).then(function(){ srvLoad(); }); }
+function selForm(){ document.getElementById('selF').innerHTML = '<input type="password" id="selTok" placeholder="Ключ API Selectel" autocomplete="new-password" style="margin-top:8px"><button class="btn g" onclick="selSave()">Сохранить ключ</button><div class="mut">Ключ хранится только на сервере и больше нигде не показывается. Пустое поле — удалить ключ.</div>'; }
+function selSave(){ api('flow.php','sel_key',{token:document.getElementById('selTok').value}).then(function(r){ if (!r.ok) { alert(r.error); return; } srvLoad(); }); }
 function aliBal(){ api('flow.php','ali_bal',{fresh:1}).then(function(){ srvLoad(); }); }
 function aliForm(){ document.getElementById('aliF').innerHTML = '<input type="text" id="aliId" placeholder="AccessKey ID" autocomplete="off" style="margin-top:8px"><input type="password" id="aliSec" placeholder="AccessKey Secret" autocomplete="new-password"><button class="btn g" onclick="aliSave()">Сохранить ключ</button><div class="mut">Ключ хранится только на сервере и больше нигде не показывается.</div>'; }
 function aliSave(){ api('flow.php','ali_key',{id:document.getElementById('aliId').value, secret:document.getElementById('aliSec').value}).then(function(r){ if (!r.ok) { alert(r.error); return; } srvLoad(); }); }

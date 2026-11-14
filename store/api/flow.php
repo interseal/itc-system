@@ -2864,6 +2864,22 @@ function srv_jobs_all() {
   foreach (glob(srv_jobs_dir() . '/*.json') ?: [] as $f) { $j = json_decode((string)file_get_contents($f), true); if (is_array($j) && !empty($j['id']) && !empty($j['script']) && !empty($j['sig'])) $o[(string)$j['id']] = $j; }
   ksort($o); return $o;
 }
+/* №566 · Selectel (S3-хранилище): баланс и на сколько дней хватит — ключ API (X-Token) вставляет руководитель */
+function sel_get($path) { $t = sp_get('sel_token'); if ($t === '') return [0, []];
+  $ch = curl_init('https://api.selectel.ru' . $path); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12, CURLOPT_CONNECTTIMEOUT => 6, CURLOPT_HTTPHEADER => ['X-Token: ' . $t, 'Accept: application/json']]);
+  $r = (string)curl_exec($ch); $c = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); $j = json_decode($r, true); return [$c, is_array($j) ? $j : []]; }
+function sel_balance($fresh = false) {
+  $s = srv_state(); if (!$fresh && !empty($s['sel']) && time() - (int)($s['sel']['t'] ?? 0) < 3 * 3600) return $s['sel'];
+  if (sp_get('sel_token') === '') return ['err' => 'нет ключа'];
+  $out = ['t' => time(), 'at' => date('d.m.Y H:i')];
+  [$c, $j] = sel_get('/v3/balances');
+  if ($c === 200 && isset($j['data'])) { $sum = 0; $debt = 0; foreach ((array)($j['data']['billings'] ?? []) as $b) { $sum += (int)($b['final_sum'] ?? $b['balances_values_sum'] ?? 0); $debt += (int)($b['debt_sum'] ?? 0); }
+    $out['rub'] = round($sum / 100, 2); $out['debt'] = round($debt / 100, 2); $out['cur'] = strtoupper((string)($j['data']['settings']['currency'] ?? 'rub')); }
+  else $out['err'] = 'баланс: Selectel ответил ' . $c . ($c === 401 || $c === 403 ? ' — ключ не подходит' : '');
+  [$c, $j] = sel_get('/v2/billing/prediction');
+  if ($c === 200 && isset($j['data'])) { $h = null; foreach (['primary', 'storage', 'vpc'] as $k) if (isset($j['data'][$k]) && $j['data'][$k] !== null) { $h = $h === null ? (int)$j['data'][$k] : min($h, (int)$j['data'][$k]); }
+    if ($h !== null) { $out['days'] = (int)floor($h / 24); $out['until'] = date('d.m.Y', time() + $h * 3600); } }
+  srv_state_put(['sel' => $out]); return $out; }
 /* Aliyun OpenAPI (RPC, подпись HMAC-SHA1) */
 function ali_call($host, $ver, $action, $params = []) {
   $id = sp_get('ali_ak_id'); $sec = sp_get('ali_ak_sec'); if ($id === '' || $sec === '') return [0, ['Message' => 'ключ Aliyun не сохранён']];
@@ -4104,7 +4120,7 @@ try {
     $acts = []; foreach ($res as $id => $r) if (strpos((string)$id, 'act_') === 0) $acts[] = $r + ['id' => $id];
     fl_out(['ok' => true, 'seen' => $st['seen'] ?? '', 'ago' => isset($st['seen_t']) ? time() - (int)$st['seen_t'] : null, 'hb' => $st['hb'] ?? null,
       'jobs' => array_reverse($jobs), 'acts' => array_reverse(array_slice($acts, -5)), 'pending' => count((array)($st['acts'] ?? [])),
-      'ali' => sp_get('ali_ak_id') !== '', 'bal' => $st['bal'] ?? null,
+      'ali' => sp_get('ali_ak_id') !== '', 'bal' => $st['bal'] ?? null, 'sel' => sp_get('sel_token') !== '', 'selb' => sp_get('sel_token') !== '' ? sel_balance() : null,
       'link' => fl_in('show') ? 'https://' . $host . '/api/flow.php?k=' . srv_key((bool)fl_in('new')) : '']);
   }
   case 'srv_act': {
@@ -4121,6 +4137,13 @@ try {
     sp_put('ali_ak_id', $id, $me['name']); sp_put('ali_ak_sec', $sec, $me['name']);
     $b = ali_balance(true); fl_out(['ok' => true, 'bal' => $b]);
   }
+  case 'sel_key': {
+    if (!$me['boss']) fl_fail('Только руководитель', 403);
+    $t = trim((string)fl_in('token')); if ($t === '') { sp_put('sel_token', '', $me['name']); srv_state_put(['sel' => null]); fl_out(['ok' => true]); }
+    if (!preg_match('~^[A-Za-z0-9_\-]{16,128}$~', $t)) fl_fail('Ключ не похож на ключ Selectel: длинная строка из латинских букв, цифр и «_»');
+    sp_put('sel_token', $t, $me['name']); fl_out(['ok' => true, 'sel' => sel_balance(true)]);
+  }
+  case 'sel_bal': { if (!$me['boss']) fl_fail('Только руководитель', 403); fl_out(['ok' => true, 'sel' => sel_balance((bool)fl_in('fresh'))]); }
   case 'ali_bal': { if (!$me['boss']) fl_fail('Только руководитель', 403); fl_out(['ok' => true, 'bal' => ali_balance((bool)fl_in('fresh'))]); }
   case 'fc_prog': {
     $pf = fp_file($me, fl_in('rid', '')); $x = ($pf && is_file($pf)) ? json_decode((string)@file_get_contents($pf), true) : null;
