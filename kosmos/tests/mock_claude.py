@@ -61,6 +61,18 @@ def plan(req, key):
         claude = 'Claude компании Anthropic' in sysx
         ans = json.dumps({'do': 'answer', 'say': f'Здравствуйте! Я {who}. На Claude: {"да" if claude else "нет"}. Ключ …{key[-4:]}. Вопрос: {text[-40:]}'}, ensure_ascii=False)
         # №538: навыки — решил в 2 шага и записал способ; повторно — делает по навыку из правил
+        # №550: комплексное КП из нескольких поставщиков и разработчик (только руководителю)
+        if 'Проверка комплексного КП' in text:
+            if 'РЕЗУЛЬТАТ make_kp' not in text:
+                return [{'type': 'text', 'text': json.dumps({'tool': 'make_kp', 'args': {'sups': [{'sup': 'SolarOne', 'section': 'Солнечные панели'}, {'sup': 'BattCo', 'section': 'Аккумуляторы'}, {'sup': 'InvMax', 'section': 'Инверторы'}],
+                    'kind': 'full', 'formats': ['xlsx'], 'client': 'Отель Тест'}}, ensure_ascii=False)}], 'end_turn'
+            return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': 'КП: ' + text.split('РЕЗУЛЬТАТ make_kp', 1)[1][:500]}, ensure_ascii=False)}], 'end_turn'
+        if 'Проверка разработки' in text:
+            if 'ПОРУЧИТЬ РАЗРАБОТКУ' not in sysx:
+                return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': 'Разработки в моих инструментах нет.'}, ensure_ascii=False)}], 'end_turn'
+            if 'РЕЗУЛЬТАТ develop' not in text:
+                return [{'type': 'text', 'text': json.dumps({'tool': 'develop', 'args': {'task': 'Добавь на страницу обновлений кнопку проверки связи с сервером'}}, ensure_ascii=False)}], 'end_turn'
+            return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': 'Разработка: ' + text.split('РЕЗУЛЬТАТ develop', 1)[1][:400]}, ensure_ascii=False)}], 'end_turn'
         if 'Проверка навыка повторно' in text:
             mm = re.search(r'№(\d+)\. КП для гостиницы', sysx)
             if mm:

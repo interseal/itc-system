@@ -359,6 +359,24 @@ try:
     except urllib.error.HTTPError as e: cc = e.code
     check('архив с неверной подписью магазин не принимает', cc == 400, cc)
     os.remove(f'{ST}/api/upd_key.php')
+    print('13. Комплексное КП из нескольких поставщиков и разработчик для руководителя (№550)')
+    q1("DROP TABLE IF EXISTS itc_sup; CREATE TABLE itc_sup (id VARCHAR(40) PRIMARY KEY, name VARCHAR(200), full_name VARCHAR(300) NOT NULL DEFAULT '', deleted TINYINT NOT NULL DEFAULT 0, seg VARCHAR(40) NOT NULL DEFAULT '', city VARCHAR(100) NOT NULL DEFAULT '', products TEXT, facts TEXT, what TEXT); "
+       "INSERT INTO itc_sup (id,name,city,products,facts,what) VALUES ('s1','SolarOne','Нинбо','[\"Панель 550 Вт\",\"Панель 600 Вт\"]','[\"20 лет на рынке\"]','солнечные панели'),"
+       "('s2','BattCo','Шэньчжэнь','[\"LiFePO4 5 кВт·ч\"]','[]','аккумуляторы'),('s3','InvMax','Ханчжоу','[\"Инвертор 5 кВт\",\"Инвертор 10 кВт\"]','[]','инверторы')")
+    c, j = kf('fc_cmd', data={'text': 'Проверка комплексного КП: панели, батареи и инверторы для отеля', 'conv': 'new'})
+    say = j.get('say', '')
+    check('одно КП из трёх поставщиков разделами (панели + аккумуляторы + инверторы)', c == 200 and 'Солнечные панели' in say and 'Инверторы' in say and '"поставщиков":3' in say.replace(' ', '') and '"моделей":5' in say.replace(' ', ''), j)
+    kid = q1("SELECT id FROM itc_fil_kp ORDER BY created_at DESC LIMIT 1")
+    xl = glob.glob(f'{ST}/uploads/**/{kid}.xlsx', recursive=True)
+    import zipfile
+    sheet = zipfile.ZipFile(xl[0]).read('xl/worksheets/sheet1.xml').decode() if xl else ''
+    check('в Excel все разделы и модели всех поставщиков', 'Солнечные панели — SolarOne' in sheet and 'Аккумуляторы — BattCo' in sheet and 'Инвертор 10 кВт' in sheet, (kid, xl, sheet[:300]))
+    c, j = kf('fc_cmd', 'mgr-t', {'text': 'Проверка разработки: добавь кнопку', 'conv': 'new'})
+    check('сотруднику разработка недоступна (всё остальное — как было)', c == 200 and 'Разработки в моих инструментах нет' in j.get('say', ''), j)
+    c, j = kf('fc_cmd', data={'text': 'Проверка разработки: добавь кнопку', 'conv': 'new'})
+    sayd = j.get('say', '')
+    con = sqlite3.connect(f'{TMP}/kosmos.sqlite'); row = con.execute("SELECT engine, text, phone FROM dev_tasks ORDER BY id DESC LIMIT 1").fetchone(); con.close()
+    check('руководителю: поручение ушло на сервер «Космоса» (у «Космоса» — Claude)', c == 200 and 'поручение №' in sayd and 'Космос-разработчик' in sayd and row and row[0] == 'claude' and 'кнопку проверки связи' in row[1] and row[2].startswith('магазин'), (sayd, row))
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

@@ -237,6 +237,7 @@ function kp_make($me, $a) {
   kp_ensure();
   $kind = (string)($a['kind'] ?? '');
   if ($kind !== 'coop' && $kind !== 'full') return 'Не указан вид КП. Спроси сотрудника (do=ask): «Сделать КП на сотрудничество (о заводе, линейки товаров с фото, без цен) или полный каталог всех моделей, чтобы клиент выбрал?»';
+  if (is_array($a['sups'] ?? null) && $a['sups']) return kp_make_multi($me, $a, $kind);   // №550 · комплексное КП
   $sups = kp_find_sup($a['sup'] ?? ''); if (!$sups) return 'Не нашёл поставщика «' . ($a['sup'] ?? '') . '» — найди его через suppliers и передай id';
   if (count($sups) > 1) return ['несколько похожих поставщиков — уточни или передай id' => array_map(function ($s) { return ['id' => $s['id'], 'название' => $s['name'], 'город' => $s['city']]; }, $sups)];
   $sup = $sups[0]; $d = kp_collect($sup, $kind);
@@ -254,6 +255,41 @@ function kp_make($me, $a) {
   $GLOBALS['KP_MADE'][] = ['id' => $id, 't' => $nice];
   return ['готово' => $nice, 'вид' => $kind === 'full' ? 'полный каталог' : 'на сотрудничество', 'от компании' => $co['short'], 'моделей' => $d['items'], 'файлы' => $fm,
     'как выдать' => 'файлы уже прикреплены к твоему ответу кнопками — просто скажи, что КП готово; ссылки не придумывай'];
+}
+/* №550 · КОМПЛЕКСНОЕ КП: несколько поставщиков — разделами одного предложения (например, солнечные панели + батареи + инверторы) */
+function kp_make_multi($me, $a, $kind) {
+  $parts = []; $ids = [];
+  foreach (array_slice((array)$a['sups'], 0, 8) as $x) {
+    $q = is_array($x) ? ($x['sup'] ?? '') : $x; $sec = is_array($x) ? trim((string)($x['section'] ?? '')) : '';
+    $f = kp_find_sup($q); if (!$f) return 'Не нашёл поставщика «' . $q . '» — найди его через suppliers и передай id';
+    if (count($f) > 1) return ['для «' . $q . '» несколько похожих поставщиков — передай id' => array_map(function ($s) { return ['id' => $s['id'], 'название' => $s['name'], 'город' => $s['city']]; }, array_slice($f, 0, 6))];
+    $sup = $f[0]; $ids[] = $sup['id']; $d = kp_collect($sup, $kind);
+    $parts[] = ['sec' => $sec !== '' ? $sec : ($d['seg'] ?: $d['brand']), 'd' => $d];
+  }
+  $title = mb_substr(trim((string)($a['title'] ?? '')), 0, 200);
+  $secs = array_map(function ($p) { return $p['sec']; }, $parts);
+  $groups = []; $facts = []; $hero = '';
+  foreach ($parts as $p) {
+    if ($hero === '' && $p['d']['hero'] !== '') $hero = $p['d']['hero'];
+    foreach ($p['d']['groups'] as $g) { $g['name'] = $p['sec'] . ' — ' . $p['d']['brand'] . ($g['name'] !== '' && $g['name'] !== $p['sec'] ? ' · ' . $g['name'] : ''); $groups[] = $g; }
+    foreach (array_slice($p['d']['facts'], 0, 3) as $fct) $facts[] = $p['sec'] . ': ' . $fct;
+  }
+  $d = ['brand' => $title ?: 'комплексная поставка', 'seg' => '', 'city' => '', 'h1' => $title ?: 'Комплексная поставка: ' . implode(', ', $secs),
+        'lead' => 'В одном предложении — ' . implode(', ', $secs) . '. Каждая позиция — напрямую с завода-производителя, подбор совместимых решений и одна поставка.',
+        'about' => '', 'hero' => $hero, 'stats' => [], 'facts' => array_slice($facts, 0, 12), 'awards' => [], 'projects' => [], 'groups' => $groups,
+        'items' => array_sum(array_map(function ($g) { return count($g['items']); }, $groups))];
+  $fm = array_values(array_intersect(['pdf', 'xlsx'], array_map('strtolower', (array)($a['formats'] ?? ['pdf', 'xlsx'])))); if (!$fm) $fm = ['pdf', 'xlsx'];
+  $client = mb_substr(trim((string)($a['client'] ?? '')), 0, 200); $co = kp_company($a['company'] ?? '');
+  $id = 'kp' . bin2hex(random_bytes(6));
+  try {
+    if (in_array('pdf', $fm, true)) file_put_contents(kp_dir() . "/$id.pdf", kp_pdf($d, $co, $kind, $client, $title));
+    if (in_array('xlsx', $fm, true)) file_put_contents(kp_dir() . "/$id.xlsx", kp_xlsx($d, $co, $kind, $client, $title));
+  } catch (Throwable $e) { return 'Не получилось собрать файл: ' . $e->getMessage(); }
+  $nice = 'КП ' . ($title ?: implode(' + ', $secs));
+  db()->prepare('INSERT INTO itc_fil_kp (id,phone,title,kind,sup_id,client,files,items) VALUES (?,?,?,?,?,?,?,?)')->execute([$id, $me['phone'], mb_substr($nice, 0, 190), $kind, $ids[0], $client, implode(',', $fm), $d['items']]);
+  $GLOBALS['KP_MADE'][] = ['id' => $id, 't' => $nice];
+  return ['готово' => $nice, 'разделы' => $secs, 'поставщиков' => count($parts), 'моделей' => $d['items'], 'от компании' => $co['short'],
+          'как выдать' => 'файлы уже прикреплены к твоему ответу кнопками — просто скажи, что комплексное КП готово'];
 }
 /* кнопки КП в тексте ответа: [[kp:id|название]] */
 function kp_marks() { $o = ''; foreach ((array)($GLOBALS['KP_MADE'] ?? []) as $k) $o .= "\n[[kp:" . $k['id'] . '|' . str_replace([']', '|'], '', $k['t']) . ']]'; return $o; }

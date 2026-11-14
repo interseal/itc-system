@@ -668,6 +668,11 @@ function a_git_env(string $key): string {
   return 'GIT_SSH_COMMAND=' . escapeshellarg('ssh -i ' . $key . ' -o IdentitiesOnly=yes -o UserKnownHostsFile=' . $kh . ' -o StrictHostKeyChecking=yes') . ' ';
 }
 function a_sh(string $cmd, ?int &$rc = null): string { $o = []; exec($cmd . ' 2>&1', $o, $rc); return implode("\n", $o); }
+/* цена DeepSeek (агент не подключает lib/dev.php — те же числа, что DEV_DS_PRICE) */
+function dev_ds_cost_a(array $u): float {
+  $in = (int)($u['input_tokens'] ?? 0) + (int)($u['cache_creation_input_tokens'] ?? 0); $c = (int)($u['cache_read_input_tokens'] ?? 0); $o = (int)($u['output_tokens'] ?? 0);
+  return round(($in * 0.6 + $c * 0.06 + $o * 2.4) / 1000000, 4);
+}
 function a_devrun(): bool {
   global $C;
   $h = fopen(sys_get_temp_dir() . '/kosmos-dev.lock', 'c');
@@ -697,12 +702,17 @@ function a_devrun(): bool {
   $cmd = ['timeout', (string)(int)$C['dev_timeout'], 'runuser', '-u', $u, '--', (string)$C['claude_bin'], '-p', (string)$t['text'], '--output-format', 'json', '--model', $model,
           '--max-budget-usd', (string)$j['budget'], '--permission-mode', 'acceptEdits', '--permission-prompts', 'none',
           '--allowedTools', 'Bash,Read,Edit,Write,Glob,Grep,WebFetch,WebSearch,Agent,TodoWrite', '--append-system-prompt', $rules];
+  $ds = (string)($j['engine'] ?? 'claude') === 'deepseek';
+  if ($ds) { $model = 'claude-opus-5-5'; $res['branch'] = 'fil/' . $id; a_sh("git -C $q checkout -q -B " . escapeshellarg($res['branch'])); a_sh('chown -R ' . escapeshellarg($u) . ': ' . $q);
+    $cmd[array_search('--model', $cmd, true) + 1] = $model;
+    $cmd[array_search('--max-budget-usd', $cmd, true) + 1] = (string)round((float)$j['budget'] * 8, 2); }   // Claude Code считает по ценам Claude, DeepSeek примерно в 8 раз дешевле   // у DeepSeek имена claude-opus* ведут на deepseek-v4-pro
   $env = ['HOME' => '/home/' . $u, 'PATH' => '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'ANTHROPIC_API_KEY' => (string)$j['key'], 'LANG' => 'C.UTF-8'];
-  if ((string)($j['ws'] ?? '') !== '') $env['ANTHROPIC_CUSTOM_HEADERS'] = 'anthropic-workspace-id: ' . $j['ws'];
+  if ($ds) { $env['ANTHROPIC_BASE_URL'] = (string)($C['ds_base'] ?? 'https://api.deepseek.com/anthropic'); $env['DISABLE_TELEMETRY'] = '1'; $env['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'] = '1'; }
+  elseif ((string)($j['ws'] ?? '') !== '') $env['ANTHROPIC_CUSTOM_HEADERS'] = 'anthropic-workspace-id: ' . $j['ws'];
   $p = proc_open($cmd, [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $dev, $env);
   $out = stream_get_contents($pipes[1]); $err = stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]); $rc = proc_close($p);
   $r = json_decode((string)$out, true);
-  $res['cost'] = is_array($r) ? (float)($r['total_cost_usd'] ?? 0) : 0;
+  $res['cost'] = is_array($r) ? ($ds ? dev_ds_cost_a((array)($r['usage'] ?? [])) : (float)($r['total_cost_usd'] ?? 0)) : 0;
   $res['result'] = is_array($r) ? (string)($r['result'] ?? '') : '';
   if (!is_array($r)) { $res['error'] = 'Claude Code не ответил (' . $rc . '): ' . mb_substr(str_replace((string)$j['key'], '…', trim($err . ' ' . $out)), -400); $finish($res); return false; }
   // проверки: что изменилось, нет ли ключей, синтаксис, проверки «Космоса»
@@ -711,7 +721,7 @@ function a_devrun(): bool {
   if (!$changed) { $res['status'] = !empty($r['is_error']) ? 'failed' : 'done'; if (!empty($r['is_error'])) $res['error'] = 'Claude Code остановился с ошибкой'; $finish($res); return true; }
   $checks = [];
   $diff = a_sh("git -C $q add -A && git -C $q diff --cached");
-  if (preg_match('~sk-ant-[A-Za-z0-9_\-]{20,}|BEGIN [A-Z ]*PRIVATE KEY|define\(\s*.UPD_KEY~', $diff)) { $res['error'] = 'в правках найден ключ — ничего не записано'; a_sh("git -C $q reset -q --hard"); $finish($res); return false; }
+  if (preg_match('~sk-ant-[A-Za-z0-9_\-]{20,}|\bsk-[a-f0-9]{32}\b|BEGIN [A-Z ]*PRIVATE KEY|define\(\s*.UPD_KEY~', $diff)) { $res['error'] = 'в правках найден ключ — ничего не записано'; a_sh("git -C $q reset -q --hard"); $finish($res); return false; }
   $ok = true;
   foreach ($changed as $f) {
     if (!is_file("$dev/$f")) continue;
@@ -723,7 +733,7 @@ function a_devrun(): bool {
     $checks[] = 'проверки сервера: ' . trim(preg_replace('~\s+~', ' ', $o)); if ($c !== 0 || stripos($o, 'не прошло') === false || !preg_match('~\b0 не прошло~u', $o)) $ok = false;
   }
   $res['checks'] = $checks ? implode('; ', $checks) : 'синтаксис в порядке (' . count($changed) . ' файлов)';
-  a_sh("git -C $q -c user.name='Космос-разработчик' -c user.email=kosmos@itcpartner.store commit -q -m " . escapeshellarg('Космос-разработчик, поручение №' . $id . ': ' . mb_substr((string)$t['text'], 0, 120)));
+  a_sh("git -C $q -c user.name=" . escapeshellarg($ds ? 'Фил-разработчик' : 'Космос-разработчик') . " -c user.email=kosmos@itcpartner.store commit -q -m " . escapeshellarg(($ds ? 'Фил-разработчик' : 'Космос-разработчик') . ', поручение №' . $id . ': ' . mb_substr((string)$t['text'], 0, 120)));
   $res['commit'] = trim(a_sh("git -C $q rev-parse --short HEAD"));
   if ($wk === '') { $res['error'] = 'нет ключа записи'; $finish($res); return false; }
   a_sh(a_git_env($wk) . "git -C $q push -q -f origin " . escapeshellarg($res['branch']), $prc);

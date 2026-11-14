@@ -711,7 +711,7 @@ function setDev(){
       + '<div class="row" style="margin-top:6px"><select class="inp" id="devModel">' + Object.keys(d.models).map(function(k){ return '<option value="' + k + '">' + esc(d.models[k]) + '</option>'; }).join('') + '</select><button class="btn" onclick="devAdd()">Поручить</button></div>';
     h += '<h4 style="margin:16px 0 8px">Поручения</h4>' + (d.tasks.length ? d.tasks.map(function(t){
       return '<div class="card"><div class="kh"><b>№' + t.id + '</b><span class="tag' + (t.status === 'done' ? ' ok' : (/fail/.test(t.status) ? ' err' : '')) + '">' + (DEV_ST[t.status] || t.status) + '</span>' + (t.cost ? '<span class="tag">$' + t.cost.toFixed(2) + '</span>' : '') + (t.release_n ? '<span class="tag ok">обновление №' + t.release_n + '</span>' : '') + '</div>'
-        + '<div class="ks">' + esc(t.text) + '</div>' + (t.result ? '<div style="white-space:pre-wrap;margin-top:6px">' + esc(t.result) + '</div>' : '')
+        + (t.engine === 'deepseek' ? '<div style="font-size:12px;color:var(--sub)">Фил-разработчик (DeepSeek), поручение из магазина</div>' : '') + '<div class="ks">' + esc(t.text) + '</div>' + (t.result ? '<div style="white-space:pre-wrap;margin-top:6px">' + esc(t.result) + '</div>' : '')
         + (t.checks ? '<div class="ks">Проверки: ' + esc(t.checks) + '</div>' : '') + (t.error ? '<div class="note">' + esc(t.error) + '</div>' : '')
         + (t.status === 'queued' ? '<button class="btn red sm" onclick="devCancel(' + t.id + ')">Отменить</button>' : '') + '</div>'; }).join('') : '<p class="note">Поручений пока нет.</p>');
     $('setBody').innerHTML = h;

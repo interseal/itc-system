@@ -441,6 +441,7 @@ try:
     O = f'{TMP}/origin.git'; W = f'{TMP}/seed'
     subprocess.run(f'rm -rf {O} {W} {TMP}/itcdev && git init -q --bare -b main {O} && git init -q -b main {W} && mkdir -p {W}/releases {W}/store {W}/kosmos/dev && echo "<?php echo 1;" > {W}/store/a.php && echo x > {W}/releases/README.md && echo "Правила" > {W}/kosmos/dev/RULES.md'
                    f' && cd {W} && git add -A && git -c user.name=t -c user.email=t@t commit -qm init && git push -q {O} main', shell=True, check=True)
+    _sh.copy(f'{ROOT}/tests/fake_claude.py', '/tmp/fake_claude.py'); os.chmod('/tmp/fake_claude.py', 0o755)
     dc = f'{TMP}/agent_dev.php'
     open(dc, 'w').write(CONF.replace("];", f"  'git_repo' => '{O}', 'git_key' => '{TMP}/gitkey', 'dev_dir' => '{TMP}/itcdev', 'dev_key' => '{TMP}/devkey', 'claude_bin' => '/tmp/fake_claude.py', 'dev_user' => 'kosmosdev', 'db_user' => '', 'agent_state' => '{TMP}/agent_state.json',\n];"))
     denv = dict(env, KOSMOS_CONFIG=dc)
@@ -463,6 +464,23 @@ try:
     c, j = call('dev', B); t3 = next(x for x in j['tasks'] if x['id'] == tid3)
     br = subprocess.run(f'git --git-dir={O} branch', shell=True, capture_output=True, text=True).stdout
     check('ключ в правках — ничего не записано в GitHub', t3['status'] == 'failed' and 'ключ' in t3['error'] and f'kosmos/{tid3}' not in br, (t3, br))
+    print('18. Фил-разработчик на DeepSeek, поручение из магазина (0.4.0)')
+    c, j = gw({'a': 'dev', 'op': 'add', 'engine': 'deepseek', 'key': 'nope', 'text': 'Сделай страницу на DeepSeek и выпусти обновление'}, key='ab' * 32)
+    check('шлюз: без настоящего ключа DeepSeek поручение не принимается', c == 400, (c, j))
+    DK = 'sk-' + 'a1' * 16
+    c, j = gw({'a': 'dev', 'op': 'add', 'engine': 'deepseek', 'key': DK, 'who': '+996', 'text': 'Сделай страницу на DeepSeek и выпусти обновление'}, key='ab' * 32); tid4 = j.get('id')
+    check('шлюз: поручение Фила принято, виден расход и лимит', c == 200 and tid4 and 'limit' in j, (c, j))
+    c, j = gw({'a': 'dev', 'op': 'add', 'text': 'Без ключа шлюза нельзя'}, key='cd' * 32); check('шлюз: чужой ключ — отказ', c == 403, (c, j))
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'devrun'], env=denv, capture_output=True, text=True, timeout=120)
+    c, j = call('dev', B); t4 = next(x for x in j['tasks'] if x['id'] == tid4); fa = json.load(open('/tmp/fake_claude_args.json'))
+    lg = subprocess.run(f'git --git-dir={O} log --oneline main', shell=True, capture_output=True, text=True).stdout
+    check('Фил работает через DeepSeek: адрес DeepSeek, его ключ, имя opus (у DeepSeek → v4-pro)', fa['base'] == 'https://api.deepseek.com/anthropic' and fa['keyval'] == 'sk-' and fa['model'] == 'claude-opus-5-5', (fa, r.stdout[-500:], r.stderr[-500:]))
+    check('расход посчитан по ценам DeepSeek, а не Claude; бюджет пересчитан', t4['cost'] == 0.84 and float(fa['budget']) > 20, (t4, fa))
+    check('обновление Фила в главной ветке, ветка fil/N, подпись «Фил-разработчик»', t4['engine'] == 'deepseek' and t4['merged'] == 1 and t4['release_n'] == 9101 and t4['branch'] == f'fil/{tid4}' and 'Фил-разработчик' in lg, (t4, lg))
+    c, j = gw({'a': 'dev', 'op': 'list'}, key='ab' * 32)
+    check('шлюз: список поручений для Фила', c == 200 and any(x['id'] == tid4 for x in j['tasks']), j)
+    _c = sqlite3.connect(f'{TMP}/kosmos.sqlite'); db_ds = (_c.execute("SELECT v FROM settings WHERE k='ds_key'").fetchone() or [''])[0]; _c.close()
+    check('ключ DeepSeek хранится зашифрованным', db_ds.strip() and DK not in db_ds, db_ds)
     c, j = call('dev_limit', B, {'limit': '2'}); c, j = call('dev_add', B, {'text': 'Ещё одно поручение на сегодня', 'model': 'opus'})
     check('лимит расходов в день — поручение не принимается', c == 400 and 'Лимит' in j.get('error', ''), j)
     c, j = call('dev', B); check('ключ записи в GitHub создан и показан руководителю', j['state'].get('pub', '').startswith('ssh-ed25519'), j['state'])
