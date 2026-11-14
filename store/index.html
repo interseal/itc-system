@@ -17895,7 +17895,8 @@ try{var _sa=JSON.parse(localStorage.getItem("itc_auth")||"null");if(_sa&&_sa.tok
       +'<button class="ag-b w" data-action="loginrole" data-v="itc">Войти как сотрудник</button></div>';
     return top+tx(false)+_lv();
   };
-  S.showGate=true; S.loginStep="role";
+  /* №585 · первый запуск — сразу ввод номера (как на втором экране); выбор «Войти / Войти как сотрудник» — по «← другой вход» */
+  S.showGate=true; S.loginRole=(["fil","kosmos","crm","trade","sklad"].indexOf(X[1])>=0)?"itc":"buyer"; S.loginStep="phone"; S.loginPhone="";
   var sp=document.getElementById("splash"); if(sp) setTimeout(function(){try{sp.style.display="none"}catch(e){}},400);
 }catch(e){}})();
 try{var _c=JSON.parse(localStorage.getItem("itc_cart")||"null");if(_c&&_c.length)S.cart=_c;}catch(e){}

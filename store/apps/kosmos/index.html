@@ -321,15 +321,22 @@ html.fil-talk .hd .snd-t{background:#e5484d}
   }
   /* ===== №272 · приветствие по имени и отчеству и «Что умеет Космос» (рассказ голосом) ===== */
   var IO = '', ROLE = '', ISBOSS = false;
-  function helloText(){ var h = new Date().getHours(); var g = h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер'; return g + (IO ? ', ' + IO : '') + '!'; }
+  /* №585 · здоровается ОДИН раз в день (руководитель: «поздоровался утром — днём уже не здоровается»).
+     Утро — «Доброе утро», день — «Добрый день» или «Приветствую» (чередуем по дням), вечер — «Добрый вечер». */
+  var HKEY = 'kosmos_hello_day', DAY = new Date().toLocaleDateString('ru-RU');
+  function helloDone(){ try { return localStorage.getItem(HKEY) === DAY; } catch(e){ return false; } }
+  function helloMark(){ try { localStorage.setItem(HKEY, DAY); } catch(e){} }
+  function helloWord(){ var d = new Date(), h = d.getHours(); return h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? (d.getDate() % 2 ? 'Добрый день' : 'Приветствую') : 'Добрый вечер'; }
+  function helloText(){ if (helloDone()) return ''; return helloWord() + (IO ? ', ' + IO : '') + '!'; }
   function helloLoad(hasHist){
     api('fil_hello', {}).then(function(r){
       if (!r || !r.ok) return; IO = String(r.io || '').trim(); ROLE = r.role || ''; ISBOSS = !!r.boss;
       var hb = document.querySelector('#hint b'); var g = helloText();
-      if (hb) hb.textContent = g + ' Я Космос'; else if (hasHist) add('fil', g + ' Чем помочь?');
-      var k = 'ks_hello_' + new Date().toISOString().slice(0, 10);
-      var said = false; try { said = localStorage.getItem(k) === '1'; localStorage.setItem(k, '1'); } catch(e){}
-      if (!said) setTimeout(function(){ FilVoice.say(g + ' Чем помочь?', VOICE); }, 600);
+      if (hb) hb.textContent = (g ? g + ' ' : '') + 'Я Космос';
+      if (!g) return;                       // сегодня уже здоровался — молчим
+      helloMark();
+      if (!hb && hasHist) add('fil', g + ' Чем помочь?');
+      setTimeout(function(){ FilVoice.say(g + ' Чем помочь?', VOICE); }, 600);
     }).catch(function(){});
   }
   /* разделы: b — только руководителю; s — только руководителю и бухгалтерии */
