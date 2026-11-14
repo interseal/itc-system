@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 const MEDIA_MAX_IN = 40 * 1048576;    // входной файл — до 40 МБ
 const MEDIA_MAX_OUT = 30 * 1048576;   // всё, что отдаём обратно, — до 30 МБ
+const MEDIA_MAX_URL = 500 * 1048576;  // 0.4.6 · по ссылке магазина — до 500 МБ   // всё, что отдаём обратно, — до 30 МБ
 const MEDIA_OPS = ['pdf_images', 'pdf_pages', 'pdf_text', 'img', 'video_frames', 'video_small', 'video_cut', 'info', 'convert'];
 // 0.4.5 · convert — «прочитать что угодно»: фото любого формата (TIFF, HEIC, BMP, GIF, SVG…) → JPEG; Word/Excel/PowerPoint/RTF/ODT
 // и старые .doc/.xls/.ppt → PDF + текст (LibreOffice); PDF → текст; видео/звук → сведения и кадр
@@ -29,13 +30,24 @@ function gw_media(array $in): void {
   $op = (string)($in['op'] ?? '');
   if ($op === 'tools') jout(['ok' => true, 'tools' => media_tools(), 'ops' => MEDIA_OPS]);
   if (!in_array($op, MEDIA_OPS, true)) fail('Неизвестное действие с файлом. Есть: ' . implode(', ', MEDIA_OPS));
-  $bin = base64_decode((string)($in['data'] ?? ''), true);
-  if ($bin === false || $bin === '') fail('Нет файла');
-  if (strlen($bin) > MEDIA_MAX_IN) fail('Файл больше 40 МБ');
   $name = preg_replace('~[^\p{L}\p{N}._ -]~u', '', (string)($in['name'] ?? 'file')) ?: 'file';
   $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
   $tmp = sys_get_temp_dir() . '/kmedia-' . bin2hex(random_bytes(6)); mkdir("$tmp/out", 0700, true);
-  $src = "$tmp/in." . (preg_match('~^[a-z0-9]{1,5}$~', $ext) ? $ext : 'bin'); file_put_contents($src, $bin);
+  $src = "$tmp/in." . (preg_match('~^[a-z0-9]{1,5}$~', $ext) ? $ext : 'bin');
+  $url = (string)($in['url'] ?? '');
+  if ($url !== '') {   // 0.4.6 · большой файл (до 500 МБ) — забираем сами по разовой ссылке магазина
+    if (!preg_match('~^https://([a-z0-9-]+\.)*itcpartner\.store/api/flow\.php\?action=ff_dl&~', $url)) { media_rm($tmp); fail('Ссылка не с нашего магазина'); }
+    $fh = fopen($src, 'wb'); $ch = curl_init($url);
+    curl_setopt_array($ch, [CURLOPT_FILE => $fh, CURLOPT_TIMEOUT => 1200, CURLOPT_CONNECTTIMEOUT => 15, CURLOPT_FOLLOWLOCATION => false, CURLOPT_NOPROGRESS => false,
+      CURLOPT_PROGRESSFUNCTION => function ($c, $dt, $d) { return $d > MEDIA_MAX_URL ? 1 : 0; }]);
+    curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); fclose($fh);
+    if ($code !== 200 || !is_file($src) || filesize($src) < 1) { media_rm($tmp); fail('Не удалось забрать файл из магазина (' . $code . ')'); }
+  } else {
+    $bin = base64_decode((string)($in['data'] ?? ''), true);
+    if ($bin === false || $bin === '') { media_rm($tmp); fail('Нет файла'); }
+    if (strlen($bin) > MEDIA_MAX_IN) { media_rm($tmp); fail('Файл больше 40 МБ'); }
+    file_put_contents($src, $bin); unset($bin);
+  }
   try { $r = media_do($op, $src, "$tmp/out", $in); }
   catch (Throwable $e) { media_rm($tmp); fail($e->getMessage()); }
   $files = []; $total = 0;

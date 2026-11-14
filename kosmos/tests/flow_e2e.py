@@ -574,6 +574,30 @@ try:
     except urllib.error.HTTPError as e: cc = e.code
     check('ссылка одноразовая — второй раз не работает', cc == 404, cc)
     c, j = kf('pc_list', 'mgr-t', {}, flow='flow'); check('компьютер в списке сотрудника', len(j.get('devs', [])) == 1, j)
+
+    print('\n23. Большие файлы кусками (№581)')
+    import base64 as _b64, random as _rnd
+    def _up(tok, name, data, mime='application/octet-stream', text=''):
+        c, r = kf('fc_up_start', tok, {'name': name, 'mime': mime, 'size': len(data)}, flow='flow')
+        if not r.get('ok'): return r
+        up, ch, off = r['up'], r['chunk'], 0
+        while off < len(data):
+            c, x = kf('fc_up_part', tok, {'up': up, 'off': off, 'data': _b64.b64encode(data[off:off + ch]).decode()}, flow='flow')
+            if not x.get('ok'): return x
+            off = x['have']
+        c, r = kf('fc_up_done', tok, {'up': up, 'text': text}, flow='flow'); return r
+    small = ('Счёт поставщика: панели 550 Вт, 120 штук\n' * 2000).encode()
+    r = _up('boss-t', 'schet.txt', small, 'text/plain'); check('файл 3 МБ кусками → обычное чтение (текст распознан)', r.get('ok') and r.get('kind') == 'текст' and not r.get('big'), r)
+    bigb = os.urandom(25 * 1048576)
+    r = _up('boss-t', 'katalog.pdf', bigb, 'application/pdf', 'Каталог Tongxin: панели, инверторы'); check('файл 25 МБ кусками → сохранён целиком', r.get('ok') and r.get('big') == 1, r)
+    fid = r.get('id', '')
+    q = subprocess.run(['mysql', '-uroot', 'itc', '-N', '-e', f"SELECT bytes,path FROM itc_fc_file WHERE id='{fid}'"], capture_output=True, text=True).stdout.split()
+    check('в базе размер и файл на месте', q and int(q[0]) == len(bigb) and os.path.getsize(f'{ST}/uploads/fil_files/{q[1]}') == len(bigb), q)
+    c, r = kf('fc_up_part', 'boss-t', {'up': 'up_nope', 'off': 0, 'data': 'AA=='}, flow='flow'); check('чужая/несуществующая загрузка — отказ', not r.get('ok'), r)
+    att = subprocess.run(['php', '-r', f"$_SERVER['HTTP_HOST']='127.0.0.1:8792'; chdir('{ST}/api'); require '{ST}/api/config.php'; echo 1;"], capture_output=True, text=True)
+    try: urllib.request.urlopen(f"{STORE}/api/flow.php?action=ff_dl&id={fid}&e=9999999999&s=bad", timeout=10); cc = 200
+    except urllib.error.HTTPError as e: cc = e.code
+    check('разовая ссылка с неверной подписью — 403', cc == 403, cc)
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

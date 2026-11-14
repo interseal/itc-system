@@ -31,6 +31,21 @@
   function one(a, file, api) {
     var name = file.name || ('Фото ' + new Date().toTimeString().substr(0, 5) + '.jpg'), ext = (name.split('.').pop() || '').toLowerCase(); a.name = name;
     var send = function (d) { return api('fc_file', d).then(function (r) { return (!r || !r.ok) && d.data && d.text ? api('fc_file', { name: d.name, text: d.text }) : r; }).then(function (r) { a.busy = false; if (!r || !r.ok) a.err = (r && r.error) || 'не прочитался'; else { a.id = r.id; a.kind = r.kind; a.chars = r.chars; } return a; }); };
+    // №581 · большой файл (больше 12 МБ, до 500 МБ) — кусками по 2 МБ
+    if (file.size > 12 * 1048576 && !/^image\//.test(file.type)) {
+      if (file.size > 500 * 1048576) { a.busy = false; a.err = 'больше 500 МБ — дайте ссылкой'; return Promise.resolve(a); }
+      return api('fc_up_start', { name: name, mime: file.type || '', size: file.size }).then(function (r) {
+        if (!r || !r.ok) return r; var up = r.up, ch = r.chunk || 2097152, off = 0, tries = 0;
+        var next = function () {
+          if (off >= file.size) return api('fc_up_done', { up: up, text: '' });
+          return file.slice(off, off + ch).arrayBuffer().then(function (b) { return api('fc_up_part', { up: up, off: off, data: b64(b) }); }).then(function (x) {
+            if (!x || !x.ok) throw new Error((x && x.error) || 'обрыв'); tries = 0; off = x.have; a.prog = Math.floor(off / file.size * 100); return next();
+          }, function (e) { if (++tries > 4) throw e; return new Promise(function (ok) { setTimeout(ok, 2000 * tries); }).then(next); });
+        };
+        return next();
+      }).then(function (r) { a.busy = false; if (!r || !r.ok) a.err = (r && r.error) || 'не загрузился'; else { a.id = r.id; a.kind = r.kind; a.chars = r.chars; } return a; },
+        function () { a.busy = false; a.err = 'связь оборвалась — прикрепите ещё раз'; return a; });
+    }
     if (/^image\//.test(file.type) || /^(jpe?g|png|heic|webp)$/.test(ext)) return shrink(file).then(function (d) { return send({ name: name, mime: 'image/jpeg', data: d }); }, function () { return file.arrayBuffer().then(function (b) { return send({ name: name, mime: file.type, data: b64(b) }); }); });
     return file.arrayBuffer().then(function (buf) {
       if (ext === 'pdf') return pdfText(buf.slice(0)).then(function (t) { return t.length > 40 ? send(buf.byteLength <= 12582912 ? { name: name, text: t, mime: 'application/pdf', data: b64(buf) } : { name: name, text: t }) : send({ name: name, mime: 'application/pdf', data: b64(buf) }); },

@@ -2448,6 +2448,15 @@ function ff_attach_text($me, $ids) {
   return $o;
 }
 
+/* №581 · БОЛЬШИЕ ФАЙЛЫ (до 500 МБ): телефон и компьютер шлют файл кусками по 2 МБ, магазин собирает.
+   Обработку больших (текст, картинки из PDF, кадры видео) делает сервер «Космоса»: он сам скачивает файл по разовой ссылке. */
+const FF_BIG_MAX = 500 * 1048576;
+function ff_up_dir() { $d = ff_dir() . '/up'; if (!is_dir($d)) @mkdir($d, 0755, true); return $d; }
+function ff_link($id, $ttl = 3600) {   // разовая ссылка на оригинал для сервера «Космоса» (папка файлов из интернета закрыта)
+  $exp = time() + $ttl; $k = function_exists('ks_gw') ? (string)ks_gw()['gw'] : (string)sp_get('srv_key');
+  $host = preg_match('~^[a-z0-9.-]+$~i', (string)($_SERVER['HTTP_HOST'] ?? '')) ? $_SERVER['HTTP_HOST'] : 'itcpartner.store';
+  return 'https://' . $host . '/api/flow.php?action=ff_dl&id=' . rawurlencode((string)$id) . '&e=' . $exp . '&s=' . hash_hmac('sha256', $id . '|' . $exp, $k); }
+
 /* №575 · «Космос» (Claude) видит сами фото, а не только распознанный текст: снимки идут к Claude вместе с вопросом */
 function ff_attach_imgs($me, $ids) {
   $ids = array_slice(array_filter(array_map('strval', (array)$ids)), 0, 6); if (!$ids) return [];
@@ -2470,7 +2479,8 @@ function ag_files($me, $a) {
     ff_cols(); $q = db()->prepare('SELECT name,path FROM itc_fc_file WHERE id=? AND (phone=? OR ?=1)'); $q->execute([(string)$a['file'], $me['phone'], !empty($me['boss']) ? 1 : 0]);
     $f = $q->fetch(); if (!$f) return 'нет такого файла (id из «ПРИЛОЖЕН ФАЙЛ»)';
     if ((string)$f['path'] === '' || !is_file(ff_dir() . '/' . basename((string)$f['path']))) return 'оригинал этого файла не сохранился (бывает с большими PDF) — попросите прислать его ещё раз или дать ссылку';
-    $bin = (string)file_get_contents(ff_dir() . '/' . basename((string)$f['path'])); $name = (string)$f['name'] ?: basename((string)$f['path']);
+    $fp = ff_dir() . '/' . basename((string)$f['path']); $fid = (string)$a['file']; $big = filesize($fp) > 30 * 1048576;   // №581 · большой файл в память не читаем
+    $bin = $big ? '' : (string)file_get_contents($fp); $name = (string)$f['name'] ?: basename((string)$f['path']);
     if (pathinfo($name, PATHINFO_EXTENSION) === '') $name .= '.' . pathinfo((string)$f['path'], PATHINFO_EXTENSION);
   } elseif (preg_match('~^https?://~i', (string)($a['url'] ?? ''))) {
     $ch = curl_init((string)$a['url']); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 4, CURLOPT_TIMEOUT => 90, CURLOPT_CONNECTTIMEOUT => 10,
@@ -2480,7 +2490,9 @@ function ag_files($me, $a) {
     if ($code !== 200 || $bin === '') return 'не удалось скачать файл по ссылке (код ' . $code . ', или больше 40 МБ)';
     $name = basename((string)parse_url((string)$a['url'], PHP_URL_PATH)) ?: 'file';
   } else return 'нужен file (id приложенного файла) или url';
-  $data = ['a' => 'media', 'op' => $op, 'name' => $name, 'data' => base64_encode($bin)];
+  $data = ['a' => 'media', 'op' => $op, 'name' => $name];
+  if (!empty($big)) $data['url'] = ff_link($fid, 7200);   // №581 · большой — сервер скачает сам по разовой ссылке
+  else $data['data'] = base64_encode($bin);
   foreach (['from', 'to', 'count', 'size', 'format', 'square', 'white', 'trim', 'height', 'len', 'min', 'limit', 'dpi'] as $k) if (isset($a[$k])) $data[$k] = $a[$k];
   if (!function_exists('ks_gw') || !defined('KS_SERVER')) return 'нет связи с сервером «Космоса» (обработка файлов идёт там)';
   $ch = curl_init(KS_SERVER . '/api.php?a=gw');
@@ -3302,6 +3314,14 @@ try {
     header('Content-Type: application/zip'); header('Content-Length: ' . filesize($p)); header('Content-Disposition: attachment; filename="' . $f . '"');
     readfile($p); exit;
   }
+  if ($action === 'ff_dl') {   // №581 · сервер «Космоса» забирает большой файл для обработки
+    $id = preg_replace('~[^a-z0-9_]~i', '', (string)($_GET['id'] ?? '')); $e = (int)($_GET['e'] ?? 0); $k = function_exists('ks_gw') ? (string)ks_gw()['gw'] : (string)sp_get('srv_key');
+    if ($id === '' || $e < time() || $k === '' || !hash_equals(hash_hmac('sha256', $id . '|' . $e, $k), (string)($_GET['s'] ?? ''))) { http_response_code(403); exit('нет доступа'); }
+    ff_cols(); $q = db()->prepare('SELECT path,name FROM itc_fc_file WHERE id=?'); $q->execute([$id]); $f = $q->fetch(); $p = $f ? ff_dir() . '/' . basename((string)$f['path']) : '';
+    if (!$f || (string)$f['path'] === '' || !is_file($p)) { http_response_code(404); exit('нет файла'); }
+    @set_time_limit(0); while (ob_get_level() > 0) @ob_end_clean();
+    header('Content-Type: application/octet-stream'); header('Content-Length: ' . filesize($p)); readfile($p); exit;
+  }
   pc_pre($action);   // №559 · вызовы программы «Фил на компьютере» (по ключу устройства)
   $me = fl_me(); fl_ensure(); wc_ensure(); if (mt_rand(1, 20) === 1) wc_tick();
   if (in_array($action, ['pc_pair_ok', 'pc_list', 'pc_revoke', 'pc_inst'], true)) pc_staff($me, $action);
@@ -3801,7 +3821,45 @@ try {
     $me = fl_me(); if (empty($me['boss'])) fl_fail('Скрыть запись может только руководитель', 403);
     sh_ensure(); db()->prepare('UPDATE itc_sup_log SET hidden=1 WHERE id=?')->execute([(int)fl_in('rid')]); fl_out(['ok' => true]);
   }
+  case 'fc_up_start': {   // №581
+    ff_ensure(); $size = (int)fl_in('size'); $name = fl_s(fl_in('name'), 250) ?: 'файл';
+    if ($size < 1) fl_fail('Пустой файл'); if ($size > FF_BIG_MAX) fl_fail('Файл больше 500 МБ — пришлите частями или ссылкой');
+    $up = fl_id('up'); @file_put_contents(ff_up_dir() . "/$up.part", ''); @file_put_contents(ff_up_dir() . "/$up.json", json_encode(['phone' => $me['phone'], 'name' => $name, 'mime' => (string)fl_in('mime'), 'size' => $size, 't' => time()], JSON_UNESCAPED_UNICODE));
+    foreach (glob(ff_up_dir() . '/*') ?: [] as $old) if (filemtime($old) < time() - 86400) @unlink($old);   // недогруженное — через сутки в мусор
+    fl_out(['ok' => true, 'up' => $up, 'chunk' => 2 * 1048576]);
+  }
+  case 'fc_up_part': {
+    $up = preg_replace('~[^a-z0-9_]~i', '', (string)fl_in('up')); $mf = ff_up_dir() . "/$up.json"; $pf = ff_up_dir() . "/$up.part";
+    $m = is_file($mf) ? json_decode((string)file_get_contents($mf), true) : null; if (!$m || $m['phone'] !== $me['phone']) fl_fail('Загрузка не найдена — начните заново');
+    clearstatcache(); $have = is_file($pf) ? filesize($pf) : 0; $off = (int)fl_in('off');
+    if ($off < $have) fl_out(['ok' => true, 'have' => $have]);      // этот кусок уже есть (повтор после обрыва)
+    if ($off !== $have) fl_fail('Кусок не по порядку');
+    $b = base64_decode((string)fl_in('data'), true); if ($b === false || $b === '' || strlen($b) > 4 * 1048576) fl_fail('Кусок не дошёл');
+    if ($have + strlen($b) > (int)$m['size']) fl_fail('Файл больше заявленного');
+    file_put_contents($pf, $b, FILE_APPEND | LOCK_EX); clearstatcache(); fl_out(['ok' => true, 'have' => filesize($pf)]);
+  }
+  case 'fc_up_done': {
+    ff_ensure(); ff_cols();
+    $up = preg_replace('~[^a-z0-9_]~i', '', (string)fl_in('up')); $mf = ff_up_dir() . "/$up.json"; $pf = ff_up_dir() . "/$up.part";
+    $m = is_file($mf) ? json_decode((string)file_get_contents($mf), true) : null; if (!$m || $m['phone'] !== $me['phone']) fl_fail('Загрузка не найдена — начните заново');
+    clearstatcache(); if (!is_file($pf) || filesize($pf) !== (int)$m['size']) fl_fail('Файл догрузился не полностью — попробуйте ещё раз');
+    if ((int)$m['size'] <= 20 * 1048576) {      // небольшой — дальше как обычно (распознавание здесь же)
+      $GLOBALS['IN']['name'] = $m['name']; $GLOBALS['IN']['mime'] = $m['mime']; $GLOBALS['IN']['data'] = base64_encode((string)file_get_contents($pf)); @unlink($pf); @unlink($mf);
+      if (trim((string)fl_in('text')) === '') unset($GLOBALS['IN']['text']);
+      goto fc_file_go;
+    }
+    $name = (string)$m['name']; $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION)); $mb = round((int)$m['size'] / 1048576, 1);
+    $kind = $ext === 'pdf' ? 'PDF' : (in_array($ext, ['mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv'], true) ? 'видео' : 'файл');
+    $text = trim((string)fl_in('text'));
+    $text = ($text !== '' ? $text . "\n\n" : '') . 'Большой файл «' . $name . '», ' . $mb . ' МБ — сохранён целиком. ' . ($text !== '' ? 'Выше — текст первых страниц. ' : '') . 'Весь текст, картинки товаров со страниц, кадры видео — инструментом files (обрабатывает сервер «Космоса», файл он заберёт сам).';
+    $id = fl_id('ff'); $sx = preg_match('~^[a-z0-9]{1,6}$~', $ext) && !preg_match('~^(php\d?|phtml|phar|pht|cgi|pl|py|sh|exe|bat|cmd|js|htaccess|html?|svgz?)$~', $ext) ? $ext : 'bin';
+    if (!@rename($pf, ff_dir() . "/$id.$sx")) fl_fail('Не получилось сохранить файл'); @unlink($mf);
+    db()->prepare('INSERT INTO itc_fc_file (id,phone,name,kind,text,chars) VALUES (?,?,?,?,?,?)')->execute([$id, $me['phone'], $name, $kind, $text, mb_strlen($text)]);
+    db()->prepare('UPDATE itc_fc_file SET path=?,mime=?,bytes=? WHERE id=?')->execute(["$id.$sx", (string)$m['mime'] ?: 'application/octet-stream', (int)$m['size'], $id]);
+    fl_out(['ok' => true, 'id' => $id, 'name' => $name, 'kind' => $kind, 'chars' => mb_strlen($text), 'preview' => mb_substr(preg_replace('~\s+~u', ' ', $text), 0, 160), 'big' => 1]);
+  }
   case 'fc_file': {
+    fc_file_go:
     ff_ensure();
     $name = fl_s(fl_in('name'), 250) ?: 'файл'; $mime = (string)fl_in('mime'); $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
     $text = (string)fl_in('text'); $kind = ''; $err = '';

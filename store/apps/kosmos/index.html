@@ -169,7 +169,7 @@ html.fil-busy .cmp #go:after{content:"";position:absolute;inset:12px;border:2.5p
 .tile .ext{position:absolute;left:6px;bottom:6px;font:700 .62rem Roboto,sans-serif;background:rgba(3,11,46,.75);border-radius:6px;padding:2px 5px;text-transform:uppercase}
 .tile .x{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(3,11,46,.8);color:#fff;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}.tile .x svg{width:16px;height:16px}
 .tile .ld{position:absolute;inset:0;background:rgba(3,11,46,.55);display:flex;align-items:center;justify-content:center}.tile .ld i{width:22px;height:22px;border:3px solid rgba(255,255,255,.3);border-top-color:#5fd3ff;border-radius:50%;animation:spin .8s linear infinite}
-.tile.err{border-color:#ff5752}.tile .em{position:absolute;left:0;right:0;bottom:0;background:rgba(229,57,53,.85);font-size:.62rem;padding:2px 4px;text-align:center}
+.tile .ld .pc{position:absolute;bottom:8px;left:0;right:0;text-align:center;font:700 .8rem Roboto,sans-serif}.tile.err{border-color:#ff5752}.tile .em{position:absolute;left:0;right:0;bottom:0;background:rgba(229,57,53,.85);font-size:.62rem;padding:2px 4px;text-align:center}
 .addsh{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:none;align-items:flex-end}.addsh.on{display:flex}
 .addin{width:100%;background:#0b1747;border-top-left-radius:24px;border-top-right-radius:24px;padding:8px 14px calc(18px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
 .addgrip{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.3);margin:4px auto 10px}
@@ -548,7 +548,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
       var ext = ((a.name || '').split('.').pop() || '').toLowerCase(); if (ext === (a.name || '').toLowerCase()) ext = '';
       var body = a.thumb ? '<img src="' + a.thumb + '" alt="">' : '<div class="doc">' + D + '<span>' + esc(a.name) + '</span></div>';
       return '<div class="tile' + (a.err ? ' err' : '') + '" title="' + esc(a.name + (a.err ? ' — ' + a.err : '')) + '">' + body +
-        (ext && a.thumb ? '<span class="ext">' + esc(ext) + '</span>' : '') + (a.busy ? '<div class="ld"><i></i></div>' : '') +
+        (ext && a.thumb ? '<span class="ext">' + esc(ext) + '</span>' : '') + (a.busy ? '<div class="ld"><i></i>' + (a.prog != null ? '<b class="pc">' + a.prog + '%</b>' : '') + '</div>' : '') +
         (a.err ? '<div class="em">' + esc(a.err) + '</div>' : '') + '<button class="x" onclick="attDel(' + i + ')" title="Убрать">' + X + '</button></div>';
     }).join('');
     if (window.goState) goState();
@@ -591,6 +591,25 @@ html.fil-talk .hd .snd-t{background:#e5484d}
   function upload(a, file){
     var name = file.name || ('Фото ' + new Date().toTimeString().substr(0, 5) + '.jpg'), ext = (name.split('.').pop() || '').toLowerCase();
     var send = function(d){ return api('fc_file', d).then(function(r){ return (!r || !r.ok) && d.data && d.text ? api('fc_file', {name:d.name, text:d.text}) : r; }).then(function(r){ a.busy = false; if (!r || !r.ok) { a.err = (r && r.error) || 'не прочитался'; } else { a.id = r.id; a.kind = r.kind; a.chars = r.chars; } attRender(); return a; }); };
+    // №581 · большой файл (больше 15 МБ, до 500 МБ) — кусками по 2 МБ, с процентами на плитке; обрыв — повторяем кусок
+    var done = function(r){ a.busy = false; a.prog = null; if (!r || !r.ok) { a.err = (r && r.error) || 'не загрузился'; } else { a.id = r.id; a.kind = r.kind; a.chars = r.chars; } attRender(); return a; };
+    var big = function(text){
+      if (file.size > 500 * 1048576) return Promise.resolve(done({ok:false, error:'больше 500 МБ — дайте ссылкой'}));
+      return api('fc_up_start', {name:name, mime:file.type || '', size:file.size}).then(function(r){
+        if (!r || !r.ok) return r; var up = r.up, ch = r.chunk || 2097152, off = 0, tries = 0;
+        var next = function(){
+          if (off >= file.size) return api('fc_up_done', {up:up, text:text || ''});
+          return file.slice(off, off + ch).arrayBuffer().then(function(b){ return api('fc_up_part', {up:up, off:off, data:b64(b)}); }).then(function(x){
+            if (!x || !x.ok) throw new Error((x && x.error) || 'обрыв'); tries = 0; off = x.have; a.prog = Math.floor(off / file.size * 100); attRender(); return next();
+          }, function(e){ if (++tries > 4) throw e; return new Promise(function(ok){ setTimeout(ok, 2000 * tries); }).then(next); });
+        };
+        return next();
+      }).then(done, function(e){ return done({ok:false, error:'связь оборвалась на ' + (a.prog || 0) + '% — прикрепите ещё раз'}); });
+    };
+    if (file.size > 15 * 1048576 && !/^image\//.test(file.type)) {
+      if (ext === 'pdf') return file.slice(0, Math.min(file.size, 60 * 1048576)).arrayBuffer().then(function(b){ return pdfText(b); }).then(function(t){ return big(t); }, function(){ return big(''); });
+      return big('');
+    }
     if (/^image\//.test(file.type) || /^(jpe?g|png|heic|webp)$/.test(ext)) return shrink(file).then(function(d){ return send({name:name, mime:'image/jpeg', data:d}); }, function(){ return file.arrayBuffer().then(function(b){ return send({name:name, mime:file.type, data:b64(b)}); }); });
     return file.arrayBuffer().then(function(buf){
       if (ext === 'pdf') return pdfText(buf.slice(0)).then(function(t){ return t.replace(/— стр\. \d+ —/g, '').trim().length > 40 ? send(buf.byteLength <= 20971520 ? {name:name, text:t, mime:'application/pdf', data:b64(buf)} : {name:name, text:t}) : send({name:name, mime:'application/pdf', data:b64(buf)}); },
