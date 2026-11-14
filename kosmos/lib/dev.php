@@ -61,6 +61,17 @@ function dev_cancel(int $id, string $phone): void {
   if (!$q->rowCount()) fail('Отменить можно только поручение, которое ещё не начато');
   log_add($phone, 'поручение разработчику отменено', ['id' => $id]);
 }
+/* 0.4.2 · правки сборки (gradle, ключ подписи) ждут решения руководителя: «Одобрить» — агент отправит их в главную ветку и выпустит обновление */
+function dev_decide(int $id, bool $ok, string $phone): void {
+  dev_schema(db());
+  $q = db()->prepare("UPDATE dev_tasks SET status=? WHERE id=? AND status='needs_ok'"); $q->execute([$ok ? 'approved' : 'rejected', $id]);
+  if (!$q->rowCount()) fail('Это поручение не ждёт вашего решения');
+  log_add($phone, $ok ? 'правки разработчика одобрены' : 'правки разработчика отклонены', ['id' => $id]);
+}
+function dev_approved(): array {
+  dev_schema(db());
+  return array_map('dev_row', db()->query("SELECT * FROM dev_tasks WHERE status='approved' ORDER BY id")->fetchAll());
+}
 function dev_state(): array {
   $f = dirname((string)cfg('db')) . '/dev.json';
   $j = is_file($f) ? json_decode((string)file_get_contents($f), true) : null;
@@ -94,6 +105,7 @@ function gw_dev(array $in): void {
   $op = (string)($in['op'] ?? '');
   $info = function () { return ['spent' => round(dev_spent_today_u() / 1000000, 2), 'limit' => (float)setting('dev_limit', '30')]; };
   if ($op === 'list') jout(['ok' => true, 'tasks' => dev_list(10)] + $info());
+  if ($op === 'decide') { dev_decide((int)($in['id'] ?? 0), !empty($in['ok']), 'магазин: ' . mb_substr((string)($in['who'] ?? ''), 0, 60)); jout(['ok' => true]); }
   if ($op === 'add') {
     $eng = (string)($in['engine'] ?? 'claude');
     if ($eng === 'deepseek') {

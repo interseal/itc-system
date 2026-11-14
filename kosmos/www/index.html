@@ -701,7 +701,7 @@ function setGit(){
   });
 }
 /* 0.3.9 · «Космос»-разработчик: поручения руководителя выполняет Claude Code на сервере */
-var DEV_ST = {draw: 'не начато', queued: 'в очереди', running: 'работает', done: 'готово', failed: 'не получилось', checks_failed: 'проверки не прошли', cancelled: 'отменено'};
+var DEV_ST = {draw: 'не начато', queued: 'в очереди', running: 'работает', done: 'готово', failed: 'не получилось', checks_failed: 'проверки не прошли', cancelled: 'отменено', needs_ok: 'ждёт вашего решения', approved: 'одобрено — выпускаю', rejected: 'отклонено'};
 function setDev(){
   api('dev').then(function(d){
     if (!d.ok) { $('setBody').innerHTML = '<div class="note">' + esc(d.error) + '</div>'; return; }
@@ -714,11 +714,13 @@ function setDev(){
       return '<div class="card"><div class="kh"><b>№' + t.id + '</b><span class="tag' + (t.status === 'done' ? ' ok' : (/fail/.test(t.status) ? ' err' : '')) + '">' + (DEV_ST[t.status] || t.status) + '</span>' + (t.cost ? '<span class="tag">$' + t.cost.toFixed(2) + '</span>' : '') + (t.release_n ? '<span class="tag ok">обновление №' + t.release_n + '</span>' : '') + '</div>'
         + (t.engine === 'deepseek' ? '<div style="font-size:12px;color:var(--sub)">Фил-разработчик (DeepSeek), поручение из магазина</div>' : '') + '<div class="ks">' + esc(t.text) + '</div>' + (t.result ? '<div style="white-space:pre-wrap;margin-top:6px">' + esc(t.result) + '</div>' : '')
         + (t.checks ? '<div class="ks">Проверки: ' + esc(t.checks) + '</div>' : '') + (t.error ? '<div class="note">' + esc(t.error) + '</div>' : '')
+        + (t.status === 'needs_ok' ? '<div class="row" style="margin-top:8px"><button class="btn sm" onclick="devDecide(' + t.id + ',1)">Одобрить и выпустить</button><button class="btn red sm" onclick="devDecide(' + t.id + ',0)">Отклонить</button></div>' : '')
         + (t.status === 'queued' ? '<button class="btn red sm" onclick="devCancel(' + t.id + ')">Отменить</button>' : '') + '</div>'; }).join('') : '<p class="note">Поручений пока нет.</p>');
     $('setBody').innerHTML = h;
   });
 }
 function devAdd(){ var t = $('devText').value.trim(); if (t.length < 10) { toast('Опишите поручение подробнее'); return; } api('dev_add', { text: t, model: $('devModel').value }).then(function(d){ if (!d.ok) { toast(d.error); return; } toast('Поручение №' + d.id + ' принято — начну в течение минуты'); setDev(); }); }
+function devDecide(id, ok){ api('dev_decide', { id: id, ok: !!ok }).then(function(d){ if (!d.ok) { toast(d.error); return; } toast(ok ? 'Одобрено — выпущу в течение минуты' : 'Отклонено'); setDev(); }); }
 function devCancel(id){ api('dev_cancel', { id: id }).then(function(d){ if (!d.ok) { toast(d.error); return; } setDev(); }); }
 function devLimit(){ api('dev_limit', { limit: $('devLim').value }).then(function(d){ if (!d.ok) { toast(d.error); return; } toast('Лимит сохранён'); setDev(); }); }
 /* 0.3.4 · сейф Bitwarden: токен машинного аккаунта — сервер сам кладёт в сейф паспорт и ключи */

@@ -142,6 +142,9 @@ try {
       $m = me_boss();
       jout(['ok' => true] + dev_add((string)($in['text'] ?? ''), (string)($in['model'] ?? 'opus'), $m['phone']) + ['tasks' => dev_list()]);
     }
+    case 'dev_decide': {   // 0.4.2 · руководитель одобряет или отклоняет правки сборки
+      $m = me_boss(); dev_decide((int)($in['id'] ?? 0), !empty($in['ok']), $m['phone']); jout(['ok' => true, 'tasks' => dev_list()]);
+    }
     case 'dev_cancel': {
       $m = me_boss(); dev_cancel((int)($in['id'] ?? 0), $m['phone']); jout(['ok' => true, 'tasks' => dev_list()]);
     }

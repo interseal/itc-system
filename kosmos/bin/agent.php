@@ -44,6 +44,7 @@ switch ($cmd) {
   case 'dbinfo':   echo json_encode(a_dbinfo()); exit;
   case 'claudeskills': require_once __DIR__ . '/../lib/boot.php'; echo json_encode(skill_sync_claude((string)($argv[2] ?? ''), (string)($argv[3] ?? 'claude') === 'hist' ? 'hist' : 'claude')); exit;   // 0.3.5 · от www-data
   case 'devclaim':  require_once __DIR__ . '/../lib/boot.php'; echo json_encode(dev_claim()); exit;   // 0.3.9 · от www-data
+  case 'devapproved': require_once __DIR__ . '/../lib/boot.php'; echo json_encode(dev_approved()); exit;   // 0.4.2
   case 'devfinish': require_once __DIR__ . '/../lib/boot.php'; dev_finish((int)($argv[2] ?? 0), (array)json_decode((string)($argv[3] ?? '{}'), true)); echo 'ok'; exit;
   case 'devrun':    exit(a_devrun() ? 0 : 1);
   case 'android':   exit(a_android((int)($argv[2] ?? 0)) ? 0 : 1);   // 0.4.1 · фоновая сборка Android для обновления №N
@@ -750,10 +751,27 @@ function dev_ds_cost_a(array $u): float {
   $in = (int)($u['input_tokens'] ?? 0) + (int)($u['cache_creation_input_tokens'] ?? 0); $c = (int)($u['cache_read_input_tokens'] ?? 0); $o = (int)($u['output_tokens'] ?? 0);
   return round(($in * 0.6 + $c * 0.06 + $o * 2.4) / 1000000, 4);
 }
+/* 0.4.2 · одобренные руководителем правки: ветку — в главную (как обычный выпуск) */
+function a_dev_merge_approved(): void {
+  global $C;
+  $list = json_decode(a_as_db('devapproved'), true); if (!is_array($list) || !$list) return;
+  $dev = rtrim((string)$C['dev_dir'], '/'); $q = escapeshellarg($dev); $rk = (string)$C['git_key']; $wk = a_dev_key();
+  foreach ($list as $t) {
+    $id = (int)$t['id']; $br = (string)$t['branch'];
+    $r = ['status' => 'done', 'cost' => $t['cost'], 'result' => $t['result'], 'checks' => $t['checks'], 'branch' => $br, 'commit' => $t['commit'], 'release_n' => $t['release_n'], 'merged' => 0, 'error' => ''];
+    a_sh(a_git_env($rk) . "git -C $q fetch -q origin && git -C $q checkout -q -f -B " . escapeshellarg($br) . ' ' . escapeshellarg('origin/' . $br) . " && git -C $q rebase -q origin/main", $c1);
+    a_sh(a_git_env($wk) . "git -C $q push -q origin HEAD:main", $c2);
+    if ($c1 === 0 && $c2 === 0) { $r['merged'] = 1; $r['error'] = 'одобрено руководителем — отправлено в работу'; }
+    else { a_sh("git -C $q rebase --abort"); $r['status'] = 'failed'; $r['error'] = 'одобрено, но в главную не попало (код успел измениться) — поручите заново'; }
+    a_as_db('devfinish', (string)$id, json_encode($r, JSON_UNESCAPED_UNICODE));
+    a_log("поручение №$id: одобренные правки " . ($r['merged'] ? 'в главной ветке' : 'не попали в главную'));
+  }
+}
 function a_devrun(): bool {
   global $C;
   $h = fopen(sys_get_temp_dir() . '/kosmos-dev.lock', 'c');
   if (!$h || !flock($h, LOCK_EX | LOCK_NB)) return true;
+  a_dev_merge_approved();   // 0.4.2 · сначала — одобренные руководителем
   $j = json_decode(a_as_db('devclaim'), true);
   if (!is_array($j) || empty($j['task'])) return true;
   $t = $j['task']; $id = (int)$t['id']; $res = ['status' => 'failed', 'branch' => 'kosmos/' . $id];
@@ -820,7 +838,9 @@ function a_devrun(): bool {
   // 0.4.1 · настройки сборки Android (gradle) и инструменты сервера, которые получают ключ подписи, — только с проверкой Claude:
   // разработчик правит их в своей ветке, в главную они сами не уходят
   $risky = array_values(preg_grep('~^android/.*\.(gradle|properties|kts)$|^android/.*gradle-wrapper|^kosmos/tools/build_android\.py$|^kosmos/bin/agent\.php$~', $changed));
-  if ($rel && $risky) { $res['status'] = 'done'; $res['error'] = 'правки сборки (' . implode(', ', array_slice($risky, 0, 3)) . ') — в ветке ' . $res['branch'] . ', в главную только после проверки Claude'; $finish($res); return true; }
+  // 0.4.2 · решение — за руководителем (кнопка «Одобрить» в настройках «Космоса» или ответ Филу/«Космосу»)
+  if ($rel && $risky) { $res['status'] = 'needs_ok'; $res['release_n'] = (int)basename($rel[0], '.json');
+    $res['error'] = 'Затронуты настройки сборки (' . implode(', ', array_slice($risky, 0, 4)) . '): через них проходит ключ подписи приложений. Проверки прошли. Нажмите «Одобрить», чтобы выпустить, или «Отклонить».'; $finish($res); return true; }
   if ($rel) {   // поручение выпускает обновление: в главную ветку, сервер соберёт его и предложит руководителю «Установить»
     a_sh(a_git_env($rk) . "git -C $q fetch -q origin && git -C $q rebase -q origin/main", $c1);
     a_sh(a_git_env($wk) . "git -C $q push -q origin HEAD:main", $c2);

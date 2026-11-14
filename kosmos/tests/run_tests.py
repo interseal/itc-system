@@ -486,7 +486,15 @@ try:
     c, j = call('dev', B); t5 = next(x for x in j['tasks'] if x['id'] == tid5)
     lg5 = subprocess.run(f'git --git-dir={O} log --oneline main', shell=True, capture_output=True, text=True).stdout
     br5 = subprocess.run(f'git --git-dir={O} branch', shell=True, capture_output=True, text=True).stdout
-    check('правка сборки Android (gradle) в главную сама не уходит — только ветка и проверка Claude (0.4.1)', t5['merged'] == 0 and 'gradle' not in lg5 and f'kosmos/{tid5}' in br5 and 'проверки Claude' in t5['error'], (t5, br5))
+    check('правка сборки Android (gradle) ждёт решения руководителя, в главную сама не уходит (0.4.2)', t5['status'] == 'needs_ok' and t5['merged'] == 0 and 'gradle' not in lg5 and f'kosmos/{tid5}' in br5 and 'Одобрить' in t5['error'], (t5, br5))
+    c, j = gw({'a': 'dev', 'op': 'decide', 'id': tid5, 'ok': True, 'who': '+996'}, key='cd' * 32); check('чужой не может одобрить', c == 403, c)
+    c, j = call('dev_decide', S, {'id': tid5, 'ok': True}); check('сотрудник не может одобрить', c == 403, c)
+    c, j = call('dev_decide', B, {'id': tid5, 'ok': True}); check('руководитель одобрил', j.get('ok'), j)
+    subprocess.run(['php', f'{ROOT}/bin/agent.php', 'devrun'], env=denv, capture_output=True, text=True, timeout=120)
+    c, j = call('dev', B); t5 = next(x for x in j['tasks'] if x['id'] == tid5)
+    lg5 = subprocess.run(f'git --git-dir={O} log --oneline main', shell=True, capture_output=True, text=True).stdout
+    check('после одобрения — правки в главной ветке, обновление №9102 выпускается', t5['merged'] == 1 and t5['status'] == 'done' and 'gradle' in lg5 and t5['release_n'] == 9102, (t5, lg5))
+    c, j = call('dev_decide', B, {'id': tid5, 'ok': False}); check('повторное решение не принимается', c == 400, j)
     c, j = call('dev_limit', B, {'limit': '2'}); c, j = call('dev_add', B, {'text': 'Ещё одно поручение на сегодня', 'model': 'opus'})
     check('лимит расходов в день — поручение не принимается', c == 400 and 'Лимит' in j.get('error', ''), j)
     c, j = call('dev', B); check('ключ записи в GitHub создан и показан руководителю', j['state'].get('pub', '').startswith('ssh-ed25519'), j['state'])

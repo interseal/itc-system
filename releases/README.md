@@ -29,4 +29,5 @@
   кладёт в обновление `store/app/<имя>/itc-<имя>.apk` + `version.json` (у store — store/app/, у sklad — store/sklad/app/).
   Пока идёт сборка, на странице «Обновления» — «собираю Android-приложения».
 - Новое приложение: `python3 kosmos/tools/new_android_app.py --key … --title … --url … [--icon значок.png] [--color #RRGGBB]`.
+- Правки настроек сборки (*.gradle, *.properties в android/, build_android.py, agent.php), сделанные «Космосом»/Филом, ждут решения руководителя: кнопка «Одобрить» в настройках «Космоса» → «Разработчик» или ответ Филу/«Космосу».
 - RuStore: APK из обновления руководитель загружает в console.rustore.ru (приложения там проверяют вручную).
