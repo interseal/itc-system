@@ -11,7 +11,7 @@ const ins55=(h,bar)=>{const i=h.indexOf('</header>');return i>=0?h.slice(0,i+9)+
 const seg55=(items,cur,act)=>`<div class="bar"><div class="seg">${items.map(x=>`<button class="${cur===x[0]?'on':''}" data-a="${act}" data-v="${x[0]}">${x[1]}</button>`).join('')}</div></div>`;
 // старые адреса «Сделки» и «Статистика» ведут в «Портфель»
 const _r55=render;render=function(){if(UI.view==='deals'){UI.view='port';UI.ptab='deals'}else if(UI.view==='stats'){UI.view='port';UI.ptab='stats'}
- if(UI.view==='lab'&&UI.labTab==='ses'){UI.view='bots';UI.botTab='ses'}return _r55()};
+ if(UI.view==='lab'&&UI.labTab==='ses'){UI.view='bots';UI.botTab='ses';UI.labTab='tests';try{saveUI()}catch(_){}}return _r55()}; // №590: «ses» больше не залипает — иначе «Анализ» вечно перекидывал в «Боты → Серии»
 // ---------- Портфель: Обзор · Сделки · Статистика ----------
 const PTAB55=[['ov','Обзор'],['deals','Сделки'],['stats','Статистика']];
 const _pv55=portView;portView=function(){const t=UI.ptab||'ov';const h=t==='deals'?dealsView():t==='stats'?statsView():_pv55();return ins55(h,seg55(PTAB55,t,'ptab'))};
