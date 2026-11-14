@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<!-- «Парикмахерские ИТК» v1 · №597 · 14.11.2026 · первое приложение на основе «ИТК Сервис» (api/svc.php).
+     Клиент: рядом на карте со «светофором» (свободно сейчас / скоро / занято / закрыто), запись на время, мои записи.
+     Салон: профиль и юрлицо, мастера, услуги с вариантами цены, часы, предоплата, расписание дня, «пришёл без записи», деньги (5% / 95%).
+     Тот же файл годится для шиномонтажа и цветов: вид бизнеса — KIND (см. ниже), подписи — в LB. -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#112C93">
+<title>Парикмахерские ИТК</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--navy:#112C93;--bg:#eef1f4;--card:#fff;--ink:#17202b;--muted:#5d6876;--line:#d5dbe2;--green:#16a34a;--yellow:#e0a100;--red:#d93025;--grey:#9aa3ad}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 Roboto,-apple-system,"Segoe UI",Arial,sans-serif;-webkit-tap-highlight-color:transparent}
+header{background:var(--navy);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 0}
+header h1{margin:0;font-size:22px;font-weight:800}header p{margin:2px 0 10px;opacity:.85;font-size:14px}
+#toShop{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.16);color:#fff;border:0;border-radius:10px;padding:6px 12px 6px 8px;font:inherit;font-size:14px;font-weight:600;margin-bottom:8px;cursor:pointer}
+nav{display:flex;gap:6px}
+nav button{flex:1;border:0;border-radius:12px 12px 0 0;padding:10px 4px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+nav button.on{background:var(--bg);color:var(--navy)}
+main{padding:12px 14px calc(env(safe-area-inset-bottom,0px) + 28px);max-width:760px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.btn{border:0;border-radius:12px;padding:12px 14px;font:inherit;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:disabled{opacity:.5}.b-navy{background:var(--navy);color:#fff}.b-line{background:#fff;color:var(--navy);border:2px solid var(--navy)}.b-green{background:var(--green);color:#fff}.b-red{background:#fff;color:var(--red);border:2px solid var(--red)}
+.b-sm{padding:7px 11px;font-size:14px;border-radius:10px}.w100{width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>.btn{flex:1 1 120px}
+.muted{color:var(--muted)}.small{font-size:13.5px}.big{font-size:18px;font-weight:800}
+label.f{display:block;font-size:13.5px;color:var(--muted);margin:10px 0 4px}
+.i{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;background:#fff;color:var(--ink)}
+textarea.i{min-height:80px;resize:vertical}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.load{padding:18px;text-align:center;color:var(--muted)}
+#map{height:46vh;min-height:260px;border-radius:16px;overflow:hidden;border:1px solid var(--line);margin-bottom:12px;background:#dfe6ec}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none}
+.c-green{background:var(--green)}.c-yellow{background:var(--yellow)}.c-red{background:var(--red)}.c-grey{background:var(--grey)}
+.t-green{color:var(--green)}.t-yellow{color:#a87700}.t-red{color:var(--red)}.t-grey{color:var(--muted)}
+.biz{display:flex;gap:12px;cursor:pointer}.biz img,.biz .ph{width:76px;height:76px;border-radius:12px;object-fit:cover;flex:none;background:#e3e8ee}
+.biz h3{margin:0 0 2px;font-size:17px}.st{display:flex;align-items:center;gap:6px;font-weight:700;font-size:14.5px;margin-top:3px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:-4px 0 10px}.legend span{display:flex;align-items:center;gap:5px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}.chip{border:1px solid var(--line);background:#fff;border-radius:20px;padding:7px 12px;font:inherit;font-size:14px;white-space:nowrap;cursor:pointer}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;margin-top:8px}
+.slot{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 0;text-align:center;font-weight:700;cursor:pointer}.slot.on{background:var(--green);border-color:var(--green);color:#fff}
+.sv{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}.sv:first-child{border-top:0}
+.pick{border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:6px;cursor:pointer}.pick.on{border-color:var(--navy);background:#eef2ff}
+.bk{border-left:4px solid var(--navy);padding:8px 10px;background:#f6f8fb;border-radius:10px;margin-top:6px}
+.bk.s-come{border-color:var(--green)}.bk.s-done{border-color:var(--grey);opacity:.75}.bk.s-cancel,.bk.s-noshow{border-color:var(--red);opacity:.6}
+.badge{display:inline-block;font-size:12px;font-weight:700;border-radius:8px;padding:2px 7px;background:#e8edf5;color:var(--navy)}
+.sheet{position:fixed;inset:0;background:rgba(10,20,40,.45);z-index:2000;display:flex;align-items:flex-end;justify-content:center}
+.sheet>div{background:var(--bg);width:100%;max-width:760px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 20px)}
+.sheet h2{margin:4px 0 10px;font-size:20px}.x{float:right;border:0;background:#fff;border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer}
+.photos{display:flex;gap:6px;overflow-x:auto}.photos img{height:120px;border-radius:12px}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);background:#17202b;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:3000;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+.toast.on{opacity:1}.hidden{display:none!important}
+.hr{display:grid;grid-template-columns:44px 1fr 1fr 34px;gap:6px;align-items:center;margin-top:6px}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sum div{background:#f6f8fb;border-radius:12px;padding:10px}.sum b{display:block;font-size:19px}
+.err{color:var(--red);font-size:14px;margin-top:8px}
+</style>
+</head>
+<body>
+<header><button id="toShop" type="button" class="hidden">← В кабинет</button>
+<h1 id="hT">Парикмахерские</h1><p id="hS">Где свободно рядом — и запись без звонков</p>
+<nav><button data-tab="near" class="on">Рядом</button><button data-tab="my">Мои записи</button><button data-tab="biz" id="tBiz">Мой салон</button><button data-tab="itc" id="tItc" class="hidden">ИТК</button></nav></header>
+<main id="M"><div class="load">Загрузка…</div></main>
+<div class="toast" id="toast"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" async onload="window.LOK=1;if(window.TAB==='near'&&window.NEAR)mapNear(window.POS)" onerror="window.LFAIL=1;var m=document.getElementById('map');if(m)m.innerHTML='<div class=load>Карта не загрузилась — список ниже</div>'"></script>
+<script>
+"use strict";
+/* ---------- вид бизнеса: тот же файл — шиномонтаж (tire) и цветы (flower) ---------- */
+var KIND=(location.pathname.match(/\/apps\/(salon|tire|flower)\//)||[])[1]||'salon';
+var LB={salon:{app:'Парикмахерские',sub:'Где свободно рядом — и запись без звонков',biz:'салон',Biz:'Салон',my:'Мой салон',st:'Мастер',sts:'Мастера',any:'Любой свободный мастер',svcEx:'Мужская стрижка',varEx:'Короткие / Длинные'},
+        tire:{app:'Шиномонтаж',sub:'Где свободный пост рядом — без очереди',biz:'шиномонтаж',Biz:'Шиномонтаж',my:'Мой шиномонтаж',st:'Пост',sts:'Посты',any:'Любой свободный пост',svcEx:'Сезонная переобувка',varEx:'R13–R15 / R16–R18 / R19+'},
+        flower:{app:'Цветы',sub:'Магазины рядом',biz:'магазин',Biz:'Магазин',my:'Мой магазин',st:'Флорист',sts:'Флористы',any:'Любой флорист',svcEx:'Букет',varEx:'Малый / Средний / Большой'}}[KIND];
+document.title=LB.app+' ИТК';
+var $=function(i){return document.getElementById(i)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+var tT;function toast(m){var t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(tT);tT=setTimeout(function(){t.classList.remove('on')},3200)}
+function money(v,cur){v=+v||0;return (Math.round(v)===v?v.toLocaleString('ru-RU'):v.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}))+(cur?' '+cur:'')}
+var DOW=['','Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+/* ---------- вход: как у других приложений ИТК ---------- */
+var TOK='',FROM_ITC=/[?&]from=itc/.test(location.search);
+try{var mu=location.search.match(/[?&]u=([^&]+)/);if(mu){TOK=decodeURIComponent(mu[1]);localStorage.setItem('svc_u',TOK);}else TOK=localStorage.getItem('svc_u')||'';
+ if(!TOK){var a0=JSON.parse(localStorage.getItem('itc_auth')||'null');if(a0&&a0.token)TOK=a0.token;}}catch(e){}
+if(!TOK)location.replace('/?back='+encodeURIComponent(location.pathname));
+var API='/api/svc.php';
+function get(a,p){var q='?action='+a+'&t='+encodeURIComponent(TOK);for(var k in (p||{}))q+='&'+k+'='+encodeURIComponent(p[k]);return fetch(API+q,{cache:'no-store'}).then(function(r){return r.json()}).catch(function(){return{ok:false,error:'Нет связи'}})}
+function post(a,b){b=b||{};b.t=TOK;return fetch(API+'?action='+a+'&t='+encodeURIComponent(TOK),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){return r.json()}).catch(function(){return{ok:false,error:'Нет связи'}})}
+$('hT').textContent=LB.app;$('hS').textContent=LB.sub;$('tBiz').textContent=LB.my;
+$('toShop').classList.toggle('hidden',!FROM_ITC);$('toShop').onclick=function(){location.href='/'};
+try{var au=JSON.parse(localStorage.getItem('itc_auth')||'null');if(au&&au.auth&&au.auth.role==='itc'&&au.auth.staffRole==='boss')$('tItc').classList.remove('hidden')}catch(e){}
+var TAB='near';window.TAB=TAB;
+document.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(!b)return;document.querySelectorAll('nav button').forEach(function(x){x.classList.toggle('on',x===b)});TAB=window.TAB=b.dataset.tab;draw()};
+function draw(){if(TAB==='near')drawNear();else if(TAB==='my')drawMy();else if(TAB==='biz')drawBiz();else drawItc()}
+function sheet(html){closeSheet();var d=document.createElement('div');d.className='sheet';d.id='sh';d.innerHTML='<div><button class="x" onclick="closeSheet()">✕</button>'+html+'</div>';d.onclick=function(e){if(e.target===d)closeSheet()};document.body.appendChild(d);return d.firstChild}
+function closeSheet(){var s=$('sh');if(s)s.remove()}
+
+/* ======================= РЯДОМ ======================= */
+var POS=null,MAP=null,MK=[],NEAR=window.NEAR=[];
+function locate(cb){if(POS)return cb(POS);if(!navigator.geolocation)return cb(null);
+ navigator.geolocation.getCurrentPosition(function(p){POS={lat:p.coords.latitude,lng:p.coords.longitude};cb(POS)},function(){cb(null)},{enableHighAccuracy:true,timeout:9000,maximumAge:60000})}
+function drawNear(){var M=$('M');M.innerHTML='<div id="map"></div><div class="legend"><span><i class="dot c-green"></i>свободно сейчас</span><span><i class="dot c-yellow"></i>скоро</span><span><i class="dot c-red"></i>занято</span><span><i class="dot c-grey"></i>закрыто</span></div><div id="nl"><div class="load">Определяю, где вы…</div></div>';
+ locate(function(p){if(!p)$('nl').innerHTML='<div class="card">Включите геолокацию, чтобы увидеть, где свободно рядом с вами.<div class="row" style="margin-top:10px"><button class="btn b-navy" onclick="POS=null;drawNear()">Включить и найти</button><button class="btn b-line" onclick="loadNear(null)">Показать все</button></div></div>';else loadNear(p)})}
+function loadNear(p){$('nl').innerHTML='<div class="load">Ищу рядом…</div>';
+ get('near',p?{kind:KIND,lat:p.lat,lng:p.lng,r:15}:{kind:KIND}).then(function(j){if(!j.ok){$('nl').innerHTML='<div class="card err">'+esc(j.error)+'</div>';return}NEAR=window.NEAR=j.list;window.POS=p;listNear();mapNear(p)})}
+function listNear(){var h='';if(!NEAR.length)h='<div class="card">Рядом пока нет ни одного '+LB.biz+'а в приложении.<div class="small muted" style="margin-top:6px">Вы владелец? Откройте «'+LB.my+'» и добавьте себя — это бесплатно.</div></div>';
+ NEAR.forEach(function(b){var L=b.load||{c:'grey',t:''};h+='<div class="card biz" onclick="openBiz('+b.id+')">'+(b.photos&&b.photos[0]?'<img src="'+esc(b.photos[0])+'" alt="">':'<div class="ph"></div>')
+  +'<div style="flex:1;min-width:0"><h3>'+esc(b.name)+'</h3><div class="small muted">'+esc(b.address)+(b.km!=null?' · '+(b.km<1?Math.round(b.km*1000)+' м':b.km.toFixed(1).replace('.',',')+' км'):'')+'</div>'
+  +'<div class="st t-'+L.c+'"><i class="dot c-'+L.c+'"></i>'+esc(L.t)+'</div>'+(b.from?'<div class="small muted">от '+money(b.from,b.cur)+'</div>':'')+'</div></div>'});
+ $('nl').innerHTML=h}
+function mapNear(p){if(!$('map'))return;if(window.LFAIL){$('map').style.height='auto';$('map').style.minHeight='0'}if(!window.L||!window.LOK){$('map').innerHTML='<div class="load">'+(window.LFAIL?'Карта не загрузилась — список ниже':'Карта загружается…')+'</div>';return}
+ if(MAP){try{MAP.remove()}catch(e){}MAP=null}
+ var c=p?[p.lat,p.lng]:(NEAR[0]&&NEAR[0].lat?[NEAR[0].lat,NEAR[0].lng]:[42.87,74.59]);
+ MAP=L.map('map',{zoomControl:false}).setView(c,13);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(MAP);
+ var col={green:'#16a34a',yellow:'#e0a100',red:'#d93025',grey:'#9aa3ad'};
+ if(p)L.circleMarker([p.lat,p.lng],{radius:7,color:'#fff',weight:3,fillColor:'#1a73e8',fillOpacity:1}).addTo(MAP);
+ var pts=[];NEAR.forEach(function(b){if(b.lat==null)return;var L0=b.load||{c:'grey'};
+  var m=L.circleMarker([b.lat,b.lng],{radius:11,color:'#fff',weight:3,fillColor:col[L0.c],fillOpacity:1}).addTo(MAP);m.bindTooltip(esc(b.name)+' — '+esc(L0.t||''));m.on('click',function(){openBiz(b.id)});pts.push([b.lat,b.lng])});
+ if(pts.length&&!p)MAP.fitBounds(pts,{padding:[30,30],maxZoom:15})}
+
+/* ---------- карточка и запись ---------- */
+var BZ=null,BK={};
+function openBiz(id){var d=sheet('<div class="load">Загрузка…</div>');get('biz',{id:id}).then(function(j){if(!j.ok){d.innerHTML+='<div class="err">'+esc(j.error)+'</div>';return}BZ=j;BK={svc:null,v:'',staff:0,date:'',at:0};bizView()})}
+function bizView(){var b=BZ.biz,L0=b.load||{c:'grey',t:''},h='<button class="x" onclick="closeSheet()">✕</button><h2>'+esc(b.name)+'</h2>';
+ if(b.photos.length)h+='<div class="photos">'+b.photos.map(function(u){return'<img src="'+esc(u)+'" alt="">'}).join('')+'</div>';
+ h+='<div class="st t-'+L0.c+'" style="margin:8px 0"><i class="dot c-'+L0.c+'"></i>'+esc(L0.t)+'</div><div class="small">'+esc(b.address)+(b.phone?' · <a href="tel:'+esc(b.phone)+'">'+esc(b.phone)+'</a>':'')+'</div>';
+ if(b.lat!=null)h+='<div class="small" style="margin-top:4px"><a target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat='+b.lat+'&mlon='+b.lng+'#map=17/'+b.lat+'/'+b.lng+'">Открыть на карте</a></div>';
+ if(b.about)h+='<p class="small muted">'+esc(b.about)+'</p>';
+ var hs=[];for(var i=1;i<=7;i++){var x=b.hours[i];hs.push(DOW[i]+' '+(x?x.o+'–'+x.c:'выходной'))}h+='<details class="small muted"><summary>Часы работы</summary>'+hs.join('<br>')+'</details>';
+ h+='<div class="card" style="margin-top:12px"><div class="big">1. Услуга</div>';
+ BZ.services.forEach(function(s){var on=BK.svc===s.id;h+='<div class="pick'+(on?' on':'')+'" onclick="pickSvc('+s.id+')"><div class="row" style="justify-content:space-between"><b>'+esc(s.name)+'</b><span>'+(s.variants.length?'от '+money(Math.min.apply(null,s.variants.map(function(v){return v.price})),b.cur):money(s.price,b.cur))+'</span></div><div class="small muted">'+s.dur+' мин'+(s.note?' · '+esc(s.note):'')+'</div>';
+  if(on&&s.variants.length)h+='<div class="chips" style="margin-top:8px">'+s.variants.map(function(v,k){return'<button class="chip'+(String(BK.v)===String(k)?' on':'')+'" onclick="event.stopPropagation();BK.v='+k+';BK.at=0;bizView()">'+esc(v.name)+' · '+money(v.price,b.cur)+'</button>'}).join('')+'</div>';h+='</div>'});
+ h+='</div>';
+ var s=svcById(BK.svc);
+ if(s&&(!s.variants.length||BK.v!=='')){h+='<div class="card"><div class="big">2. '+LB.st+'</div><div class="chips" style="margin-top:8px"><button class="chip'+(!BK.staff?' on':'')+'" onclick="BK.staff=0;BK.at=0;bizView()">'+LB.any+'</button>'
+  +BZ.staff.map(function(st){return'<button class="chip'+(BK.staff===st.id?' on':'')+'" onclick="BK.staff='+st.id+';BK.at=0;bizView()">'+esc(st.name)+'</button>'}).join('')+'</div></div>';
+  h+='<div class="card"><div class="big">3. Время</div><div class="chips" style="margin-top:8px" id="days"></div><div id="sl"><div class="load">Смотрю свободное время…</div></div></div>';
+  h+='<div id="conf"></div>'}
+ $('sh').firstChild.innerHTML=h;if(s&&(!s.variants.length||BK.v!==''))daysAndSlots()}
+function svcById(id){for(var i=0;i<(BZ?BZ.services.length:0);i++)if(BZ.services[i].id===id)return BZ.services[i];return null}
+function pickSvc(id){BK.svc=id;BK.v='';BK.at=0;bizView()}
+function ymd(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+function daysAndSlots(){var t=new Date(),h='';if(!BK.date)BK.date=ymd(t);for(var i=0;i<7;i++){var d=new Date(t.getTime()+i*864e5),k=ymd(d);h+='<button class="chip'+(BK.date===k?' on':'')+'" onclick="BK.date=\''+k+'\';BK.at=0;bizView()">'+(i===0?'Сегодня':i===1?'Завтра':DOW[(d.getDay()||7)]+' '+d.getDate())+'</button>'}$('days').innerHTML=h;
+ get('slots',{biz:BZ.biz.id,service:BK.svc,staff:BK.staff,date:BK.date}).then(function(j){if(!j.ok){$('sl').innerHTML='<div class="err">'+esc(j.error)+'</div>';return}
+  if(!j.slots.length){$('sl').innerHTML='<div class="muted" style="margin-top:8px">На этот день свободного времени нет — выберите другой день'+(BK.staff?' или любого мастера':'')+'.</div>';return}
+  $('sl').innerHTML='<div class="slots">'+j.slots.map(function(x){return'<div class="slot'+(BK.at===x.at?' on':'')+'" onclick="BK.at='+x.at+';BK.hm=\''+x.hm+'\';confView()">'+x.hm+'</div>'}).join('')+'</div>';if(BK.at)confView()})}
+function confView(){document.querySelectorAll('.slot').forEach(function(e){e.classList.toggle('on',e.textContent===BK.hm)});var s=svcById(BK.svc),b=BZ.biz,price=s.variants.length?s.variants[BK.v].price:s.price,pp=b.prepay,pre=0;
+ if(pp.mode==='full')pre=price;else if(pp.mode==='percent')pre=Math.round(price*pp.value)/100;else if(pp.mode==='fixed')pre=Math.min(price,pp.value);
+ var nm='';try{var au=JSON.parse(localStorage.getItem('itc_auth')||'null');nm=(au&&au.auth&&au.auth.name)||''}catch(e){}
+ $('conf').innerHTML='<div class="card"><div class="big">4. Подтвердите</div><p>'+esc(s.name)+(s.variants.length?' · '+esc(s.variants[BK.v].name):'')+'<br>'+BK.date.split('-').reverse().join('.')+' в <b>'+BK.hm+'</b> · '+money(price,b.cur)+'</p>'
+  +(pre?'<p class="small">Предоплата '+money(pre,b.cur)+'. Бесплатная отмена — не позже чем за '+pp.cancel_h+' ч.</p>':'')
+  +'<label class="f">Как вас зовут</label><input class="i" id="bnm" value="'+esc(nm)+'"><label class="f">Пожелание (необязательно)</label><input class="i" id="bnote" maxlength="300">'
+  +'<button class="btn b-green w100" style="margin-top:12px" id="bgo" onclick="doBook()">Записаться</button><div id="berr"></div></div>';$('conf').scrollIntoView({behavior:'smooth',block:'nearest'})}
+function doBook(){$('bgo').disabled=true;post('book',{biz:BZ.biz.id,service:BK.svc,variant:BK.v,staff:BK.staff,at:BK.at,name:$('bnm').value,note:$('bnote').value}).then(function(j){$('bgo').disabled=false;
+ if(!j.ok){$('berr').innerHTML='<div class="err">'+esc(j.error)+'</div>';if(/заняли/.test(j.error||'')){BK.at=0;daysAndSlots()}return}
+ if(j.pay_url){location.href=j.pay_url;return}
+ closeSheet();toast('Вы записаны'+(j.staff?' к мастеру '+j.staff:'')+(j.pay_onsite?'. Предоплату '+LB.biz+' возьмёт на месте':''));TAB=window.TAB='my';document.querySelectorAll('nav button').forEach(function(x){x.classList.toggle('on',x.dataset.tab==='my')});draw()})}
+
+/* ======================= МОИ ЗАПИСИ ======================= */
+var SN={new:'ждёт',ok:'подтверждена',wait:'ждёт оплаты',come:'пришёл',done:'выполнено',noshow:'не пришёл',cancel:'отменена'};
+function drawMy(){$('M').innerHTML='<div class="load">Загрузка…</div>';get('my').then(function(j){if(!j.ok){$('M').innerHTML='<div class="card err">'+esc(j.error)+'</div>';return}
+ if(!j.list.length){$('M').innerHTML='<div class="card">Записей пока нет. Откройте «Рядом» и выберите, где свободно.</div>';return}
+ var now=Date.now()/1000;$('M').innerHTML=j.list.map(function(x){var fut=x.t0>now&&['new','ok','wait'].indexOf(x.status)>=0;
+  return'<div class="card"><div class="row" style="justify-content:space-between"><b>'+esc(x.biz.name)+'</b><span class="badge">'+esc(SN[x.status]||x.status)+'</span></div><div>'+esc(x.service)+'</div><div class="big" style="margin:4px 0">'+x.start.slice(8,10)+'.'+x.start.slice(5,7)+' в '+x.start.slice(11)+'</div>'
+  +'<div class="small muted">'+esc(x.biz.address)+' · '+money(x.price)+(x.prepay?' · предоплата '+money(x.prepay)+(x.pay==='paid'?' оплачена':x.pay==='refund'?' возвращается':' — на месте'):'')+'</div>'
+  +(fut?'<div class="row" style="margin-top:10px">'+(x.biz.lat?'<a class="btn b-line b-sm" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat='+x.biz.lat+'&mlon='+x.biz.lng+'#map=17/'+x.biz.lat+'/'+x.biz.lng+'">Как доехать</a>':'')+(x.biz.phone?'<a class="btn b-line b-sm" href="tel:'+esc(x.biz.phone)+'">Позвонить</a>':'')+'<button class="btn b-red b-sm" onclick="myCancel('+x.id+','+x.cancel_h+','+x.t0+','+(x.pay==='paid'?1:0)+')">Отменить</button></div>':'')+'</div>'}).join('')})}
+function myCancel(id,h,t0,paid){var late=t0-Date.now()/1000<h*3600;if(!confirm(late&&paid?'До записи меньше '+h+' ч — предоплата не вернётся. Отменить?':'Отменить запись?'))return;
+ post('cancel',{id:id}).then(function(j){toast(j.ok?(j.refund?'Отменено. Предоплата вернётся':'Отменено'):j.error);drawMy()})}
+
+/* ======================= МОЙ САЛОН ======================= */
+var MB=[],CB=null,BT='day';
+function drawBiz(){$('M').innerHTML='<div class="load">Загрузка…</div>';get('mybiz',{kind:KIND}).then(function(j){if(!j.ok){$('M').innerHTML='<div class="card err">'+esc(j.error)+'</div>';return}MB=j.list;window.FEE=j.fee_pct;
+ if(CB)CB=MB.filter(function(b){return b.id===CB.id})[0]||null;if(!CB)CB=MB[0]||null;
+ if(!CB){$('M').innerHTML='<div class="card"><div class="big">Добавьте свой '+LB.biz+'</div><p class="small">Клиенты рядом увидят, когда у вас свободно, и запишутся сами. Это бесплатно: '+FEE+'% берётся только с денег, которые клиент заплатил через приложение (предоплата), — вам приходит '+(100-FEE)+'%.</p><button class="btn b-navy w100" onclick="CB={};BT=\'prof\';bizTabs()">Добавить '+LB.biz+'</button></div>';return}
+ bizTabs()})}
+function bizTabs(){var tabs=CB.id?[['day','Сегодня'],['svc','Услуги'],['st',LB.sts],['prof','Профиль'],['money','Деньги']]:[['prof','Профиль']];if(!CB.id)BT='prof';
+ var h=(MB.length>1?'<select class="i" style="margin-bottom:8px" onchange="CB=MB[this.selectedIndex];bizTabs()">'+MB.map(function(b){return'<option'+(b.id===CB.id?' selected':'')+'>'+esc(b.name)+'</option>'}).join('')+'</select>':'');
+ if(CB.id){var L0=CB.load||{c:'grey',t:''};h+='<div class="card"><div class="row" style="justify-content:space-between"><div><b>'+esc(CB.name)+'</b><div class="st t-'+L0.c+'"><i class="dot c-'+L0.c+'"></i>Клиенты видят: '+esc(L0.t)+'</div></div>'
+  +(CB.status==='active'?'<button class="btn b-line b-sm" onclick="publish(0)">Скрыть</button>':'<button class="btn b-green b-sm" onclick="publish(1)">Показывать клиентам</button>')+'</div>'+(CB.status!=='active'?'<div class="small muted" style="margin-top:6px">Сейчас клиенты вас не видят — это черновик.</div>':'')+'<div id="perr"></div></div>'}
+ h+='<div class="chips" style="margin-bottom:10px">'+tabs.map(function(t){return'<button class="chip'+(BT===t[0]?' on':'')+'" onclick="BT=\''+t[0]+'\';bizTabs()">'+t[1]+'</button>'}).join('')+(CB.id?'<button class="chip" onclick="CB={};BT=\'prof\';bizTabs()">+ ещё '+LB.biz+'</button>':'')+'</div><div id="BB"></div>';
+ $('M').innerHTML=h;({day:bDay,svc:bSvc,st:bSt,prof:bProf,money:bMoney})[BT]()}
+function publish(on){post('publish',{biz:CB.id,on:on}).then(function(j){if(!j.ok){$('perr').innerHTML='<div class="err">'+esc(j.error)+'</div>';return}toast(on?'Теперь клиенты вас видят':'Скрыто от клиентов');drawBiz()})}
+
+/* --- сегодня --- */
+var DD='';
+function bDay(){if(!DD)DD=ymd(new Date());$('BB').innerHTML='<div class="load">Загрузка…</div>';get('day',{biz:CB.id,date:DD}).then(function(j){if(!j.ok){$('BB').innerHTML='<div class="err">'+esc(j.error)+'</div>';return}
+ var t=new Date(),dh='';for(var i=-1;i<7;i++){var d=new Date(t.getTime()+i*864e5),k=ymd(d);dh+='<button class="chip'+(DD===k?' on':'')+'" onclick="DD=\''+k+'\';bDay()">'+(i===0?'Сегодня':i===-1?'Вчера':i===1?'Завтра':DOW[d.getDay()||7]+' '+d.getDate())+'</button>'}
+ var h='<div class="chips" style="margin-bottom:10px">'+dh+'</div>';if(!j.staff.length)h+='<div class="card">Добавьте '+LB.sts.toLowerCase()+' во вкладке «'+LB.sts+'».</div>';
+ j.staff.forEach(function(st){var my=j.list.filter(function(x){return x.staff_id===st.id});h+='<div class="card"><div class="row" style="justify-content:space-between"><b>'+esc(st.name)+'</b><span class="small muted">'+(st.open?st.open[0]+'–'+st.open[1]:'выходной')+'</span></div>';
+  if(DD===ymd(new Date())&&st.open)h+='<button class="btn b-green w100 b-sm" style="margin-top:8px" onclick="walkin('+st.id+')">+ Пришёл без записи — занять сейчас</button>';
+  if(!my.length)h+='<div class="small muted" style="margin-top:6px">Записей нет</div>';
+  my.forEach(function(x){h+='<div class="bk s-'+x.status+'"><div class="row" style="justify-content:space-between"><b>'+x.start.slice(11)+'–'+x.end.slice(11)+'</b><span class="badge">'+esc(SN[x.status]||x.status)+(x.src!=='app'?' · '+(x.src==='walkin'?'без записи':'по телефону'):'')+'</span></div>'
+   +'<div>'+esc(x.service)+' · '+money(x.price,CB.cur)+'</div><div class="small muted">'+esc(x.client_name||'')+(x.client?' · <a href="tel:+'+esc(x.client)+'">+'+esc(x.client)+'</a>':'')+(x.prepay?' · предоплата '+money(x.prepay,CB.cur)+' ('+(x.pay==='paid'?'оплачена через приложение':x.pay==='refund'?'возврат':'на месте')+')':'')+(x.note?' · '+esc(x.note):'')+'</div>';
+   if(['new','ok','wait','come'].indexOf(x.status)>=0)h+='<div class="row" style="margin-top:6px">'+(x.status!=='come'?'<button class="btn b-line b-sm" onclick="bst('+x.id+',\'come\')">Пришёл</button>':'')+'<button class="btn b-navy b-sm" onclick="bst('+x.id+',\'done\',1)">Готово</button>'+(x.status!=='come'?'<button class="btn b-line b-sm" onclick="bst('+x.id+',\'noshow\')">Не пришёл</button>':'')+'<button class="btn b-red b-sm" onclick="if(confirm(\'Отменить запись? Если клиент платил через приложение — деньги вернутся ему.\'))bst('+x.id+',\'cancel\')">Отменить</button></div>';
+   h+='</div>'});h+='</div>'});
+ $('BB').innerHTML=h})}
+function bst(id,s,end){post('bstatus',{id:id,status:s,end_now:end?1:0}).then(function(j){if(!j.ok)toast(j.error);bDay()})}
+function walkin(sid){var o=CB.services.filter(function(s){return s.active}).map(function(s){return'<option value="'+s.id+'" data-d="'+s.dur+'">'+esc(s.name)+' · '+s.dur+' мин</option>'}).join('');
+ sheet('<h2>Пришёл без записи</h2><p class="small muted">Мастер станет занят на это время — клиенты на карте увидят, что сейчас занято.</p><label class="f">Услуга</label><select class="i" id="wsv"><option value="0" data-d="30">Другое</option>'+o+'</select><label class="f">На сколько минут</label><input class="i" id="wd" type="number" value="30" min="5" max="600"><label class="f">Имя клиента (необязательно)</label><input class="i" id="wn"><button class="btn b-green w100" style="margin-top:12px" id="wgo">Занять мастера</button><div id="werr"></div>');
+ $('wsv').onchange=function(){$('wd').value=this.options[this.selectedIndex].dataset.d};
+ $('wgo').onclick=function(){post('walkin',{biz:CB.id,staff:sid,service:+$('wsv').value,dur:+$('wd').value,name:$('wn').value}).then(function(j){if(!j.ok){$('werr').innerHTML='<div class="err">'+esc(j.error)+'</div>';return}closeSheet();toast('Отмечено');bDay()})}}
+
+/* --- услуги --- */
+function bSvc(){var h='<div class="card"><div class="small muted">Если цена зависит от чего-то ('+LB.varEx+') — добавьте варианты цены, клиент выберет нужный.</div><button class="btn b-navy w100" style="margin-top:8px" onclick="svcEdit(0)">+ Услуга</button></div>';
+ CB.services.forEach(function(s){h+='<div class="card" onclick="svcEdit('+s.id+')" style="cursor:pointer'+(s.active?'':';opacity:.55')+'"><div class="row" style="justify-content:space-between"><b>'+esc(s.name)+'</b><span>'+(s.variants.length?s.variants.map(function(v){return esc(v.name)+' '+money(v.price,CB.cur)}).join(' · '):money(s.price,CB.cur))+'</span></div><div class="small muted">'+s.dur+' мин'+(s.active?'':' · скрыта')+'</div></div>'});
+ $('BB').innerHTML=h}
+function svcEdit(id){var s=CB.services.filter(function(x){return x.id===id})[0]||{name:'',dur:30,price:'',variants:[],note:'',active:1};
+ var vr=function(v){return'<div class="g2 vr" style="margin-top:6px"><input class="i vn" placeholder="Вариант" value="'+esc(v.name||'')+'"><input class="i vp" type="number" placeholder="Цена" value="'+(v.price||'')+'"></div>'};
+ sheet('<h2>'+(id?'Услуга':'Новая услуга')+'</h2><label class="f">Название</label><input class="i" id="sn" value="'+esc(s.name)+'" placeholder="'+LB.svcEx+'"><div class="g2"><div><label class="f">Длится, мин</label><input class="i" id="sd" type="number" value="'+s.dur+'"></div><div><label class="f">Цена'+(CB.cur?' ('+esc(CB.cur)+')':'')+'</label><input class="i" id="sp" type="number" value="'+s.price+'"></div></div>'
+  +'<label class="f">Варианты цены (если есть)</label><div id="vrs">'+(s.variants.length?s.variants:[{}]).map(vr).join('')+'</div><button class="btn b-line b-sm" style="margin-top:6px" id="vadd">+ вариант</button>'
+  +'<label class="f">Пояснение</label><input class="i" id="sno" value="'+esc(s.note)+'"><label class="row" style="margin-top:10px"><input type="checkbox" id="sa"'+(s.active?' checked':'')+'> показывать клиентам</label>'
+  +'<button class="btn b-navy w100" style="margin-top:12px" id="sgo">Сохранить</button>'+(id?'<button class="btn b-red w100" style="margin-top:8px" id="sdel">Удалить</button>':'')+'<div id="serr"></div>');
+ $('vadd').onclick=function(){$('vrs').insertAdjacentHTML('beforeend',vr({}))};
+ $('sgo').onclick=function(){var V=[];document.querySelectorAll('.vr').forEach(function(r){var n=r.querySelector('.vn').value.trim(),p=+r.querySelector('.vp').value;if(n&&p>0)V.push({name:n,price:p})});
+  post('svc_save',{biz:CB.id,id:id,name:$('sn').value,dur:+$('sd').value,price:+$('sp').value||(V[0]?V[0].price:0),variants:V,note:$('sno').value,active:$('sa').checked?1:0}).then(function(j){if(!j.ok){$('serr').innerHTML='<div class="err">'+esc(j.error)+'</div>';return}closeSheet();toast('Сохранено');drawBiz()})};
+ if(id)$('sdel').onclick=function(){if(confirm('Удалить услугу?'))post('svc_del',{biz:CB.id,id:id}).then(function(){closeSheet();drawBiz()})}}
+
+/* --- мастера --- */
+function bSt(){var h='<div class="card"><button class="btn b-navy w100" onclick="stEdit(0)">+ '+LB.st+'</button><div class="small muted" style="margin-top:6px">Если часы не указать — работает по часам '+LB.biz+'а.</div></div>';
+ CB.staff.forEach(function(s){h+='<div class="card" onclick="stEdit('+s.id+')" style="cursor:pointer'+(s.active?'':';opacity:.55')+'"><b>'+esc(s.name)+'</b><div class="small muted">'+esc(s.title||'')+(s.hours?' · свои часы':'')+(s.active?'':' · не принимает')+'</div></div>'});$('BB').innerHTML=h}
+function hoursHtml(H,pre){var h='';for(var i=1;i<=7;i++){var x=H&&H[i];h+='<div class="hr"><b>'+DOW[i]+'</b><input class="i" type="time" id="'+pre+'o'+i+'" value="'+(x?x.o:'')+'"><input class="i" type="time" id="'+pre+'c'+i+'" value="'+(x?x.c:'')+'"><input type="checkbox" title="работает" id="'+pre+'w'+i+'"'+(x?' checked':'')+'></div>'}return h}
+function hoursRead(pre){var H={};for(var i=1;i<=7;i++){H[i]=$(pre+'w'+i).checked&&$(pre+'o'+i).value&&$(pre+'c'+i).value?{o:$(pre+'o'+i).value,c:$(pre+'c'+i).value}:null}return H}
+function stEdit(id){var s=CB.staff.filter(function(x){return x.id===id})[0]||{name:'',title:'',hours:null,active:1};
+ sheet('<h2>'+(id?esc(s.name):'Новый: '+LB.st.toLowerCase())+'</h2><label class="f">Имя</label><input class="i" id="tn" value="'+esc(s.name)+'"><label class="f">Кто (необязательно)</label><input class="i" id="tt" value="'+esc(s.title)+'" placeholder="барбер, колорист…">'
+  +'<label class="row" style="margin-top:10px"><input type="checkbox" id="th"'+(s.hours?' checked':'')+'> свои часы работы</label><div id="thw" class="'+(s.hours?'':'hidden')+'">'+hoursHtml(s.hours||CB.hours,'t')+'</div>'
+  +'<label class="row" style="margin-top:10px"><input type="checkbox" id="ta"'+(s.active?' checked':'')+'> принимает записи</label><button class="btn b-navy w100" style="margin-top:12px" id="tgo">Сохранить</button>'+(id?'<button class="btn b-red w100" style="margin-top:8px" id="tdel">Удалить</button>':'')+'<div id="terr"></div>');
+ $('th').onchange=function(){$('thw').classList.toggle('hidden',!this.checked)};
+ $('tgo').onclick=function(){post('staff_save',{biz:CB.id,id:id,name:$('tn').value,title:$('tt').value,hours:$('th').checked?hoursRead('t'):null,active:$('ta').checked?1:0}).then(function(j){if(!j.ok){$('terr').innerHTML='<div class="err">'+esc(j.error)+'</div>';return}closeSheet();toast('Сохранено');drawBiz()})};
+ if(id)$('tdel').onclick=function(){if(confirm('Удалить?'))post('staff_del',{biz:CB.id,id:id}).then(function(j){closeSheet();toast(j.hidden?'Есть будущие записи — скрыт, а не удалён':'Удалён');drawBiz()})}}
+
+/* --- профиль --- */
+var PMAP=null;
+function bProf(){var b=CB,pp=b.prepay||{mode:'none',value:0,cancel_h:2},H=b.hours||{1:{o:'10:00',c:'20:00'},2:{o:'10:00',c:'20:00'},3:{o:'10:00',c:'20:00'},4:{o:'10:00',c:'20:00'},5:{o:'10:00',c:'20:00'},6:{o:'10:00',c:'18:00'},7:null};
+ var tz=b.tz&&b.tz!=='UTC'?b.tz:(Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC');
+ var h='<div class="card"><div class="big">'+LB.Biz+'</div><label class="f">Название</label><input class="i" id="pn" value="'+esc(b.name||'')+'"><label class="f">Телефон для клиентов</label><input class="i" id="pph" value="'+esc(b.phone||'')+'" inputmode="tel">'
+  +'<label class="f">О вас (необязательно)</label><textarea class="i" id="pab">'+esc(b.about||'')+'</textarea></div>'
+  +'<div class="card"><div class="big">Кто вы по документам</div><div class="chips" style="margin-top:8px" id="plt">'+[['ip','ИП'],['ooo','ООО / компания'],['self','Самозанятый'],['other','Другое']].map(function(x){return'<button class="chip'+(b.legal_type===x[0]?' on':'')+'" data-v="'+x[0]+'">'+x[1]+'</button>'}).join('')+'</div>'
+  +'<label class="f">Название по документам</label><input class="i" id="pln" value="'+esc(b.legal_name||'')+'" placeholder="ИП Иванов Иван Иванович"><label class="f">ИНН / налоговый номер</label><input class="i" id="pinn" value="'+esc(b.inn||'')+'"><div class="small muted" style="margin-top:6px">Нужно, чтобы переводить вам деньги клиентов, прошедшие через приложение.</div></div>'
+  +'<div class="card"><div class="big">Где вы</div><label class="f">Адрес</label><input class="i" id="pad" value="'+esc(b.address||'')+'"><div class="g2"><div><label class="f">Город</label><input class="i" id="pci" value="'+esc(b.city||'')+'"></div><div><label class="f">Валюта цен</label><input class="i" id="pcu" value="'+esc(b.cur||'')+'" placeholder="RUB, KGS, KZT…" maxlength="8"></div></div>'
+  +'<label class="f">Точка на карте — нажмите на карту, где вход</label><div id="pmap" style="height:220px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div><div class="row" style="margin-top:6px"><button class="btn b-line b-sm" id="phere">Я сейчас здесь</button><span class="small muted" id="pll">'+(b.lat!=null?'Точка стоит':'Точка не поставлена')+'</span></div>'
+  +'<div class="small muted" style="margin-top:6px">Часовой пояс: '+esc(tz)+'</div></div>'
+  +'<div class="card"><div class="big">Часы работы</div>'+hoursHtml(H,'h')+'</div>'
+  +'<div class="card"><div class="big">Предоплата при записи</div><div class="small muted">Защищает от «записался и не пришёл». Через приложение: '+(window.FEE||5)+'% наши, '+(100-(window.FEE||5))+'% вам.</div><select class="i" id="ppm" style="margin-top:8px"><option value="none">Без предоплаты</option><option value="percent">Процент от цены</option><option value="fixed">Фиксированная сумма</option><option value="full">Вся сумма сразу</option></select>'
+  +'<div class="g2"><div><label class="f">Сколько</label><input class="i" id="ppv" type="number" value="'+(pp.value||'')+'"></div><div><label class="f">Бесплатная отмена за, ч</label><input class="i" id="ppc" type="number" value="'+pp.cancel_h+'"></div></div></div>'
+  +'<div class="card"><div class="big">Кто ещё ведёт записи</div><label class="f">Телефоны администраторов через запятую</label><input class="i" id="padm" value="'+esc((b.admins||[]).join(', '))+'" inputmode="tel"></div>';
+ if(b.id)h+='<div class="card"><div class="big">Фото</div><div class="photos" style="margin:8px 0">'+(b.photos||[]).map(function(u){return'<div style="position:relative"><img src="'+esc(u)+'"><button class="x" style="position:absolute;top:4px;right:4px;width:28px;height:28px;font-size:14px" onclick="phDel(\''+esc(u)+'\')">✕</button></div>'}).join('')+'</div><input type="file" accept="image/*" id="pfile" class="hidden"><button class="btn b-line w100" onclick="$(\'pfile\').click()">+ Добавить фото</button></div>';
+ h+='<button class="btn b-navy w100" id="pgo">Сохранить</button><div id="perr2"></div>';
+ $('BB').innerHTML=h;$('ppm').value=pp.mode;var LT=b.legal_type||'';
+ $('plt').onclick=function(e){var c=e.target.closest('.chip');if(!c)return;LT=c.dataset.v;this.querySelectorAll('.chip').forEach(function(x){x.classList.toggle('on',x===c)})};
+ var LAT=b.lat,LNG=b.lng,mk=null;function setPt(a,g){LAT=a;LNG=g;$('pll').textContent='Точка стоит: '+a.toFixed(5)+', '+g.toFixed(5);if(PMAP){if(mk)mk.setLatLng([a,g]);else mk=L.marker([a,g]).addTo(PMAP);PMAP.setView([a,g],Math.max(PMAP.getZoom(),16))}}
+ if(!(window.L&&window.LOK))$('pmap').innerHTML='<div class="load">Карта не загрузилась — нажмите «Я сейчас здесь», стоя у входа</div>';
+ if(window.L&&window.LOK){if(PMAP){try{PMAP.remove()}catch(e){}}PMAP=L.map('pmap').setView(LAT!=null?[LAT,LNG]:(POS?[POS.lat,POS.lng]:[42.87,74.59]),LAT!=null?17:12);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(PMAP);if(LAT!=null)mk=L.marker([LAT,LNG]).addTo(PMAP);PMAP.on('click',function(e){setPt(e.latlng.lat,e.latlng.lng)})}
+ $('phere').onclick=function(){POS=null;locate(function(p){if(p)setPt(p.lat,p.lng);else toast('Не удалось определить — нажмите на карту')})};
+ if($('pfile'))$('pfile').onchange=function(){var f=this.files[0];if(!f)return;shrink(f,function(d){post('photo',{biz:b.id,data:d}).then(function(j){if(!j.ok)toast(j.error);else{toast('Фото добавлено');drawBiz()}})})};
+ $('pgo').onclick=function(){$('pgo').disabled=true;post('biz_save',{id:b.id||0,kind:KIND,name:$('pn').value,phone:$('pph').value,about:$('pab').value,legal_type:LT,legal_name:$('pln').value,inn:$('pinn').value,address:$('pad').value,city:$('pci').value,cur:$('pcu').value,lat:LAT,lng:LNG,tz:tz,
+  hours:hoursRead('h'),prepay:{mode:$('ppm').value,value:+$('ppv').value||0,cancel_h:+$('ppc').value||0},admins:$('padm').value.split(/[,;\s]+/).filter(Boolean)}).then(function(j){$('pgo').disabled=false;if(!j.ok){$('perr2').innerHTML='<div class="err">'+esc(j.error)+'</div>';return}
+  toast('Сохранено');var isNew=!b.id;CB={id:j.id};BT=isNew?'st':'prof';drawBiz()})}}
+function phDel(u){if(confirm('Убрать фото?'))post('photo',{biz:CB.id,del:u}).then(function(){drawBiz()})}
+function shrink(file,cb){var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){var k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.85))};im.src=r.result};r.readAsDataURL(file)}
+
+/* --- деньги --- */
+function bMoney(){$('BB').innerHTML='<div class="load">Загрузка…</div>';get('money',{biz:CB.id}).then(function(j){if(!j.ok){$('BB').innerHTML='<div class="err">'+esc(j.error)+'</div>';return}var s=j.sum,c=j.cur;
+ var h='<div class="card"><div class="small muted">Здесь — только деньги, которые клиенты заплатили через приложение. С них '+j.fee_pct+'% остаётся ИТК, '+(100-j.fee_pct)+'% — вам. Оплату на месте приложение не трогает.</div>'
+  +'<div class="sum" style="margin-top:10px"><div>Прошло через приложение<b>'+money(s.paid,c)+'</b></div><div>Комиссия ИТК '+j.fee_pct+'%<b>'+money(s.fee,c)+'</b></div><div>Ждёт перевода вам<b>'+money(s.due,c)+'</b></div><div>Уже переведено<b>'+money(s.sent,c)+'</b></div></div></div>';
+ if(!j.list.length)h+='<div class="card muted">Пока онлайн-оплат не было.</div>';
+ j.list.forEach(function(p){h+='<div class="card"><div class="row" style="justify-content:space-between"><b>'+esc(p.what||'')+'</b><span>'+money(p.amount,c)+'</span></div><div class="small muted">'+esc(p.client||'')+' · '+(p.status==='refund'?'возвращено клиенту':'вам '+money(p.payout,c)+' · ИТК '+money(p.fee,c)+' · '+(p.payout_status==='sent'?'переведено':'ждёт перевода'))+'</div></div>'});
+ $('BB').innerHTML=h})}
+
+/* ======================= ИТК (руководитель) ======================= */
+function drawItc(){$('M').innerHTML='<div class="load">Загрузка…</div>';get('admin').then(function(j){if(!j.ok){$('M').innerHTML='<div class="card err">'+esc(j.error)+'</div>';return}var t=j.total;
+ var h='<div class="card"><div class="big">Все бизнесы «ИТК Сервис»</div><div class="sum" style="margin-top:10px"><div>Прошло через нас<b>'+money(t.through)+'</b></div><div>Наши '+j.fee_pct+'%<b>'+money(t.fee)+'</b></div><div>Перевести бизнесам<b>'+money(t.due)+'</b></div><div>Бизнесов<b>'+j.list.length+'</b></div></div></div>';
+ var KN={salon:'парикмахерская',tire:'шиномонтаж',flower:'цветы'},LTn={ip:'ИП',ooo:'ООО',self:'самозанятый',other:'другое'};
+ j.list.forEach(function(b){h+='<div class="card"><div class="row" style="justify-content:space-between"><b>'+esc(b.name)+'</b><span class="badge">'+(b.status==='active'?'виден клиентам':b.status==='draft'?'черновик':'выключен')+'</span></div><div class="small muted">'+esc(KN[b.kind]||b.kind)+' · '+esc(b.city||'')+' · '+esc(LTn[b.legal_type]||'форма не указана')+(b.inn?' · ИНН '+esc(b.inn):'')+' · записей за 30 дней: '+b.bk30+'</div>'
+  +'<div class="small" style="margin-top:4px">Наши: '+money(b.fee)+' · ждёт перевода: '+money(b.due)+'</div>'+(+b.due>0?'<button class="btn b-line b-sm" style="margin-top:6px" onclick="if(confirm(\'Отметить, что '+money(b.due)+' переведено?\'))post(\'payout_mark\',{biz:'+b.id+'}).then(drawItc)">Отметить: переведено</button>':'')+'</div>'});
+ $('M').innerHTML=h})}
+
+if(TOK)draw();
+</script>
+</body>
+</html>
