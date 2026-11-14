@@ -161,7 +161,8 @@ switch ($a) {
   case 'upd_ready': {                                // №545 · что сервер подготовил к установке (только руководитель)
     $S = ks_staff(); if (!ks_boss($S)) ks_out(['ok' => false, 'error' => 'Только для руководителя'], 403);
     $r = ks_json(ks_dir() . '/releases.json');
-    ks_out(['ok' => true, 'items' => ks_ready_list(), 'err' => (string)($r['last_err'] ?? '')]);
+    ks_out(['ok' => true, 'items' => ks_ready_list(), 'err' => (string)($r['last_err'] ?? ''), 'now' => time(),
+            'seen' => (int)($r['at'] ?? 0), 'ver' => (string)($r['ver'] ?? ''), 'wait' => (string)($r['wait'] ?? ''), 'android' => $r['android'] ?? null]);   // №596 · видно, жив ли сервер и что он делает
   }
 
   /* №553 · правки разработчиков, которые ждут решения руководителя, — прямо на странице «Обновления» */
@@ -285,7 +286,9 @@ switch ($a) {
     // №545 · сервер сам собирает обновления: ключ обновлений отдаём ему, пока он его не получил
     $out = ['ok' => true, 'gw' => $g['gw'], 'cron' => ks_cron_url()];
     if (!empty($b['want_upd_key']) && ($uk = ks_upd_key()) !== '') $out['upd_key'] = $uk;
-    if (is_array($b['releases'] ?? null)) ks_put(ks_dir() . '/releases.json', ['at' => time(), 'last_err' => mb_substr((string)($b['releases']['last_err'] ?? ''), 0, 300)]);
+    if (is_array($b['releases'] ?? null)) ks_put(ks_dir() . '/releases.json', ['at' => time(), 'last_err' => mb_substr((string)($b['releases']['last_err'] ?? ''), 0, 300),
+      'wait' => mb_substr((string)($b['releases']['wait'] ?? ''), 0, 200), 'ver' => mb_substr((string)($b['ver'] ?? ''), 0, 20),
+      'android' => is_array($b['android'] ?? null) ? array_intersect_key($b['android'], array_flip(['n', 'run', 'step', 'at', 'started', 'ok', 'err'])) : null]);   // №596
     ks_out($out);
   }
 

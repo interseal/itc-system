@@ -215,6 +215,7 @@ function a_report(): void {
                          'err' => mb_substr((string)($bw['err'] ?? ''), 0, 200), 'n' => count((array)($bw['items'] ?? [])), 'project' => mb_substr((string)($bw['project'] ?? ''), 0, 60)];
   $rep['want_upd_key'] = !is_file((string)$C['upd_key_file']);   // 0.3.7 · ключ обновлений магазин отдаёт серверу один раз
   $rep['releases'] = a_release_state();
+  $rep['android'] = a_android_status();   // 0.4.8 · ход сборки Android — на страницу «Обновления»
   [$code, $body] = a_store('a=report', json_encode($rep, JSON_UNESCAPED_UNICODE), null, 20);
   if ($code !== 200) { a_log('магазин не принял отчёт: ' . $code); return; }
   $j = json_decode((string)$body, true); if (!is_array($j)) return;
@@ -704,6 +705,20 @@ function a_android_secrets(): array {
   foreach ($map as $env => $key) { $val = trim($v[$key] ?? ''); if ($val === '') $miss[] = $key; else $out[$env] = $val; }
   return $miss ? ['err' => 'в сейфе «Авто» нет: ' . implode(', ', $miss)] : $out;
 }
+/* 0.4.8 · что сейчас со сборкой Android: последний номер, шаг, сколько идёт, ошибка */
+function a_android_status(): array {
+  global $C; $base = rtrim((string)$C['release_dir'], '/') . '/android';
+  $ds = glob("$base/*", GLOB_ONLYDIR) ?: []; if (!$ds) return [];
+  usort($ds, function ($a, $b) { return filemtime($b) <=> filemtime($a); });
+  $d = $ds[0]; $n = (int)basename($d);
+  $st = is_file("$d/status.json") ? (array)json_decode((string)file_get_contents("$d/status.json"), true) : [];
+  $h = @fopen(sys_get_temp_dir() . '/kosmos-android.lock', 'c'); $run = false;
+  if ($h) { if (!flock($h, LOCK_EX | LOCK_NB)) $run = true; else flock($h, LOCK_UN); fclose($h); }
+  $o = ['n' => $n, 'run' => $run, 'step' => mb_substr((string)($st['step'] ?? ''), 0, 160), 'at' => (int)($st['at'] ?? 0), 'started' => (int)($st['started'] ?? 0)];
+  if (is_file("$d/ok.json")) $o['ok'] = true;
+  if (is_file("$d/fail.txt")) $o['err'] = mb_substr((string)file_get_contents("$d/fail.txt"), -500);
+  return $o;
+}
 function a_android(int $n): bool {
   global $C;
   if ($n < 1) return false;
@@ -725,7 +740,8 @@ function a_android(int $n): bool {
   $apps = $an['apps'] ?? ''; $apps = is_array($apps) ? implode(',', $apps) : (string)$apps;
   $cmd = [(string)$C['python'], "$dir/kosmos/tools/build_android.py", '--project', $src, '--apps', $apps, '--code', (string)(int)($an['code'] ?? 0),
           '--name', (string)($an['name'] ?? ''), '--notes', mb_substr((string)($an['notes'] ?? ''), 0, 500), '--out', "$ad/extra"];
-  $env = $sec + ['PATH' => '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME' => '/root', 'LANG' => 'C.UTF-8'];
+  $env = $sec + ['PATH' => '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME' => '/root', 'LANG' => 'C.UTF-8', 'ITC_ANDROID_STATUS' => "$ad/status.json"];
+  @file_put_contents("$ad/status.json", json_encode(['step' => 'начинаю', 'at' => time(), 'started' => time()], JSON_UNESCAPED_UNICODE));
   foreach (['ITC_GRADLE_BIN', 'ITC_APKSIGNER', 'ITC_ANDROID_SDK', 'ITC_GRADLE_HOME'] as $k) if (getenv($k) !== false) $env[$k] = getenv($k);   // для проверок
   $p = proc_open(array_merge(['timeout', (string)(int)$C['android_timeout']], $cmd), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $src, $env);
   $out = stream_get_contents($pipes[1]); $err = stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]); $rc = proc_close($p);

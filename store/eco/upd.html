@@ -482,6 +482,15 @@ function rdDraw(){
   hidden = 0;
   if (hidden) h += '<div class="mut" style="margin-top:6px">Скрыто устаревших обновлений: ' + hidden + ' — всё из них уже вошло в следующие.</div>';
   if (RD.err) h += '<div class="err">Сервер не смог собрать обновление: ' + esc(RD.err) + '</div>';
+  // №596 · жив ли сервер «Космоса» и что он сейчас делает — чтобы не гадать, почему нет обновлений
+  if (RD.seen) {
+    var ago = Math.max(0, Math.round(((RD.now || 0) - RD.seen) / 60)), A = RD.android || null;
+    var mins = function(m){ return m < 60 ? m + ' мин' : Math.floor(m / 60) + ' ч ' + (m % 60) + ' мин'; };
+    if (ago > 20) h += '<div class="err" style="margin-top:10px"><b>Сервер «Космоса» не отзывается ' + mins(ago) + '.</b> Обновления сейчас не собираются. Перезапустите сервер в консоли Aliyun (Сингапур, 47.82.162.57) или напишите Claude.</div>';
+    else h += '<div class="mut" style="margin-top:10px">Сервер «Космоса»' + (RD.ver ? ' ' + esc(RD.ver) : '') + ' на связи (' + (ago ? ago + ' мин назад' : 'только что') + ').</div>';
+    if (A && A.run) h += '<div class="mut" style="margin-top:4px">Собирает Android-приложения (обновление №' + A.n + '): ' + esc(A.step || '…') + ' · идёт ' + mins(Math.round(((RD.now || 0) - (A.started || RD.now)) / 60)) + '. Остальные обновления это не задерживает.</div>';
+    else if (A && A.err && !A.ok) h += '<div class="err" style="margin-top:4px">Android-приложения (№' + A.n + ') не собрались: ' + esc(A.err) + '</div>';
+  }
   b.innerHTML = h;
 }
 function rdInstall(n){
