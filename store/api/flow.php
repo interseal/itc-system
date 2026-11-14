@@ -2372,6 +2372,21 @@ function ff_ensure() {
   db()->exec("CREATE TABLE IF NOT EXISTS itc_fc_file (id VARCHAR(40) NOT NULL PRIMARY KEY, phone VARCHAR(40) NOT NULL DEFAULT '', name VARCHAR(250) NOT NULL DEFAULT '',
     kind VARCHAR(20) NOT NULL DEFAULT '', text MEDIUMTEXT NULL, chars INT NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, KEY idx_ff_phone (phone, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
+/* №558 · файл любого формата → сервер «Космоса» (convert): фото → JPEG, документы → текст, видео/звук → сведения.
+   Возвращает ['kind'=>…, 'text'=>…, 'jpg'=>байты, 'info'=>[…]] или ['error'=>…] */
+function ff_convert($name, $bin) {
+  if (!function_exists('ks_gw') || !defined('KS_SERVER')) return ['error' => 'нет связи с сервером «Космоса»'];
+  $ch = curl_init(KS_SERVER . '/api.php?a=gw');
+  curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_TIMEOUT => 240, CURLOPT_CONNECTTIMEOUT => 6,
+    CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Kosmos-GW: ' . ks_gw()['gw']],
+    CURLOPT_POSTFIELDS => json_encode(['a' => 'media', 'op' => 'convert', 'name' => $name, 'data' => base64_encode($bin)], JSON_UNESCAPED_UNICODE)]);
+  $r = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+  $j = is_string($r) ? json_decode($r, true) : null;
+  if ($code !== 200 || !is_array($j) || empty($j['ok'])) return ['error' => is_array($j) ? (string)($j['error'] ?? 'сервер не прочитал') : 'сервер «Космоса» не ответил'];
+  $out = ['kind' => (string)($j['kind'] ?? ''), 'text' => (string)($j['text'] ?? ''), 'info' => (array)($j['info'] ?? [])];
+  foreach ((array)($j['files'] ?? []) as $f) if (preg_match('~\.jpe?g$~i', (string)$f['name'])) { $out['jpg'] = (string)base64_decode((string)$f['data']); break; }
+  return $out;
+}
 /* фото / скан → текст (Яндекс Vision OCR) */
 function ff_ocr($bin, $mime, &$err) {
   $err = '';
@@ -3758,30 +3773,41 @@ try {
     else {
       $bin = base64_decode((string)fl_in('data'), true);
       if ($bin === false || $bin === '') fl_fail('Файл не дошёл — попробуйте ещё раз');
+      if (strlen($bin) > 20 * 1024 * 1024) fl_fail('Файл больше 20 МБ — сожмите его, пришлите частями или ссылкой (ссылку Фил скачает сам, до 40 МБ)');
       $isVid = in_array($ext, ['mp4', 'mov', 'webm', 'm4v'], true) || strpos($mime, 'video/') === 0;   // №554 · видео — для обработки на сервере
-      if (strlen($bin) > ($isVid ? 20 : 12) * 1024 * 1024) fl_fail($isVid ? 'Видео больше 20 МБ — сожмите его или пришлите ссылку' : 'Файл больше 12 МБ — Филу его не прочитать. Пришлите частями или фото страниц');
+      // №558 · ЛЮБОЙ ФОРМАТ: быстрые — здесь, остальное (TIFF, HEIC, BMP, GIF, старые .doc/.xls, PowerPoint, RTF, ODT, звук…) — переводит сервер «Космоса»
+      $fastImg = in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) || in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) && !in_array($ext, ['tif', 'tiff', 'heic', 'heif', 'bmp', 'gif'], true);
       if ($isVid) { $kind = 'видео'; $text = 'Видео «' . $name . '», ' . round(strlen($bin) / 1048576, 1) . ' МБ. Обработать — инструментом files (кадры, сжать, отрезок, сведения).'; }
-      else
-      if (strpos($mime, 'image/') === 0 || in_array($ext, ['jpg', 'jpeg', 'png', 'heic', 'webp'], true)) { $kind = 'фото'; $text = ff_ocr($bin, $mime === 'image/png' ? 'image/png' : 'image/jpeg', $err); }
-      elseif ($ext === 'pdf') { $kind = 'PDF-скан'; $text = ff_ocr($bin, 'application/pdf', $err); }
+      elseif ($fastImg) { $kind = 'фото'; $text = ff_ocr($bin, $mime === 'image/png' || $ext === 'png' ? 'image/png' : 'image/jpeg', $err); }
+      elseif ($ext === 'pdf') { $kind = 'PDF-скан'; $text = ff_ocr($bin, 'application/pdf', $err);
+        if ($text === null || mb_strlen(trim((string)$text)) < 3) { $cv = ff_convert($name, $bin); if (!empty($cv['text'])) $text = (string)$cv['text']; } }
       elseif ($ext === 'docx') { $kind = 'Word'; $text = ff_docx($bin); }
       elseif ($ext === 'xlsx') { $kind = 'Excel'; $text = ff_xlsx($bin); }
-      elseif (in_array($ext, ['txt', 'csv', 'md', 'json', 'xml', 'html', 'htm'], true)) { $kind = 'текст'; $text = mb_convert_encoding($bin, 'UTF-8', mb_check_encoding($bin, 'UTF-8') ? 'UTF-8' : 'Windows-1251'); }
-      elseif (in_array($ext, ['doc', 'xls'], true)) fl_fail('Старый формат .' . $ext . ' Фил не читает. Сохраните файл как .' . $ext . 'x (в Word/Excel: «Сохранить как») или сфотографируйте');
-      else fl_fail('Такой файл Фил пока не читает. Подходят: фото, PDF, Word (.docx), Excel (.xlsx), текст');
+      elseif (in_array($ext, ['txt', 'csv', 'md', 'json', 'xml', 'html', 'htm', 'log', 'ini', 'yml', 'yaml', 'tsv'], true)) { $kind = 'текст'; $text = mb_convert_encoding($bin, 'UTF-8', mb_check_encoding($bin, 'UTF-8') ? 'UTF-8' : 'Windows-1251'); }
+      else {
+        $cv = ff_convert($name, $bin);
+        if (($cv['kind'] ?? '') === 'фото' && !empty($cv['jpg'])) {   // фото любого формата → JPEG: дальше как обычное фото
+          $kind = 'фото'; $bin = $cv['jpg']; $mime = 'image/jpeg'; $ext = 'jpg'; $text = ff_ocr($bin, 'image/jpeg', $err);
+        } elseif (!empty($cv['kind'])) {
+          $kind = (string)$cv['kind']; $text = (string)($cv['text'] ?? '');
+          if (in_array($kind, ['видео', 'звук'], true)) $text = ucfirst($kind) . ' «' . $name . '»' . (!empty($cv['info']) ? ' (' . implode(', ', array_map(function ($k, $v) { return "$k: $v"; }, array_keys($cv['info']), $cv['info'])) . ')' : '') . '. Обработать — инструментом files.';
+        } else { $kind = 'файл'; $text = ''; $err = (string)($cv['error'] ?? ''); }
+      }
     }
     // №557 · фото без текста (портрет сотрудника, товар, логотип) — тоже принимаем: сохраняем снимок, Фил/«Космос» работают с ним как с файлом
     if ($kind === 'фото' && ($text === null || mb_strlen(trim((string)$text)) < 3))
       $text = 'Фото «' . $name . '» — текста на нём нет (это снимок: человек, товар, логотип, место). Файл сохранён: его можно обработать (files), прикрепить к поставщику или поставить логотипом (brand_set).';
-    if ($text === null) fl_fail('Не удалось распознать текст: ' . $err);
+    // №558 · ничего не отклоняем: не прочитали — всё равно сохраняем и честно говорим
+    if ($text === null || mb_strlen(trim((string)$text)) < 3)
+      $text = 'Файл «' . $name . '» (' . ($ext ?: 'без расширения') . ', ' . (isset($bin) && $bin !== false ? round(strlen((string)$bin) / 1024) . ' КБ' : '') . ') сохранён, но текста в нём не нашлось' . ($err !== '' ? ' (' . mb_substr($err, 0, 120) . ')' : '') . '. Его можно прикрепить к поставщику или обработать (files).';
     $text = trim(mb_substr((string)$text, 0, 200000));
-    if (mb_strlen($text) < 3) fl_fail('В файле не нашлось текста. Если это скан документа — снимите ближе и ровнее, при хорошем свете');
     $id = fl_id('ff');
     db()->prepare('INSERT INTO itc_fc_file (id,phone,name,kind,text,chars) VALUES (?,?,?,?,?,?)')->execute([$id, $me['phone'], $name, $kind, $text, mb_strlen($text)]);
     /* №33 · оригинал файла храним — чтобы Фил мог приложить его к карточке поставщика */
     if (!isset($bin)) { $bin = base64_decode((string)fl_in('data'), true); }
-    if ($bin !== false && $bin !== '' && strlen($bin) <= 20 * 1024 * 1024 && preg_match('~^(pdf|jpe?g|png|webp|docx|xlsx|mp4|mov|webm|m4v)$~', $ext ?: ($kind === 'фото' ? 'jpg' : ''))) {
-      try { ff_cols(); $sx = $ext ?: 'jpg'; if ($kind === 'фото' && $mime === 'image/jpeg') $sx = 'jpg';
+    $sxx = $ext ?: ($kind === 'фото' ? 'jpg' : 'bin');   // №558 · храним оригинал любого формата (папка закрыта от интернета); исполняемые — нет
+    if ($bin !== false && $bin !== '' && strlen($bin) <= 20 * 1024 * 1024 && preg_match('~^[a-z0-9]{1,6}$~', $sxx) && !preg_match('~^(php\d?|phtml|phar|pht|cgi|pl|py|sh|exe|bat|cmd|js|htaccess|html?|svgz?)$~', $sxx)) {
+      try { ff_cols(); $sx = $sxx; if ($kind === 'фото' && $mime === 'image/jpeg') $sx = 'jpg';
         $fn = $id . '.' . $sx; if (@file_put_contents(ff_dir() . '/' . $fn, $bin) !== false)
           db()->prepare('UPDATE itc_fc_file SET path=?,mime=?,bytes=? WHERE id=?')->execute([$fn, $mime ?: 'application/octet-stream', strlen($bin), $id]); } catch (Throwable $e) {}
     }

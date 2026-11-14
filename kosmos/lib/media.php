@@ -7,11 +7,14 @@ declare(strict_types=1);
 
 const MEDIA_MAX_IN = 40 * 1048576;    // входной файл — до 40 МБ
 const MEDIA_MAX_OUT = 30 * 1048576;   // всё, что отдаём обратно, — до 30 МБ
-const MEDIA_OPS = ['pdf_images', 'pdf_pages', 'pdf_text', 'img', 'video_frames', 'video_small', 'video_cut', 'info'];
+const MEDIA_OPS = ['pdf_images', 'pdf_pages', 'pdf_text', 'img', 'video_frames', 'video_small', 'video_cut', 'info', 'convert'];
+// 0.4.5 · convert — «прочитать что угодно»: фото любого формата (TIFF, HEIC, BMP, GIF, SVG…) → JPEG; Word/Excel/PowerPoint/RTF/ODT
+// и старые .doc/.xls/.ppt → PDF + текст (LibreOffice); PDF → текст; видео/звук → сведения и кадр
+const MEDIA_OFFICE = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'rtf', 'odt', 'ods', 'odp', 'pages', 'numbers', 'key', 'wps', 'et', 'dps', 'csv'];
 
 function media_tools(): array {
   $have = [];
-  foreach (['pdfimages', 'pdftoppm', 'pdftotext', 'convert', 'ffmpeg', 'ffprobe'] as $t) $have[$t] = trim((string)shell_exec('command -v ' . $t . ' 2>/dev/null')) !== '';
+  foreach (['pdfimages', 'pdftoppm', 'pdftotext', 'convert', 'ffmpeg', 'ffprobe', 'soffice', 'heif-convert'] as $t) $have[$t] = trim((string)shell_exec('command -v ' . $t . ' 2>/dev/null')) !== '';
   return $have;
 }
 function media_run(array $cmd, int $timeout = 120): array {
@@ -98,6 +101,48 @@ function media_do(string $op, string $src, string $out, array $in): array {
       [$rc, , $e] = media_run($cmd);
       if ($rc !== 0) throw new RuntimeException('не удалось обработать фото: ' . mb_substr($e, 0, 200));
       return [];
+    }
+    case 'convert': {
+      $ext = strtolower(pathinfo((string)($in['name'] ?? ''), PATHINFO_EXTENSION));
+      $head = (string)file_get_contents($src, false, null, 0, 16);
+      if (strncmp($head, '%PDF-', 5) === 0) {
+        media_need('pdftotext'); media_run(['pdftotext', '-layout', '-l', '60', $src, "$out/../t.txt"]);
+        return ['kind' => 'PDF', 'text' => mb_substr((string)@file_get_contents("$out/../t.txt"), 0, 200000)];
+      }
+      if (in_array($ext, MEDIA_OFFICE, true) || preg_match('~^(\xD0\xCF\x11\xE0|PK\x03\x04|\{\\\\rtf)~', $head) && !in_array($ext, ['zip', 'apk', 'jar'], true)) {
+        media_need('soffice'); $home = "$out/../lo"; @mkdir($home);
+        [$rc, , $e] = media_run(['env', 'HOME=' . $home, 'soffice', '--headless', '--norestore', '--convert-to', 'pdf', '--outdir', $out, $src], 180);
+        $pdf = glob("$out/*.pdf")[0] ?? '';
+        if ($pdf === '') throw new RuntimeException('не удалось открыть документ: ' . mb_substr($e, 0, 160));
+        rename($pdf, "$out/документ.pdf");
+        media_run(['pdftotext', '-layout', '-l', '80', "$out/документ.pdf", "$out/../t.txt"]);
+        return ['kind' => 'документ', 'text' => mb_substr((string)@file_get_contents("$out/../t.txt"), 0, 200000)];
+      }
+      // фото любого формата → JPEG (многостраничный TIFF — до 20 страниц)
+      $isHeic = in_array($ext, ['heic', 'heif'], true) || strpos($head, 'ftypheic') !== false || strpos($head, 'ftypmif1') !== false || strpos($head, 'ftypheix') !== false;
+      $img = $src;
+      if ($isHeic && media_tools()['heif-convert']) { media_run(['heif-convert', '-q', '92', $src, "$out/../h.jpg"]); if (is_file("$out/../h.jpg")) $img = "$out/../h.jpg"; }
+      if (media_tools()['convert']) {
+        [$rc, $o] = media_run(['identify', '-format', "%m %w %h\n", $img], 30);
+        if ($rc === 0 && trim($o) !== '' && !preg_match('~^(MP4|MOV|M4V|3GP|AVI|MKV|WEBM|MP3|WAV|OGG)~m', $o)) {
+          $pages = min(20, count(array_filter(explode("\n", trim($o)))));
+          media_run(['convert', $img . '[0-' . max(0, $pages - 1) . ']', '-auto-orient', '-background', 'white', '-flatten', '-resize', '2400x2400>', '-quality', '88', "$out/фото.jpg"], 120);
+          if (!glob("$out/*.jpg")) media_run(['convert', $img . '[0]', '-auto-orient', '-background', 'white', '-flatten', '-resize', '2400x2400>', '-quality', '88', "$out/фото.jpg"], 120);
+          if (glob("$out/*.jpg")) return ['kind' => 'фото', 'info' => ['формат' => strtok(trim($o), ' '), 'страниц' => $pages]];
+        }
+      }
+      // видео / звук
+      if (media_tools()['ffprobe']) {
+        [$rc, $o] = media_run(['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', $src]);
+        $j = json_decode($o, true);
+        if (is_array($j) && !empty($j['streams'])) {
+          $v = null; foreach ($j['streams'] as $st) if (($st['codec_type'] ?? '') === 'video' && empty($st['disposition']['attached_pic'])) { $v = $st; break; }
+          $dur = round((float)($j['format']['duration'] ?? 0), 1);
+          if ($v) media_run(['ffmpeg', '-v', 'error', '-ss', (string)min(1, $dur / 2), '-i', $src, '-frames:v', '1', '-q:v', '3', "$out/кадр.jpg"]);
+          return ['kind' => $v ? 'видео' : 'звук', 'info' => ['длительность, с' => $dur, 'размер' => $v ? ($v['width'] . '×' . $v['height']) : '', 'формат' => (string)($j['format']['format_long_name'] ?? '')]];
+        }
+      }
+      throw new RuntimeException('формат не распознан');
     }
     case 'info': {
       media_need('ffprobe');

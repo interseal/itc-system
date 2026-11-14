@@ -658,11 +658,12 @@ function a_release_one(int $n, array $r, string $dir): string {
 function a_media_tools(): void {
   if (time() - (int)(a_state()['media_at'] ?? 0) < 3600) return;
   a_state_put(['media_at' => time()]);
-  $need = ['pdfimages' => 'poppler-utils', 'convert' => 'imagemagick', 'ffmpeg' => 'ffmpeg', 'qpdf' => 'qpdf'];
+  $need = ['pdfimages' => 'poppler-utils', 'convert' => 'imagemagick', 'ffmpeg' => 'ffmpeg', 'qpdf' => 'qpdf',
+           'soffice' => 'libreoffice-nogui', 'heif-convert' => 'libheif-examples'];   // 0.4.5 · Word/Excel/PowerPoint любых версий, фото HEIC с iPhone
   $miss = []; foreach ($need as $bin => $pkg) if (trim(a_sh('command -v ' . $bin)) === '') $miss[$pkg] = 1;
   if (!$miss) return;
   a_log('ставлю программы для файлов: ' . implode(', ', array_keys($miss)));
-  a_sh('DEBIAN_FRONTEND=noninteractive apt-get install -y -q ' . implode(' ', array_map('escapeshellarg', array_keys($miss))) . ' 2>&1 | tail -2');
+  a_sh('DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends ' . implode(' ', array_map('escapeshellarg', array_keys($miss))) . ' 2>&1 | tail -2');
   // ImageMagick по умолчанию не открывает PDF — разрешаем (картинки из каталогов)
   foreach (glob('/etc/ImageMagick-*/policy.xml') ?: [] as $pf) { $x = (string)file_get_contents($pf); $y = preg_replace('~(<policy domain="coder" rights=")none(" pattern="PDF" />)~', '$1read|write$2', $x); if ($y !== $x) file_put_contents($pf, $y); }
 }
