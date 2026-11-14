@@ -6,7 +6,10 @@ model = a[a.index('--model') + 1]; budget = a[a.index('--max-budget-usd') + 1]
 open('/tmp/fake_claude_args.json', 'w').write(json.dumps({'model': model, 'budget': budget, 'user': os.getuid(), 'cwd': os.getcwd(), 'rules': '--append-system-prompt' in a,
     'key': bool(os.environ.get('ANTHROPIC_API_KEY')), 'base': os.environ.get('ANTHROPIC_BASE_URL', ''), 'keyval': os.environ.get('ANTHROPIC_API_KEY', '')[:3]}))
 n = 9101 if 'DeepSeek' in task else 9100
-if 'сломай' in task: open('store/bad.php', 'w').write('<?php echo ;')
+if 'gradle' in task:   # правит настройки сборки Android и выпускает обновление
+    os.makedirs('android/ITCApp/app', exist_ok=True); open('android/ITCApp/app/build.gradle', 'w').write('// правка')
+    open('releases/9102.json', 'w').write(json.dumps({'n': 9102, 'title': 'gradle', 'what': [], 'files': [], 'kosmos': False}))
+elif 'сломай' in task: open('store/bad.php', 'w').write('<?php echo ;')
 elif 'ключ' in task: open('store/leak.php', 'w').write("<?php $k = 'sk-ant-api03-" + 'x' * 40 + "';")
 else:
     os.makedirs('store/eco', exist_ok=True); open(f'store/eco/new{n}.html', 'w').write('<!doctype html><p>новое</p>')

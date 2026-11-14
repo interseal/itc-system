@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2.0 · только в приложении магазина: отдельные значки приложений сотрудника в списке приложений телефона.
+     Выключены по умолчанию — включаются, когда сотрудник нажимает «На экран» в «Моих приложениях».
+     Покупатели их не видят. Значок без кружка ИТК: это самостоятельный значок, а не ярлык. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity-alias android:name=".A_eco" android:targetActivity=".AppShortcutActivity" android:enabled="false" android:exported="true"
+            android:label="Экосистема" android:icon="@mipmap/ic_app_eco" android:roundIcon="@mipmap/ic_app_eco" android:taskAffinity="">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+            <meta-data android:name="itc.url" android:value="https://itcpartner.store/apps/eco/"/>
+        </activity-alias>
+        <activity-alias android:name=".A_crm" android:targetActivity=".AppShortcutActivity" android:enabled="false" android:exported="true"
+            android:label="Воронки сделок" android:icon="@mipmap/ic_app_crm" android:roundIcon="@mipmap/ic_app_crm" android:taskAffinity="">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+            <meta-data android:name="itc.url" android:value="https://itcpartner.store/apps/crm/"/>
+        </activity-alias>
+        <activity-alias android:name=".A_fil" android:targetActivity=".AppShortcutActivity" android:enabled="false" android:exported="true"
+            android:label="Фил" android:icon="@mipmap/ic_app_fil" android:roundIcon="@mipmap/ic_app_fil" android:taskAffinity="">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+            <meta-data android:name="itc.url" android:value="https://itcpartner.store/apps/fil/"/>
+        </activity-alias>
+        <activity-alias android:name=".A_perevod" android:targetActivity=".AppShortcutActivity" android:enabled="false" android:exported="true"
+            android:label="ИТК Переводчик" android:icon="@mipmap/ic_app_perevod" android:roundIcon="@mipmap/ic_app_perevod" android:taskAffinity="">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+            <meta-data android:name="itc.url" android:value="https://itcpartner.store/apps/perevod/?from=itc"/>
+        </activity-alias>
+        <activity-alias android:name=".A_nav" android:targetActivity=".AppShortcutActivity" android:enabled="false" android:exported="true"
+            android:label="ИТК Навигатор" android:icon="@mipmap/ic_app_nav" android:roundIcon="@mipmap/ic_app_nav" android:taskAffinity="">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+            <meta-data android:name="itc.url" android:value="https://itcpartner.store/apps/nav/?from=itc"/>
+        </activity-alias>
+        <activity-alias android:name=".A_metro" android:targetActivity=".AppShortcutActivity" android:enabled="false" android:exported="true"
+            android:label="Мой Гуанчжоу" android:icon="@mipmap/ic_app_metro" android:roundIcon="@mipmap/ic_app_metro" android:taskAffinity="">
+            <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+            <meta-data android:name="itc.url" android:value="https://metro.itcpartner.store/?from=itc"/>
+        </activity-alias>
+    </application>
+</manifest>

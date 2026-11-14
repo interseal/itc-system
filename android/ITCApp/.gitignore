@@ -1,0 +1,10 @@
+# сборка и местные настройки — не в GitHub
+build/
+.gradle/
+.idea/
+local.properties
+*.jks
+*.keystore
+itc-key*
+app/*/release/
+app/release/

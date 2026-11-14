@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "521552804452",
+    "project_id": "itc-global-278a8",
+    "storage_bucket": "itc-global-278a8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:521552804452:android:4ac327e06235b1b958bd71",
+        "android_client_info": {
+          "package_name": "store.itcpartner.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARariAI6AdFmroEiF_Ro8RpnaLuDxZiNQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

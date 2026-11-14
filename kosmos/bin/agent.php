@@ -34,6 +34,8 @@ $C = (is_file($cfgFile) ? (array)(require $cfgFile) : []) + [
   // 0.3.9 · «Космос»-разработчик: Claude Code от пользователя kosmosdev в /srv/itc-dev; писать в GitHub — ключом github_dev (только root)
   'dev_user' => 'kosmosdev', 'dev_dir' => '/srv/itc-dev', 'dev_key' => '/etc/kosmos/github_dev', 'claude_bin' => 'claude', 'dev_timeout' => 5400,
   'upd_key_file' => '/etc/kosmos/upd_key.php', 'own_sign_key' => '/etc/kosmos/sign_own.pem', 'release_dir' => '/var/lib/kosmos-releases', 'python' => 'python3',
+  // 0.4.1 · Android-приложения собирает сервер (android/ITCApp из GitHub), копия проекта для сборки — здесь
+  'android_dir' => '/srv/itc-android', 'android_timeout' => 3600,
 ];
 date_default_timezone_set((string)$C['tz']);
 $cmd = (string)($argv[1] ?? '');
@@ -44,6 +46,7 @@ switch ($cmd) {
   case 'devclaim':  require_once __DIR__ . '/../lib/boot.php'; echo json_encode(dev_claim()); exit;   // 0.3.9 · от www-data
   case 'devfinish': require_once __DIR__ . '/../lib/boot.php'; dev_finish((int)($argv[2] ?? 0), (array)json_decode((string)($argv[3] ?? '{}'), true)); echo 'ok'; exit;
   case 'devrun':    exit(a_devrun() ? 0 : 1);
+  case 'android':   exit(a_android((int)($argv[2] ?? 0)) ? 0 : 1);   // 0.4.1 · фоновая сборка Android для обновления №N
   case 'bwinfo':   echo json_encode(a_bwinfo()); exit;   // 0.3.4 · от www-data: токен сейфа и ключи Claude (расшифровка — ключом базы)
   case 'bw':       a_lock(); exit(a_bw(true) ? 0 : 1);
   case 'skills':   a_lock(); exit(a_claude_skills(true) ? 0 : 1);
@@ -582,7 +585,7 @@ function a_release(bool $force): bool {
   $g = is_file(a_git_file()) ? (array)json_decode((string)file_get_contents(a_git_file()), true) : [];
   $head = (string)($g['head']['hash'] ?? '');
   $st = a_release_state();
-  if (!is_dir("$dir/releases") || (!$force && ($head === '' || ($st['head'] ?? '') === $head))) return true;
+  if (!is_dir("$dir/releases") || (!$force && empty($st['wait']) && ($head === '' || ($st['head'] ?? '') === $head))) return true;
   $st['head'] = $head; $st['done'] = (array)($st['done'] ?? []);
   $todo = [];
   foreach (glob("$dir/releases/*.json") ?: [] as $f) {
@@ -591,8 +594,10 @@ function a_release(bool $force): bool {
     $todo[(int)$r['n']] = $r;
   }
   ksort($todo);
+  unset($st['wait']);
   foreach ($todo as $n => $r) {
     $err = a_release_one($n, $r, $dir);
+    if ($err === '__wait') { $st['wait'] = "№$n: собираю Android-приложения"; break; }   // 0.4.1 · сборка идёт в фоне, проверим через минуту
     $st['done'][(string)$n] = ['at' => date('Y-m-d H:i:s'), 'ok' => $err === '', 'err' => $err, 'title' => mb_substr((string)($r['title'] ?? ''), 0, 120)];
     if ($err !== '') { a_log("обновление №$n: $err"); unset($st['done'][(string)$n]['ok']); $st['done'][(string)$n]['ok'] = false; $st['last_err'] = "№$n: $err"; break; }
     a_log("обновление №$n собрано, подписано и отдано в магазин");
@@ -616,9 +621,20 @@ function a_release_one(int $n, array $r, string $dir): string {
     if ($p === '' || strpos($p, '..') !== false || !preg_match('~^(store|site|metro)/~', $p) || !is_file("$dir/$p")) { a_rm($tmp); return 'нет файла ' . $p; }
     @mkdir(dirname("$tmp/extra/$p"), 0700, true); copy("$dir/$p", "$tmp/extra/$p");
   }
+  // 0.4.1 · обновление с Android-приложениями: сначала сервер собирает APK (в фоне, 5–20 минут), потом кладёт их в обновление
+  if (!empty($r['android'])) {
+    $ad = rtrim((string)$C['release_dir'], '/') . "/android/$n";
+    if (is_file("$ad/fail.txt")) { a_rm($tmp); return 'Android: ' . mb_substr((string)file_get_contents("$ad/fail.txt"), 0, 400); }
+    if (!is_file("$ad/ok.json")) { a_rm($tmp); a_android_kick($n); return '__wait'; }
+    exec('cp -a ' . escapeshellarg("$ad/extra") . '/. ' . escapeshellarg("$tmp/extra") . ' 2>&1', $o, $rc);
+    if ($rc !== 0) { a_rm($tmp); return 'Android: не удалось взять собранные файлы'; }
+    $aj = (array)json_decode((string)file_get_contents("$ad/ok.json"), true);
+    $r['what'] = array_merge((array)($r['what'] ?? []), ['Приложения: ' . implode(', ', array_map(function ($x) { return $x['app'] . ' (' . $x['size'] . ')'; }, (array)($aj['apps'] ?? [])))
+      . ' — версия ' . ($aj['name'] ?? '') . '. Собраны и подписаны на сервере «Космоса»; у людей обновятся сами при следующем запуске.']);
+  }
   $cmd = [(string)$C['python'], "$dir/kosmos/tools/build_store_update.py", '--n', (string)$n, '--upd-key', (string)$C['upd_key_file'], '--sign-key', $key,
           '--out', "$tmp/obnovlenie_$n.zip", '--title', mb_substr((string)($r['title'] ?? ('Обновление №' . $n)), 0, 200)];
-  if ((array)($r['files'] ?? [])) array_push($cmd, '--extra', "$tmp/extra");
+  if ((array)($r['files'] ?? []) || !empty($r['android'])) array_push($cmd, '--extra', "$tmp/extra");
   foreach ((array)($r['what'] ?? []) as $w) array_push($cmd, '--what', mb_substr((string)$w, 0, 600));
   if (empty($r['kosmos'])) $cmd[] = '--no-pkg';
   $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $dir);
@@ -631,6 +647,67 @@ function a_release_one(int $n, array $r, string $dir): string {
   $j = json_decode($body, true);
   if ($code !== 200 || empty($j['ok'])) return 'магазин не принял файл: ' . (is_array($j) ? (string)($j['error'] ?? '') : '') . ' (' . $code . ')';
   return '';
+}
+
+/* ---------------- 0.4.1 · Android-приложения собирает сервер ----------------
+   releases/N.json: "android": {"apps": ["fil", "kosmos"] | "all", "code": 27, "name": "2.2.4", "notes": "что нового"}.
+   Сборка — отдельным фоновым процессом (agent.php android N): Java 17, Android SDK и Gradle ставятся сами (kosmos/tools/build_android.py),
+   ключ подписи и пароли — из сейфа «Авто» (ANDROID_*) только на время сборки, файл ключа удаляется сразу. Готовое кладётся в
+   release_dir/android/N/extra (store/app/<имя>/itc-<имя>.apk + version.json), и обновление №N собирается как обычно. */
+function a_android_kick(int $n): void {
+  $h = @fopen(sys_get_temp_dir() . '/kosmos-android.lock', 'c'); if (!$h) return;
+  if (!flock($h, LOCK_EX | LOCK_NB)) { fclose($h); return; }   // уже собирается
+  flock($h, LOCK_UN); fclose($h);
+  $cfg = getenv('KOSMOS_CONFIG') ?: '';
+  exec(($cfg !== '' ? 'KOSMOS_CONFIG=' . escapeshellarg($cfg) . ' ' : '') . 'nohup ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' android ' . $n
+    . ' >> ' . escapeshellarg(sys_get_temp_dir() . '/kosmos-android.log') . ' 2>&1 &');
+  a_log("Android для обновления №$n: начинаю сборку");
+}
+/* ключ подписи Android из сейфа «Авто» (значения — только в памяти) */
+function a_android_secrets(): array {
+  $info = json_decode(a_as_db('bwinfo'), true); $tok = is_array($info) ? (string)($info['token'] ?? '') : '';
+  if ($tok === '') return ['err' => 'не подключён сейф Bitwarden (настройки «Космоса» → «Сейф»)'];
+  if (($e = a_bws_install()) !== '') return ['err' => $e];
+  [$rc, $pr, $e] = a_bws($tok, ['project', 'list']); if ($rc !== 0 || !is_array($pr) || !$pr) return ['err' => 'сейф не отвечает: ' . $e];
+  $pid = (string)$pr[0]['id']; foreach ($pr as $x) if (mb_strtolower((string)($x['name'] ?? '')) === 'авто') $pid = (string)$x['id'];
+  [$rc, $list, $e] = a_bws($tok, ['secret', 'list', $pid]); if ($rc !== 0 || !is_array($list)) return ['err' => 'не удалось прочитать сейф: ' . $e];
+  $v = []; foreach ($list as $x) $v[(string)$x['key']] = (string)$x['value'];
+  $map = ['ITC_KEYSTORE_B64' => 'ANDROID_KEYSTORE_BASE64', 'ITC_KEYSTORE_PASSWORD' => 'ANDROID_KEYSTORE_PASSWORD', 'ITC_KEY_ALIAS' => 'ANDROID_KEY_ALIAS', 'ITC_KEY_PASSWORD' => 'ANDROID_KEY_PASSWORD'];
+  $out = []; $miss = [];
+  foreach ($map as $env => $key) { $val = trim($v[$key] ?? ''); if ($val === '') $miss[] = $key; else $out[$env] = $val; }
+  return $miss ? ['err' => 'в сейфе «Авто» нет: ' . implode(', ', $miss)] : $out;
+}
+function a_android(int $n): bool {
+  global $C;
+  if ($n < 1) return false;
+  $h = fopen(sys_get_temp_dir() . '/kosmos-android.lock', 'c');
+  if (!$h || !flock($h, LOCK_EX | LOCK_NB)) return true;
+  $dir = rtrim((string)$C['git_dir'], '/'); $ad = rtrim((string)$C['release_dir'], '/') . "/android/$n";
+  $fail = function (string $e) use ($ad, $n) { @mkdir($ad, 0700, true); file_put_contents("$ad/fail.txt", $e); a_log("Android для №$n: $e"); return false; };
+  $r = json_decode((string)@file_get_contents("$dir/releases/$n.json"), true);
+  $an = is_array($r) ? (array)($r['android'] ?? []) : [];
+  if (!$an) return $fail('в releases/' . $n . '.json нет раздела android');
+  if (!is_dir("$dir/android/ITCApp/app")) return $fail('в GitHub нет проекта android/ITCApp');
+  $sec = a_android_secrets(); if (isset($sec['err'])) return $fail((string)$sec['err']);
+  // копия проекта для сборки (папка сборки остаётся между сборками — так быстрее)
+  $src = rtrim((string)$C['android_dir'], '/'); @mkdir($src, 0750, true);
+  a_sh('command -v rsync >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q rsync');
+  a_sh('rsync -a --delete --exclude build --exclude .gradle --exclude local.properties ' . escapeshellarg("$dir/android/ITCApp/") . ' ' . escapeshellarg("$src/"), $rc);
+  if ($rc !== 0) return $fail('не удалось подготовить проект');
+  @mkdir("$ad/extra", 0700, true);
+  $apps = $an['apps'] ?? ''; $apps = is_array($apps) ? implode(',', $apps) : (string)$apps;
+  $cmd = [(string)$C['python'], "$dir/kosmos/tools/build_android.py", '--project', $src, '--apps', $apps, '--code', (string)(int)($an['code'] ?? 0),
+          '--name', (string)($an['name'] ?? ''), '--notes', mb_substr((string)($an['notes'] ?? ''), 0, 500), '--out', "$ad/extra"];
+  $env = $sec + ['PATH' => '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME' => '/root', 'LANG' => 'C.UTF-8'];
+  foreach (['ITC_GRADLE_BIN', 'ITC_APKSIGNER', 'ITC_ANDROID_SDK', 'ITC_GRADLE_HOME'] as $k) if (getenv($k) !== false) $env[$k] = getenv($k);   // для проверок
+  $p = proc_open(array_merge(['timeout', (string)(int)$C['android_timeout']], $cmd), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $src, $env);
+  $out = stream_get_contents($pipes[1]); $err = stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]); $rc = proc_close($p);
+  foreach ($sec as $v) if (strlen($v) >= 4) { $out = str_replace($v, '…', $out); $err = str_replace($v, '…', $err); }
+  $j = json_decode((string)$out, true);
+  if ($rc !== 0 || !is_array($j) || empty($j['ok'])) return $fail(mb_substr(trim($err) ?: trim($out) ?: ('сборка остановилась (' . $rc . ')'), -600));
+  file_put_contents("$ad/ok.json", json_encode($j, JSON_UNESCAPED_UNICODE));
+  a_log("Android для №$n собран: " . implode(', ', array_column((array)$j['apps'], 'app')));
+  return true;
 }
 
 /* ---------------- 0.3.9 · «Космос»-разработчик ----------------
@@ -717,7 +794,7 @@ function a_devrun(): bool {
   if (!is_array($r)) { $res['error'] = 'Claude Code не ответил (' . $rc . '): ' . mb_substr(str_replace((string)$j['key'], '…', trim($err . ' ' . $out)), -400); $finish($res); return false; }
   // проверки: что изменилось, нет ли ключей, синтаксис, проверки «Космоса»
   a_sh('chown -R root: ' . $q);
-  $changed = array_values(array_filter(array_map(function ($l) { return trim(substr($l, 3)); }, explode("\n", a_sh("git -C $q status --porcelain")))));
+  $changed = array_values(array_filter(array_map(function ($l) { return trim(substr($l, 3)); }, explode("\n", a_sh("git -C $q status --porcelain -uall")))));
   if (!$changed) { $res['status'] = !empty($r['is_error']) ? 'failed' : 'done'; if (!empty($r['is_error'])) $res['error'] = 'Claude Code остановился с ошибкой'; $finish($res); return true; }
   $checks = [];
   $diff = a_sh("git -C $q add -A && git -C $q diff --cached");
@@ -740,6 +817,10 @@ function a_devrun(): bool {
   if ($prc !== 0) { $res['status'] = 'failed'; $res['error'] = 'GitHub не принял правки — добавьте ключ записи (настройки «Космоса» → «Разработчик»)'; $finish($res); return false; }
   if (!$ok) { $res['status'] = 'checks_failed'; $finish($res); return false; }
   $rel = array_values(preg_grep('~^releases/\d+\.json$~', $changed));
+  // 0.4.1 · настройки сборки Android (gradle) и инструменты сервера, которые получают ключ подписи, — только с проверкой Claude:
+  // разработчик правит их в своей ветке, в главную они сами не уходят
+  $risky = array_values(preg_grep('~^android/.*\.(gradle|properties|kts)$|^android/.*gradle-wrapper|^kosmos/tools/build_android\.py$|^kosmos/bin/agent\.php$~', $changed));
+  if ($rel && $risky) { $res['status'] = 'done'; $res['error'] = 'правки сборки (' . implode(', ', array_slice($risky, 0, 3)) . ') — в ветке ' . $res['branch'] . ', в главную только после проверки Claude'; $finish($res); return true; }
   if ($rel) {   // поручение выпускает обновление: в главную ветку, сервер соберёт его и предложит руководителю «Установить»
     a_sh(a_git_env($rk) . "git -C $q fetch -q origin && git -C $q rebase -q origin/main", $c1);
     a_sh(a_git_env($wk) . "git -C $q push -q origin HEAD:main", $c2);

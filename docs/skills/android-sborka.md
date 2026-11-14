@@ -1,0 +1,9 @@
+# Собрать и выпустить Android-приложения ИТК
+Когда: Android Studio, собрать APK, новая версия приложения, новое приложение, RuStore, обновить приложение Фил/Космос/склад
+---
+1) Проект — android/ITCApp в GitHub: один проект, 13 приложений-вариантов (store, sklad, esim, metro, nav, perevod, fil, kosmos, crm, draw, eco, trade, hotels). Код Java общий.
+2) Новое приложение: python3 kosmos/tools/new_android_app.py --key имя --title "Название" --url https://itcpartner.store/apps/имя/ [--icon значок.png] [--color #RRGGBB].
+3) Выпуск: releases/N.json с "android": {"apps": ["fil"], "code": 27, "name": "2.2.4", "notes": "что нового"}; не больше 6 приложений за раз; code — больше прежнего.
+4) Сервер «Космоса» сам ставит Java 17/SDK 34/Gradle 8.2, подписывает ключом из сейфа «Авто» (ANDROID_*), кладёт APK и version.json в обновление. Ждать 5–20 минут.
+5) Руководитель ставит обновление кнопкой; приложения у людей обновятся сами. В RuStore — APK загружает руководитель.
+6) Правки *.gradle — только с проверкой Claude (разработчик сам в главную их не отправит).

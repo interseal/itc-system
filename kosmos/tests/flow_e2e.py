@@ -21,6 +21,7 @@ open(f'{TMP}/config.php', 'w').write(f'''<?php return [
 ];''')
 subprocess.run(['mysql', '-uroot', 'itc', '-e', 'DROP TABLE IF EXISTS itc_ks_log, itc_ks_conv, itc_ks_task, itc_fc_log, itc_fil_conv, itc_fil_task, itc_skill, itc_skill_copy; DELETE FROM itc_secret WHERE k LIKE "ks_%" OR k LIKE "fil_%" OR k = "sp_voice" OR k LIKE "nvk_%"'], capture_output=True)
 for f in glob.glob(f'{ST}/uploads/kosmos/*/gw.json'): os.remove(f)
+for f in glob.glob(f'{ST}/uploads/kosmos/*/ready/*'): os.remove(f)   # готовые обновления прошлых проверок
 env = dict(os.environ, KOSMOS_CONFIG=f'{TMP}/config.php', PHP_CLI_SERVER_WORKERS='4')
 procs = [subprocess.Popen([sys.executable, f'{ROOT}/tests/mock_claude.py', '8768', f'{TMP}/mock.log']),
          subprocess.Popen(['php', '-S', '127.0.0.1:8793', '-t', f'{ROOT}/www'], env=env, stdout=open(f'{TMP}/php.log', 'w'), stderr=subprocess.STDOUT),
@@ -377,6 +378,57 @@ try:
     sayd = j.get('say', '')
     con = sqlite3.connect(f'{TMP}/kosmos.sqlite'); row = con.execute("SELECT engine, text, phone FROM dev_tasks ORDER BY id DESC LIMIT 1").fetchone(); con.close()
     check('руководителю: поручение ушло на сервер «Космоса» (у «Космоса» — Claude)', c == 200 and 'поручение №' in sayd and 'Космос-разработчик' in sayd and row and row[0] == 'claude' and 'кнопку проверки связи' in row[1] and row[2].startswith('магазин'), (sayd, row))
+    print('14. Android-приложения собирает сервер (№551, сервер 0.4.1)')
+    open(f'{ST}/api/upd_key.php', 'w').write(f"<?php define('UPD_KEY', '{uk}');\n")
+    shutil.copytree(f'{R}/android/ITCApp', f'{GD}/android/ITCApp', ignore=shutil.ignore_patterns('build'))
+    json.dump({'n': 9010, 'title': 'Фил и Космос 2.2.4', 'what': ['новые значки'], 'files': [], 'kosmos': False,
+               'android': {'apps': ['fil', 'kosmos'], 'code': 27, 'name': '2.2.4', 'notes': 'Быстрее открывается'}}, open(f'{GD}/releases/9010.json', 'w'), ensure_ascii=False)
+    KS = base64.b64encode(b'KEYSTORE-BYTES-\x01\x02').decode()
+    FB = f'{TMP}/fake_bws.json'; pid = 'p-avto'
+    json.dump({'projects': [{'id': pid, 'name': 'Авто'}], 'calls': [], 'secrets': [{'id': f's{i}', 'projectId': pid, 'key': k, 'value': v, 'note': ''} for i, (k, v) in enumerate(
+        [('ANDROID_KEYSTORE_BASE64', KS), ('ANDROID_KEYSTORE_PASSWORD', 'storepw-123456'), ('ANDROID_KEY_ALIAS', 'key0'), ('ANDROID_KEY_PASSWORD', 'keypw-654321')])]}, open(FB, 'w'))
+    c, j = http(f'{KOS}/api.php?a=bw_set', {'token': '0.' + '1' * 8 + '-' + '2' * 4 + '-' + '3' * 4 + '-' + '4' * 4 + '-' + '5' * 12 + '.' + 'A' * 30 + ':' + 'B' * 24}, {'X-Eco-Token': 'boss-token'})
+    check('сейф подключён (пробный токен)', j.get('ok'), j)
+    open(ac, 'a')
+    acf = open(ac).read().replace('];', f"  'bws_bin' => '{ROOT}/tests/fake_bws.py', 'android_dir' => '{TMP}/android_src',\n];"); open(ac, 'w').write(acf)
+    for f in glob.glob('/tmp/itc-sign-*'): shutil.rmtree(f, ignore_errors=True)
+    aenv2 = dict(aenv, FAKE_BWS_DB=FB, ITC_GRADLE_BIN=f'{ROOT}/tests/fake_gradle.py', ITC_APKSIGNER=f'{ROOT}/tests/fake_apksigner.py', ITC_ANDROID_SDK=f'{TMP}/sdk')
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'release'], env=aenv2, capture_output=True, text=True, timeout=120)
+    check('обновление с Android: сначала сборка в фоне, обновление ждёт', 'начинаю сборку' in r.stdout and json.load(open(f'{TMP}/rel/state.json')).get('wait', '').startswith('№9010'), (r.stdout[-400:], r.stderr[-300:]))
+    for _ in range(60):
+        if os.path.exists(f'{TMP}/rel/android/9010/ok.json') or os.path.exists(f'{TMP}/rel/android/9010/fail.txt'): break
+        time.sleep(0.5)
+    fg = json.load(open('/tmp/fake_gradle.json'))
+    check('сборка: ключ подписи из сейфа — файлом 600, пароли переданы, base64 в окружение не попал', os.path.exists(f'{TMP}/rel/android/9010/ok.json') and fg['ks_mode'] == '0o600'
+          and fg['ks_body'] == 'KEYSTORE-BYTES-\x01\x02' and fg['pw'] and fg['alias'] == 'key0' and not fg['b64_in_env'], (fg, open(f'{TMP}/rel/android/9010/fail.txt').read() if os.path.exists(f'{TMP}/rel/android/9010/fail.txt') else ''))
+    check('версия 27 / 2.2.4, только нужные приложения, в копии проекта', '-PitcVersionCode=27' in fg['args'] and '-PitcVersionName=2.2.4' in fg['args'] and 'assembleFilRelease' in fg['args']
+          and 'assembleKosmosRelease' in fg['args'] and len([x for x in fg['args'] if x.startswith('assemble')]) == 2 and fg['cwd'] == f'{TMP}/android_src', fg)
+    check('файл ключа удалён сразу после сборки', not glob.glob('/tmp/itc-sign-*'), glob.glob('/tmp/itc-sign-*'))
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'release'], env=aenv2, capture_output=True, text=True, timeout=120)
+    c, j = http(f'{STORE}/api/kosmos.php?a=upd_ready&t=boss-t', {}); it = next((x for x in j.get('items', []) if x.get('n') == 9010), {})
+    check('обновление №9010 готово к установке, в «что нового» — приложения и версия', it and any('fil (' in w and '2.2.4' in w for w in it.get('what', [])), (r.stdout[-300:], j))
+    zb = urllib.request.urlopen(urllib.request.Request(f'{STORE}/api/kosmos.php?a=upd_get&n=9010&t=boss-t'), timeout=30).read(); z = zipfile.ZipFile(io.BytesIO(zb))
+    vj = json.loads(z.read('store/app/fil/version.json'))
+    check('в обновлении APK и version.json по адресам приложений', {'store/app/fil/itc-fil.apk', 'store/app/kosmos/itc-kosmos.apk', 'store/app/kosmos/version.json'} <= set(z.namelist())
+          and vj['code'] == 27 and vj['name'] == '2.2.4' and vj['url'] == 'https://itcpartner.store/app/fil/itc-fil.apk' and vj['notes'] == 'Быстрее открывается', (z.namelist(), vj))
+    log_all = open(f'{TMP}/rel/android/9010/ok.json').read() + r.stdout + r.stderr
+    check('пароли и ключ нигде не записаны', 'storepw-123456' not in log_all and 'keypw-654321' not in log_all and KS not in log_all)
+    json.dump({'n': 9011, 'title': 'Сломанная сборка', 'what': [], 'files': [], 'kosmos': False, 'android': {'apps': ['fil'], 'code': 28, 'name': '2.2.5'}}, open(f'{GD}/releases/9011.json', 'w'), ensure_ascii=False)
+    open(f'{TMP}/gradle_fail.sh', 'w').write(f'#!/bin/sh\nFAKE_GRADLE_FAIL=1 exec {ROOT}/tests/fake_gradle.py "$@"\n'); os.chmod(f'{TMP}/gradle_fail.sh', 0o755)
+    aenv3 = dict(aenv2, ITC_GRADLE_BIN=f'{TMP}/gradle_fail.sh')
+    subprocess.run(['php', f'{ROOT}/bin/agent.php', 'release'], env=aenv3, capture_output=True, text=True, timeout=120)
+    for _ in range(60):
+        if os.path.exists(f'{TMP}/rel/android/9011/fail.txt'): break
+        time.sleep(0.5)
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'release'], env=aenv3, capture_output=True, text=True, timeout=120)
+    stj = json.load(open(f'{TMP}/rel/state.json')); ft = open(f'{TMP}/rel/android/9011/fail.txt').read() if os.path.exists(f'{TMP}/rel/android/9011/fail.txt') else ''
+    check('сборка не удалась — обновление не выпускается, причина видна, пароль скрыт', stj['done'].get('9011', {}).get('ok') is False and 'Gradle не собрал' in ft and 'keypw-654321' not in ft + json.dumps(stj, ensure_ascii=False), (ft, stj.get('done', {}).get('9011')))
+    json.dump({'n': 9012, 'title': 'Слишком много', 'what': [], 'files': [], 'kosmos': False, 'android': {'apps': 'all', 'code': 29, 'name': '2.2.6'}}, open(f'{GD}/releases/9012.json', 'w'), ensure_ascii=False)
+    subprocess.run(['php', f'{ROOT}/bin/agent.php', 'release'], env=aenv2, capture_output=True, text=True, timeout=120)
+    for _ in range(60):
+        if os.path.exists(f'{TMP}/rel/android/9012/fail.txt'): break
+        time.sleep(0.5)
+    check('больше 6 приложений за раз — просит разбить (магазин принимает до 60 МБ)', 'не больше 6' in (open(f'{TMP}/rel/android/9012/fail.txt').read() if os.path.exists(f'{TMP}/rel/android/9012/fail.txt') else ''))
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

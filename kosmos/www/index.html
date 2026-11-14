@@ -691,7 +691,8 @@ function setGit(){
     h += '<div class="card' + (g.ok ? ' act' : '') + '"><div class="kh"><b>Рабочая копия</b>' + (g.ok ? '<span class="tag ok">в порядке</span>' : '<span class="tag err">' + esc(g.err || 'ещё не готова') + '</span>') + '</div>'
       + (g.head && g.head.hash ? '<div class="ks">Последнее изменение: <b>' + esc(g.head.msg || '') + '</b> · ' + esc(g.head.hash) + (g.head.date ? ' · ' + dmy(String(g.head.date).replace('T', ' ').slice(0, 19)) : '') + '</div>' : '')
       + '<div class="ks">' + (g.pulled_at ? 'Обновлена ' + dmy(g.pulled_at) + ' ' + hm(g.pulled_at) + ' · ' : '') + 'проверена ' + dmy(g.checked_at) + ' ' + hm(g.checked_at) + (g.files ? ' · файлов: ' + num(g.files) : '') + '</div></div>';
-    if (g.pub) {
+    if (g.pub && g.ok) h += '<p class="note" style="margin-top:12px">Ключ сервера для GitHub (только чтение) уже добавлен — его больше не трогать. Ключ записи для разработчика — на вкладке «Разработчик».</p>';
+    else if (g.pub) {
       h += '<h4 style="margin:16px 0 8px">Ключ сервера для GitHub</h4>'
         + '<p class="note">Один раз: GitHub → хранилище ' + esc(repo) + ' → Settings (Настройки) → Deploy keys → Add deploy key. Title: «Сервер Сингапур», Key: вставьте строку ниже, галочку записи не ставьте → Add key. Это открытая часть ключа, её можно показывать; закрытая хранится только на сервере.</p>'
         + '<div class="row"><input class="inp" id="gitPub" readonly style="flex:1;min-width:240px;font-family:monospace;font-size:12px" value="' + esc(g.pub) + '"><button class="btn sm" onclick="gitCopy()">Скопировать</button></div>';

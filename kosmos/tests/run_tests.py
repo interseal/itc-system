@@ -481,6 +481,12 @@ try:
     check('шлюз: список поручений для Фила', c == 200 and any(x['id'] == tid4 for x in j['tasks']), j)
     _c = sqlite3.connect(f'{TMP}/kosmos.sqlite'); db_ds = (_c.execute("SELECT v FROM settings WHERE k='ds_key'").fetchone() or [''])[0]; _c.close()
     check('ключ DeepSeek хранится зашифрованным', db_ds.strip() and DK not in db_ds, db_ds)
+    c, j = call('dev_add', B, {'text': 'Поправь gradle и выпусти обновление', 'model': 'opus'}); tid5 = j['id']
+    subprocess.run(['php', f'{ROOT}/bin/agent.php', 'devrun'], env=denv, capture_output=True, text=True, timeout=120)
+    c, j = call('dev', B); t5 = next(x for x in j['tasks'] if x['id'] == tid5)
+    lg5 = subprocess.run(f'git --git-dir={O} log --oneline main', shell=True, capture_output=True, text=True).stdout
+    br5 = subprocess.run(f'git --git-dir={O} branch', shell=True, capture_output=True, text=True).stdout
+    check('правка сборки Android (gradle) в главную сама не уходит — только ветка и проверка Claude (0.4.1)', t5['merged'] == 0 and 'gradle' not in lg5 and f'kosmos/{tid5}' in br5 and 'проверки Claude' in t5['error'], (t5, br5))
     c, j = call('dev_limit', B, {'limit': '2'}); c, j = call('dev_add', B, {'text': 'Ещё одно поручение на сегодня', 'model': 'opus'})
     check('лимит расходов в день — поручение не принимается', c == 400 and 'Лимит' in j.get('error', ''), j)
     c, j = call('dev', B); check('ключ записи в GitHub создан и показан руководителю', j['state'].get('pub', '').startswith('ssh-ed25519'), j['state'])

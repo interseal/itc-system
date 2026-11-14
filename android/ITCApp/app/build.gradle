@@ -1,0 +1,187 @@
+plugins {
+    id 'com.android.application'
+}
+android {
+    namespace 'store.itcpartner.app'
+    compileSdk 34
+    defaultConfig {
+        applicationId "store.itcpartner.app"
+        minSdk 23
+        targetSdk 34
+        // №551 · версию задаёт сервер при сборке (releases/N.json → android.code / android.name); без неё — как в Android Studio
+        versionCode((project.findProperty('itcVersionCode') ?: '26') as Integer)
+        versionName((project.findProperty('itcVersionName') ?: '2.2.3') as String)
+    }
+    // 2.3 · + kosmos («Космос» — помощник на Claude, как Фил) — всего 13.
+    // 2.2 · ещё три отдельных: eco (Экосистема), trade (Трейдинг), hotels (Отели) — всего 12.
+    // 2.1 · из одного проекта — 9 приложений: store (магазин), sklad (склад) и 7 отдельных: esim, metro, nav, perevod, fil, crm, draw.
+    // Собрать все: Build → Generate Signed Bundle / APK → APK → отметить нужные варианты *Release.
+    // 1.9 · из одного проекта — два приложения. В Android Studio: вкладка Build Variants слева внизу,
+    // storeRelease — «ИТК Глобал» (магазин), skladRelease — «ITC 仓库» (склад в Китае).
+    buildFeatures { buildConfig true }
+    flavorDimensions "app"
+    productFlavors {
+        store {
+            dimension "app"
+            applicationId "store.itcpartner.app"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "false"
+            buildConfigField "String", "APP_KEY", '"store"'
+        }
+        sklad {
+            dimension "app"
+            applicationId "store.itcpartner.sklad"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/sklad/"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/sklad/app/version.json"'
+            buildConfigField "boolean", "SKLAD", "true"
+            buildConfigField "boolean", "MINI", "false"
+            buildConfigField "String", "APP_KEY", '"sklad"'
+        }
+        esim {
+            dimension "app"
+            applicationId "store.itcpartner.esim"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/esim/"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/esim/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "true"
+            buildConfigField "String", "APP_KEY", '"esim"'
+        }
+        metro {
+            dimension "app"
+            applicationId "store.itcpartner.metro"
+            buildConfigField "String", "START_URL", '"https://metro.itcpartner.store/?from=itc"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/metro/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "true"
+            buildConfigField "String", "APP_KEY", '"metro"'
+        }
+        nav {
+            dimension "app"
+            applicationId "store.itcpartner.nav"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/apps/nav/?from=itc"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/nav/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "true"
+            buildConfigField "String", "APP_KEY", '"nav"'
+        }
+        perevod {
+            dimension "app"
+            applicationId "store.itcpartner.perevod"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/apps/perevod/?from=itc"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/perevod/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "true"
+            buildConfigField "String", "APP_KEY", '"perevod"'
+        }
+        fil {
+            dimension "app"
+            applicationId "store.itcpartner.fil"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/apps/fil/"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/fil/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "true"
+            buildConfigField "String", "APP_KEY", '"fil"'
+        }
+        kosmos {   // 2.3 · «Космос» — помощник ИТК на Claude (как Фил), отдельное приложение
+            dimension "app"
+            applicationId "store.itcpartner.kosmos"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/apps/kosmos/"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/kosmos/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "true"
+            buildConfigField "String", "APP_KEY", '"kosmos"'
+        }
+        crm {
+            dimension "app"
+            applicationId "store.itcpartner.crm"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/apps/crm/"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/crm/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "true"
+            buildConfigField "String", "APP_KEY", '"crm"'
+        }
+        draw {
+            dimension "app"
+            applicationId "store.itcpartner.draw"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/apps/draw/"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/draw/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "true"
+            buildConfigField "String", "APP_KEY", '"draw"'
+        }
+        eco {
+            dimension "app"
+            applicationId "store.itcpartner.eco"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/apps/eco/"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/eco/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "true"
+            buildConfigField "String", "APP_KEY", '"eco"'
+        }
+        trade {
+            dimension "app"
+            applicationId "store.itcpartner.trade"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/apps/trade/"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/trade/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "true"
+            buildConfigField "String", "APP_KEY", '"trade"'
+        }
+        hotels {
+            dimension "app"
+            applicationId "store.itcpartner.hotels"
+            buildConfigField "String", "START_URL", '"https://itcpartner.store/apps/hotels/?from=itc"'
+            buildConfigField "String", "UPDATE_URL", '"https://itcpartner.store/app/hotels/version.json"'
+            buildConfigField "boolean", "SKLAD", "false"
+            buildConfigField "boolean", "MINI", "true"
+            buildConfigField "String", "APP_KEY", '"hotels"'
+        }
+    }
+    // №551 · подпись на сервере «Космоса»: ключ и пароли — из сейфа Bitwarden («Авто»: ANDROID_*), передаются только на время сборки.
+    // В Android Studio на ноутбуке этих переменных нет — подписывает мастер «Generate Signed APK», как раньше.
+    signingConfigs {
+        if (System.getenv('ITC_KEYSTORE_FILE')) {
+            release {
+                storeFile file(System.getenv('ITC_KEYSTORE_FILE'))
+                storePassword System.getenv('ITC_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ITC_KEY_ALIAS')
+                keyPassword System.getenv('ITC_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (System.getenv('ITC_KEYSTORE_FILE')) signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.webkit:webkit:1.10.0'
+    // 1.9 · фоновая проверка сообщений склада (без Google)
+    implementation 'androidx.work:work-runtime:2.9.0'
+    // Уведомления
+    implementation platform('com.google.firebase:firebase-bom:33.1.2')
+    implementation 'com.google.firebase:firebase-messaging'
+}
+
+// Firebase: подключение google-services.json. Строка идёт В САМОМ КОНЦЕ файла.
+apply plugin: 'com.google.gms.google-services'
+
+// 1.9 · у склада (store.itcpartner.sklad) нет своего Firebase — его уведомления идут через SkladPoll.
+// Поэтому для вариантов sklad шаг google-services выключаем, иначе сборка остановится.
+android.applicationVariants.configureEach { v ->
+    // 2.1 · отдельные приложения (eSIM, Мой Гуанчжоу, Навигатор, Переводчик, Фил, CRM, Рисовалка) — тоже без Firebase
+    if (v.flavorName != 'store') {
+        def n = "process${v.name.capitalize()}GoogleServices"
+        tasks.configureEach { t -> if (t.name == n) t.enabled = false }
+    }
+}
