@@ -674,13 +674,20 @@ function a_media_tools(): void {
    Сборка — отдельным фоновым процессом (agent.php android N): Java 17, Android SDK и Gradle ставятся сами (kosmos/tools/build_android.py),
    ключ подписи и пароли — из сейфа «Авто» (ANDROID_*) только на время сборки, файл ключа удаляется сразу. Готовое кладётся в
    release_dir/android/N/extra (store/app/<имя>/itc-<имя>.apk + version.json), и обновление №N собирается как обычно. */
+/* 0.4.8 · запуск в фоне без унаследованных файлов (иначе фоновая задача держит замок агента) */
+function a_bg(string $run): void {
+  exec('/bin/bash -c ' . escapeshellarg('for f in /proc/$$/fd/*; do n=${f##*/}; [ "$n" -gt 2 ] 2>/dev/null && eval "exec $n>&-"; done; ' . $run . ' &') . ' </dev/null >/dev/null 2>&1');
+}
 function a_android_kick(int $n): void {
   $h = @fopen(sys_get_temp_dir() . '/kosmos-android.lock', 'c'); if (!$h) return;
   if (!flock($h, LOCK_EX | LOCK_NB)) { fclose($h); return; }   // уже собирается
   flock($h, LOCK_UN); fclose($h);
   $cfg = getenv('KOSMOS_CONFIG') ?: '';
-  exec(($cfg !== '' ? 'KOSMOS_CONFIG=' . escapeshellarg($cfg) . ' ' : '') . 'nohup ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' android ' . $n
-    . ' >> ' . escapeshellarg(sys_get_temp_dir() . '/kosmos-android.log') . ' 2>&1 &');
+  /* 0.4.8 · фоновая сборка НЕ должна наследовать открытые файлы прохода: раньше она держала kosmos-agent.lock,
+     и пока шла сборка Android (часами), все проходы агента выходили с «уже работает другой проход» — обновления вставали */
+  $run = ($cfg !== '' ? 'KOSMOS_CONFIG=' . escapeshellarg($cfg) . ' ' : '') . 'nohup ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' android ' . $n
+    . ' >> ' . escapeshellarg(sys_get_temp_dir() . '/kosmos-android.log') . ' 2>&1';
+  a_bg($run);
   a_log("Android для обновления №$n: начинаю сборку");
 }
 /* ключ подписи Android из сейфа «Авто» (значения — только в памяти) */
@@ -743,7 +750,7 @@ function a_dev_kick(): void {
   if (!flock($h, LOCK_EX | LOCK_NB)) { fclose($h); return; }   // поручение уже выполняется
   flock($h, LOCK_UN); fclose($h);
   $cfg = getenv('KOSMOS_CONFIG') ?: '';
-  exec(($cfg !== '' ? 'KOSMOS_CONFIG=' . escapeshellarg($cfg) . ' ' : '') . 'nohup ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' devrun >> ' . escapeshellarg(sys_get_temp_dir() . '/kosmos-dev.log') . ' 2>&1 &');
+  a_bg(($cfg !== '' ? 'KOSMOS_CONFIG=' . escapeshellarg($cfg) . ' ' : '') . 'nohup ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' devrun >> ' . escapeshellarg(sys_get_temp_dir() . '/kosmos-dev.log') . ' 2>&1');
 }
 function a_dev_key(): string {
   global $C; $k = (string)$C['dev_key'];
