@@ -10,10 +10,12 @@
 //   td_stop   остановить серию         td_hide  убрать серию из списка
 //   an_save / an_list / an_get / an_del — архив анализов (тесты систем, проверки)
 //   kv_get / kv_set — каталог монет и свои группы; res_put / res_get / res_list / res_sigs — итоги тестов по каждой монете
+//   td_bt     проверить серию на истории: разные стопы, свечи, фильтры (№565)
 //   cron      шаг для всех серий (без входа; повторный запуск в ту же минуту ничего не делает)
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/tdemo_lib.php';
+require_once __DIR__ . '/tdemo_bt.php';
 @set_time_limit(55);
 $action = $_GET['action'] ?? (PHP_SAPI === 'cli' ? ($argv[1] ?? '') : '');
 $IN = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' ? (json_decode(file_get_contents('php://input'), true) ?: []) : [];
@@ -60,6 +62,9 @@ if ($action === 'td_start') { td_ensure();
 if ($action === 'td_list') { td_ensure(); $l = td_lock(); if ($l) { $rr = td_load("phone=? AND status='run'", [$ME]); shuffle($rr); td_tick_rows($rr, 12); }
   $rows = td_load('phone=? ORDER BY created_at DESC LIMIT 150', [$ME]); $out = []; foreach ($rows as $r) { $s = json_decode($r['data'], true); if ($s && empty($s['hidden'])) $out[] = $s; }
   $cf = __DIR__ . '/tdemo_cron.txt'; td_out(['ok' => true, 'series' => $out, 'cron' => is_file($cf) ? (int)file_get_contents($cf) : 0, 'now' => time()]); }
+// №565 · проверка серии на истории с разными стопами, свечами и фильтрами (по одной монете за запрос)
+if ($action === 'td_bt') { td_ensure(); $rows = td_load('id=? AND phone=?', [(string)td_in('id'), $ME]); if (!$rows) td_fail('Серия не найдена', 404);
+  $s = json_decode($rows[0]['data'], true); $days = max(1, min(7, (int)td_in('days', 5))); $r = tdb_run($s, $days); if (empty($r['ok'])) td_fail($r['error'] ?? 'Не получилось', 502); td_out($r); }
 if ($action === 'td_stop' || $action === 'td_hide') { td_ensure(); $rows = td_load('id=? AND phone=?', [(string)td_in('id'), $ME]); if (!$rows) td_fail('Серия не найдена', 404); $r = $rows[0]; $s = json_decode($r['data'], true);
   if ($action === 'td_stop' && $s['status'] === 'run') { td_step($s); if ($s['open']) { $p = td_price($s['mkt'], $s['sym']) ?? $s['open']['ep']; if (!empty($s['sys'])) tds_close($s, $p, time(), 'серия остановлена'); else td_close($s, $p, time(), 'серия остановлена'); } $s['status'] = 'stop'; $s['tdone'] = time(); }
   if ($action === 'td_hide') $s['hidden'] = 1; td_save($r, $s); td_out(['ok' => true, 'series' => $s]); }
