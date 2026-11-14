@@ -73,7 +73,7 @@ label.l{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
 <body>
 <div class="top">
   <a href="/eco/upd.html" aria-label="Назад"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></a>
-  <h1>Навыки «Фила», «Космоса» и Claude</h1>
+  <h1>Навыки и история: «Фил», «Космос», Claude</h1>
 </div>
 <div class="wrap">
   <div class="card">
@@ -99,8 +99,8 @@ function api(action, data){
     .catch(function(){ return {ok:false, error:'Нет связи с магазином'}; });
 }
 var S = {items: [], open: {}, f: 'all', del: 0, warn: ''};
-var F = [['all','Все'],['on','Работают'],['paused','Приостановлены'],['claude','От Claude'],['kosmos','От «Космоса»'],['boss','Мои']];
-function kind(x){ return x.claude ? 'claude' : (x.author === 'Космос' ? 'kosmos' : (x.author === 'Фил' ? 'fil' : 'boss')); }
+var F = [['all','Все'],['on','Работают'],['paused','Приостановлены'],['claude','Навыки Claude'],['hist','История Claude'],['kosmos','От «Космоса»'],['boss','Мои']];
+function kind(x){ return x.history ? 'hist' : (x.claude ? 'claude' : (x.author === 'Космос' ? 'kosmos' : (x.author === 'Фил' ? 'fil' : 'boss'))); }
 function load(){
   if (!T) { document.getElementById('list').innerHTML = '<div class="err">Войдите в Экосистему как руководитель, затем откройте эту страницу снова.</div>'; return; }
   api('nvk_list').then(function(d){
@@ -122,7 +122,7 @@ function draw(){
 function row(x){
   var o = S.open[x.id];
   var h = '<div class="sk' + (x.paused ? ' off' : '') + '" id="sk' + x.id + '"><div class="sk-h" onclick="tog(' + x.id + ')"><b>' + esc(x.title) + '</b><span class="mut">' + (o ? '▲' : '▼') + '</span></div>'
-    + '<div>' + (x.paused ? '<span class="tag p">приостановлен</span>' : '') + '<span class="tag' + (x.claude ? ' c' : '') + '">' + (x.claude ? 'от Claude' : 'записал ' + esc(x.author || '—')) + '</span>'
+    + '<div>' + (x.paused ? '<span class="tag p">приостановлен</span>' : '') + '<span class="tag' + (x.claude ? ' c' : '') + '">' + (x.history ? 'история работы Claude' : x.claude ? 'от Claude' : 'записал ' + esc(x.author || '—')) + '</span>'
     + (x.uses ? '<span class="tag">применяли ' + x.uses + ' раз</span>' : '') + '</div>';
   if (o) {
     h += '<div class="sk-b"><div class="mut">Когда применять</div><div>' + esc(x.trig || '—') + '</div><div class="mut" style="margin-top:6px">Как делать</div><pre>' + esc(x.steps) + '</pre>'

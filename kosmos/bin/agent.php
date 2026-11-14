@@ -38,7 +38,7 @@ $cmd = (string)($argv[1] ?? '');
 
 switch ($cmd) {
   case 'dbinfo':   echo json_encode(a_dbinfo()); exit;
-  case 'claudeskills': require_once __DIR__ . '/../lib/boot.php'; echo json_encode(skill_sync_claude((string)($argv[2] ?? ''))); exit;   // 0.3.5 · от www-data
+  case 'claudeskills': require_once __DIR__ . '/../lib/boot.php'; echo json_encode(skill_sync_claude((string)($argv[2] ?? ''), (string)($argv[3] ?? 'claude') === 'hist' ? 'hist' : 'claude')); exit;   // 0.3.5 · от www-data
   case 'bwinfo':   echo json_encode(a_bwinfo()); exit;   // 0.3.4 · от www-data: токен сейфа и ключи Claude (расшифровка — ключом базы)
   case 'bw':       a_lock(); exit(a_bw(true) ? 0 : 1);
   case 'skills':   a_lock(); exit(a_claude_skills(true) ? 0 : 1);
@@ -89,9 +89,10 @@ function a_store(string $query, ?string $post = null, ?string $saveTo = null, in
 }
 
 /* То, что лежит в базе, читаем от имени www-data (владельца базы), чтобы не испортить права на файлы. */
-function a_as_db(string $sub, string $arg = ''): string {
+function a_as_db(string $sub, string ...$args): string {
   global $C, $cfgFile;
-  $php = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' ' . $sub . ($arg !== '' ? ' ' . escapeshellarg($arg) : '');
+  $php = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' ' . $sub;
+  foreach ($args as $arg) if ($arg !== '') $php .= ' ' . escapeshellarg($arg);
   $env = 'KOSMOS_CONFIG=' . escapeshellarg($cfgFile) . ' ';
   $line = ($C['db_user'] !== '' && function_exists('posix_geteuid') && posix_geteuid() === 0) ? 'runuser -u ' . escapeshellarg((string)$C['db_user']) . ' -- env ' . $env . $php : 'env ' . $env . $php;
   return (string)shell_exec($line . ' 2>/dev/null');
@@ -530,14 +531,18 @@ function a_claude_skills(bool $force): bool {
   global $C;
   $g = is_file(a_git_file()) ? (array)json_decode((string)file_get_contents(a_git_file()), true) : [];
   $head = (string)($g['head']['hash'] ?? '');
-  $dir = rtrim((string)$C['git_dir'], '/') . '/docs/skills';
-  if (!is_dir($dir)) return true;
   if (!$force && ($head === '' || (a_state()['skills_head'] ?? '') === $head)) return true;
-  $r = json_decode(a_as_db('claudeskills', $dir), true);
-  if (!is_array($r)) { a_log('навыки Claude: не удалось перенести'); return false; }
+  // 0.3.8 · и история работы Claude (docs/history) — «Космос» и «Фил» видят, что и когда делалось
+  foreach (['skills' => ['claude', 'навыки Claude'], 'history' => ['hist', 'история Claude']] as $sub => [$pre, $what]) {
+    $dir = rtrim((string)$C['git_dir'], '/') . '/docs/' . $sub;
+    if (!is_dir($dir)) continue;
+    $out = a_as_db('claudeskills', $dir, $pre);
+    $r = json_decode($out, true);
+    if (!is_array($r)) { a_log($what . ': не удалось перенести'); return false; }
+    if ($r['new'] || $r['upd'] || $r['del']) a_log($what . ': новых ' . $r['new'] . ', обновлено ' . $r['upd'] . ', убрано ' . $r['del']);
+    if ($r['bad']) a_log($what . ': не разобраны (нет «# название» / «---» или текст длиннее 1500 знаков): ' . implode(', ', $r['bad']));
+  }
   a_state_put(['skills_head' => $head]);
-  if ($r['new'] || $r['upd'] || $r['del']) a_log('навыки Claude: новых ' . $r['new'] . ', обновлено ' . $r['upd'] . ', убрано ' . $r['del']);
-  if ($r['bad']) a_log('навыки Claude: не разобраны (нет «# название» / «---» или шаги длиннее 1500 знаков): ' . implode(', ', $r['bad']));
   return true;
 }
 

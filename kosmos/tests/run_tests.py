@@ -430,6 +430,13 @@ try:
     os.remove(f'{G}/docs/skills/claude-dengi.md'); open(f'{G}/docs/skills/claude-dengi.md', 'w').write('# Деньги Claude\nКогда: баланс\n---\nновый текст от Claude, длинный достаточно\n')
     r, rows = run_sk(); d = {x[4]: x for x in rows}
     check('удалённый руководителем навык Claude не воскресает', d['claude:claude-dengi'][3] == 1 and 'мой вариант' in d['claude:claude-dengi'][0], d['claude:claude-dengi'])
+    print('16. История работы Claude (0.3.8)')
+    os.makedirs(f'{G}/docs/history', exist_ok=True)
+    _sh.copy(f'{os.path.dirname(ROOT)}/docs/history/2026-11-14-seif.md', f'{G}/docs/history/2026-11-14-seif.md')
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'skills'], env=aenv, capture_output=True, text=True, timeout=60)
+    c, j = gw({'a': 'skills', 'op': 'pick', 'q': 'как появился машинный аккаунт и проект Авто в сейфе'}, key='ab' * 32)
+    h = next((x for x in j.get('items', []) if x.get('history')), None)
+    check('запись истории перенесена и находится по вопросу (отметка «история»)', 'история Claude: новых 1' in r.stdout and h and h['claude'] == 1 and 'Сейф' in h['title'] or 'сейф' in (h or {}).get('title', ''), (r.stdout[-300:], j))
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

@@ -36,7 +36,7 @@ try:
         pg.click('a[href="/eco/skills.html"]'); pg.wait_for_selector('.sk')
         t = pg.inner_text('#list')
         check('провалился — видны все навыки: свой и от Claude', 'КП для гостиницы' in t and 'Деньги Claude' in t and 'от Claude' in t, t)
-        check('фильтры со счётом', 'От Claude · 1' in pg.inner_text('#filt') and 'Все · 2' in pg.inner_text('#filt'), pg.inner_text('#filt'))
+        check('фильтры со счётом', 'Навыки Claude · 1' in pg.inner_text('#filt') and 'История Claude · 0' in pg.inner_text('#filt') and 'Все · 2' in pg.inner_text('#filt'), pg.inner_text('#filt'))
         pg.fill('#q', 'billing'); check('поиск по тексту шагов', pg.locator('.sk').count() == 1 and 'Деньги Claude' in pg.inner_text('#list'))
         pg.fill('#q', '')
         pg.click('text=Деньги Claude'); pg.wait_for_selector('text=Приостановить')

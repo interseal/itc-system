@@ -34,7 +34,8 @@ function skill_row(array $r): array {
   return ['id' => (int)$r['id'], 'title' => (string)$r['title'], 'trig' => (string)$r['trig'], 'steps' => (string)$r['steps'], 'trace' => (string)$r['trace'],
           'author' => (string)$r['author'], 'who' => (string)$r['who'], 'manual' => (int)$r['manual'], 'uses' => (int)$r['uses'],
           'used_at' => (string)$r['used_at'], 'created_at' => (string)$r['created_at'], 'updated_at' => (string)$r['updated_at'],
-          'paused' => (int)($r['paused'] ?? 0), 'claude' => strpos((string)($r['src'] ?? ''), 'claude:') === 0 ? 1 : 0];   // 0.3.6
+          'paused' => (int)($r['paused'] ?? 0), 'claude' => preg_match('~^(claude|hist):~', (string)($r['src'] ?? '')) ? 1 : 0,   // 0.3.6
+          'history' => strpos((string)($r['src'] ?? ''), 'hist:') === 0 ? 1 : 0];   // 0.3.8 · запись истории работы Claude
 }
 
 function skill_all(): array {
@@ -97,10 +98,10 @@ function skill_parse_md(string $md): ?array {
   if ($steps === '') return null;
   return ['title' => trim($t[1]), 'trig' => $trig, 'steps' => $steps];
 }
-function skill_sync_claude(string $dir): array {
+function skill_sync_claude(string $dir, string $pre = 'claude'): array {   // 0.3.8 · $pre: claude — навыки, hist — история работы
   $d = db(); $seen = []; $n = ['new' => 0, 'upd' => 0, 'del' => 0, 'bad' => []];
   foreach (glob(rtrim($dir, '/') . '/*.md') ?: [] as $f) {
-    $src = 'claude:' . basename($f, '.md');
+    $src = $pre . ':' . basename($f, '.md');
     if (basename($f) === 'README.md') continue;
     $raw = (string)file_get_contents($f); $h = substr(hash('sha256', $raw), 0, 16);
     $a = skill_parse_md($raw);
@@ -119,9 +120,9 @@ function skill_sync_claude(string $dir): array {
       $n['new']++;
     }
   }
-  $q = $d->query("SELECT id, src FROM skills WHERE deleted=0 AND boss=0 AND src LIKE 'claude:%'");
+  $q = $d->prepare("SELECT id, src FROM skills WHERE deleted=0 AND boss=0 AND src LIKE ?"); $q->execute([$pre . ':%']);
   foreach ($q->fetchAll() as $r) if (!in_array($r['src'], $seen, true)) { $d->prepare('UPDATE skills SET deleted=1 WHERE id=?')->execute([$r['id']]); $n['del']++; }
-  if ($n['new'] || $n['upd'] || $n['del']) log_add('', 'навыки Claude из GitHub', $n);
+  if ($n['new'] || $n['upd'] || $n['del']) log_add('', $pre === 'hist' ? 'история Claude из GitHub' : 'навыки Claude из GitHub', $n);
   return $n;
 }
 
