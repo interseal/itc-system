@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Мой Гуанчжоу</title>
+<style>html,body{margin:0;height:100%;background:#030b2e;color:#fff;font:16px Roboto,Arial,sans-serif;display:flex;align-items:center;justify-content:center}</style></head>
+<body><div>Открываю «Мой Гуанчжоу»…</div>
+<script>
+/* №595 · вход для отдельного приложения «Мой Гуанчжоу» (metro.itcpartner.store).
+   Есть вход в магазин на этом телефоне — отдаём метку входа в метро; нет — экран входа (номер и код), потом сюда же. */
+(function(){
+  var tok=""; try{var a=JSON.parse(localStorage.getItem("itc_auth")||"null");tok=(a&&a.token)||"";}catch(e){}
+  if(tok) location.replace("https://metro.itcpartner.store/?from=itc&t="+Date.now()+"&u="+encodeURIComponent(tok));
+  else location.replace("/?back="+encodeURIComponent("/metro-in/"));
+})();
+</script></body></html>

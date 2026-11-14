@@ -1164,6 +1164,32 @@ var UTOK='',ANON='';
 try{var mu=location.search.match(/[?&]u=([^&]+)/);if(mu){UTOK=decodeURIComponent(mu[1]);store('metro_u',UTOK);}else UTOK=store('metro_u')||'';
  ANON=store('metro_anon')||'';if(!ANON){ANON='';var al='abcdefghijklmnopqrstuvwxyz0123456789';for(var ai=0;ai<24;ai++)ANON+=al.charAt(Math.floor(Math.random()*al.length));store('metro_anon',ANON);}}catch(e){}
 function favQ(){return '?u='+encodeURIComponent(UTOK)+'&a='+encodeURIComponent(ANON);}
+/* №595 · ОДИН ВХОД — ОДНИ МЕСТА И НАСТРОЙКИ ВО ВСЕХ ПРИЛОЖЕНИЯХ.
+   Отдельное приложение «Мой Гуанчжоу» открывалось без входа — сервер видел «новое устройство» и давал пустой список.
+   Теперь без метки входа приложение один раз просит войти (тем же номером), а фон, язык, город, прошлые маршруты
+   и поиски хранятся на сервере у человека и приходят в любое его приложение. */
+(function(){
+  try{ if(!UTOK && /ITCApp/.test(navigator.userAgent)){ var lt=+(localStorage.getItem('metro_login_try')||0);
+    if(Date.now()-lt>30*60e3){ localStorage.setItem('metro_login_try',String(Date.now())); location.replace('https://itcpartner.store/metro-in/'); return; } } }catch(e){}
+  var SYNC=['metro_bg','metro_card','metro_lang','metro_ecity','metro_pcity','metro_hist','metro_fil_hist','metro_routes','metro_lastroute','metro_tmode','metro_walkmax','metro_navrot','metro_follow'];
+  var LS=window.localStorage; if(!LS)return; var P=Storage.prototype, oSet=P.setItem, oDel=P.removeItem, tm=null, busy=false;
+  function lt(){return +(oGet('metro_cfg_t')||0);} function oGet(k){try{return P.getItem.call(LS,k);}catch(e){return null;}}
+  function push(){clearTimeout(tm);tm=setTimeout(function(){var v={};SYNC.forEach(function(k){var x=oGet(k);if(x!=null)v[k]=x;});
+    fetch('fav.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'cfg',u:UTOK,a:ANON,t:lt(),cfg:v})}).catch(function(){});},1500);}
+  var ready=false,dirty=false;   // пока не пришли настройки с сервера, свои изменения только отмечаем (иначе значения по умолчанию затрут сохранённые)
+  function mark(k){if(!busy&&SYNC.indexOf(k)>=0){if(!ready){dirty=true;return;}try{oSet.call(LS,'metro_cfg_t',String(Date.now()));}catch(e){}push();}}
+  P.setItem=function(k,v){var r=oSet.call(this,k,v);if(this===LS)mark(k);return r;};
+  P.removeItem=function(k){var r=oDel.call(this,k);if(this===LS)mark(k);return r;};
+  var IDK=UTOK?('u:'+UTOK.slice(0,12)):('a:'+ANON), idOld=oGet('metro_cfg_id'); if(idOld!==IDK){ try{ oSet.call(LS,'metro_cfg_t','0'); oSet.call(LS,'metro_cfg_id',IDK); }catch(e){} }   // другой человек/вход — правда на сервере
+  fetch('fav.php'+favQ()+'&cfg=1',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
+    if(j&&j.who==='anon'&&UTOK&&/ITCApp/.test(navigator.userAgent)){ try{ var lt2=+(localStorage.getItem('metro_login_try')||0); if(Date.now()-lt2>30*60e3){ oDel.call(LS,'metro_u'); oSet.call(LS,'metro_login_try',String(Date.now())); location.replace('https://itcpartner.store/metro-in/'); return; } }catch(e){} }   // вход устарел — войти заново
+    var c=(j&&j.cfg)||{}, st=+(c.t||0), v=c.v||{};
+    if(st>lt()){ var ch=false; busy=true; try{ SYNC.forEach(function(k){var x=v.hasOwnProperty(k)?v[k]:null,o=oGet(k);if(x!==o){ch=true;if(x==null)oDel.call(LS,k);else oSet.call(LS,k,x);}}); oSet.call(LS,'metro_cfg_t',String(st)); }catch(e){} busy=false;
+      var g='metro_cfg_rl_'+st; if(ch&&!sessionStorage.getItem(g)){sessionStorage.setItem(g,'1');location.reload();} }
+    else if(lt()>st||dirty||(!st&&SYNC.some(function(k){return oGet(k)!=null;}))){ if(dirty||!lt()) try{oSet.call(LS,'metro_cfg_t',String(Math.max(Date.now(),st+1)));}catch(e){} push(); }
+    ready=true;
+  }).catch(function(){ready=true;});
+})();
 function homeItem(){return MYP.filter(function(r){return r.ic==='home';})[0]||null;}
 function homeShort(h){var t=h?(h.ru||h.zh||''):'';return t.length>22?t.slice(0,21)+'…':t;}
 function homePaint(){var h=homeItem();var b=$('oHome');if(b)b.innerHTML=mi('home')+' '+(h?'Дом · '+esc(homeShort(h)):'Дом не задан');}

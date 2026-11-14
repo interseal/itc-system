@@ -36,7 +36,13 @@ if ($tok !== '' && preg_match('/^[A-Za-z0-9_\-]{8,200}$/', $tok)) {
                 if ($s = $st->fetch()) {
                     $sr = (string)($s['staff_role'] ?? '');
                     if (($s['role'] ?? '') === 'itc' && ($sr === 'boss' || $sr === 'bossacct' || $sr === '')) $who = ['key' => 'boss', 'kind' => 'boss'];
-                    elseif (!empty($s['phone'])) $who = ['key' => 'p_' . md5(preg_replace('/\D+/', '', $s['phone'])), 'kind' => 'phone'];
+                    elseif (!empty($s['phone'])) {
+                        // №595 · один человек — одни места: руководитель, вошедший в отдельном приложении как покупатель
+                        // (тем же номером), получает свой общий список, а не пустой
+                        $pd = preg_replace('/\D+/', '', $s['phone']); $isBoss = false;
+                        try { foreach (db()->query("SELECT DISTINCT phone FROM sessions WHERE role='itc' AND staff_role IN ('boss','bossacct')")->fetchAll(PDO::FETCH_COLUMN) as $bp) { $bd = preg_replace('/\D+/', '', (string)$bp); if ($bd !== '' && substr($bd, -10) === substr($pd, -10)) $isBoss = true; } } catch (Throwable $e) {}
+                        $who = $isBoss ? ['key' => 'boss', 'kind' => 'boss'] : ['key' => 'p_' . md5($pd), 'kind' => 'phone'];
+                    }
                 }
             }
         } catch (Throwable $e) { /* база магазина недоступна — ниже попробуем метку устройства */ }
@@ -61,6 +67,28 @@ function save($file, $a) {
 function clean($s, $n) { return mb_substr(trim(strip_tags((string)$s)), 0, $n); }
 
 $list = load($file);
+// №595 · места, сохранённые на телефоне без входа (по метке устройства), переносим в общий список человека — один раз
+if ($who['kind'] !== 'anon' && strlen($anon) >= 16 && strlen($anon) <= 48) {
+  $af = "$dir/u_a_" . md5($anon) . '.json';
+  if (is_file($af)) {
+    $have = []; foreach ($list as $r) $have[preg_replace('/\s+/u', '', (string)($r['zh'] ?? ''))] = 1;
+    foreach (load($af) as $r) { $k = preg_replace('/\s+/u', '', (string)($r['zh'] ?? '')); if ($k === '' || isset($have[$k]) || count($list) >= 300) continue;
+      if (($r['ic'] ?? '') === 'home') foreach ($list as $x) if (($x['ic'] ?? '') === 'home') { $r['ic'] = 'location_on'; break; }
+      $list[] = $r; $have[$k] = 1; }
+    save($file, $list); @rename($af, $af . '.merged');
+  }
+}
+// №595 · настройки и история (фон, язык, город, прошлые маршруты, поиски) — общие для всех приложений человека
+$cfgf = ($who['kind'] === 'boss') ? "$dir/cfg_boss.json" : "$dir/cfg_{$who['key']}.json";
+if (isset($_GET['cfg']) || ($in['op'] ?? '') === 'cfg') {
+  $c = is_file($cfgf) ? (json_decode((string)file_get_contents($cfgf), true) ?: []) : [];
+  if (($in['op'] ?? '') === 'cfg' && is_array($in['cfg'] ?? null) && (int)($in['t'] ?? 0) >= (int)($c['t'] ?? 0)) {
+    $v = []; foreach ($in['cfg'] as $k => $x) if (preg_match('/^metro_[a-z0-9_]{1,30}$/', (string)$k) && is_string($x) && strlen($x) <= 60000) $v[$k] = $x;
+    $c = ['t' => (int)$in['t'], 'v' => $v];
+    $j = json_encode($c, JSON_UNESCAPED_UNICODE); if (strlen($j) < 400000) { file_put_contents($cfgf . '.tmp', $j, LOCK_EX); rename($cfgf . '.tmp', $cfgf); }
+  }
+  out(['ok' => true, 'cfg' => $c ?: (object)[], 'who' => $who['kind']]);
+}
 // v3: одинаковые названия — оставляем первое, дубли убираем
 $seen = []; $clean = []; $changed = false;
 foreach ($list as $r) { $k = preg_replace('/\s+/u', '', (string)($r['zh'] ?? '')); if ($k !== '' && isset($seen[$k])) { $changed = true; continue; } $seen[$k] = 1; $clean[] = $r; }
