@@ -132,6 +132,29 @@ try {
       jout(['ok' => true, 'test' => $test, 'keys' => keys_list()]);
     }
 
+    case 'bw': {    // 0.3.4 · сейф Bitwarden: вставлен ли токен и что сделал агент (сам токен не отдаётся)
+      me_boss();
+      $f = dirname((string)cfg('db')) . '/bw.json';
+      $st = is_file($f) ? json_decode((string)file_get_contents($f), true) : null;
+      jout(['ok' => true, 'set' => setting('bw_token', '') !== '', 'last4' => setting('bw_last4', ''), 'set_at' => setting('bw_set_at', ''), 'state' => is_array($st) ? $st : null]);
+    }
+
+    case 'bw_set': {
+      $m = me_boss();
+      $t = trim((string)($in['token'] ?? ''));
+      if (!preg_match('~^0\.[0-9a-f\-]{36}\.[A-Za-z0-9]{10,}:[A-Za-z0-9+/=]{20,}$~', $t)) fail('Это не похоже на токен машинного аккаунта Bitwarden (начинается с «0.», внутри двоеточие)');
+      setting_put('bw_token', key_enc($t)); setting_put('bw_last4', substr($t, -4)); setting_put('bw_set_at', now());
+      log_add($m['phone'], 'bw_set', ['last4' => substr($t, -4)]);
+      jout(['ok' => true]);
+    }
+
+    case 'bw_del': {
+      $m = me_boss();
+      setting_put('bw_token', ''); setting_put('bw_last4', '');
+      log_add($m['phone'], 'bw_del', []);
+      jout(['ok' => true]);
+    }
+
     case 'git': {   // 0.3.0 · рабочая копия хранилища кода на GitHub (её ведёт агент)
       me_boss();
       $f = dirname((string)cfg('db')) . '/git.json';

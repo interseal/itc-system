@@ -235,6 +235,7 @@ table.t td.n{text-align:right;font-variant-numeric:tabular-nums}
       <button class="tab" data-t="memory" onclick="setTab('memory')">Память компании</button>
       <button class="tab" data-t="usage" onclick="setTab('usage')">Расход</button>
       <button class="tab" data-t="git" onclick="setTab('git')">GitHub</button>
+      <button class="tab" data-t="bw" onclick="setTab('bw')">Сейф</button>
     </div>
     <div class="win-b" id="setBody"></div>
   </div>
@@ -553,7 +554,7 @@ function setTab(t){
   SET.tab = t;
   Array.prototype.forEach.call(document.querySelectorAll('#setTabs .tab'), function(b){ b.classList.toggle('on', b.getAttribute('data-t') === t); });
   $('setBody').innerHTML = '<div class="note">Загружаю…</div>';
-  ({ keys: setKeys, models: setModels, users: setUsers, memory: setMemory, usage: setUsage, git: setGit })[t]();
+  ({ keys: setKeys, models: setModels, users: setUsers, memory: setMemory, usage: setUsage, git: setGit, bw: setBw })[t]();
 }
 function keyStatus(k){ if (!k.status) return '<span class="tag">не проверен</span>'; return k.status === 'ok' ? '<span class="tag ok">работает</span>' : '<span class="tag err">' + esc(k.status) + '</span>'; }
 function setKeys(){
@@ -696,6 +697,33 @@ function setGit(){
     }
     $('setBody').innerHTML = h;
   });
+}
+/* 0.3.4 · сейф Bitwarden: токен машинного аккаунта — сервер сам кладёт в сейф паспорт и ключи */
+function setBw(){
+  api('bw').then(function(d){
+    if (!d.ok) { $('setBody').innerHTML = '<div class="note">' + esc(d.error) + '</div>'; return; }
+    var s = d.state || {}, h = '<p class="note">Сервер сам кладёт в сейф Bitwarden паспорт системы и «Сейчас в работе» (из GitHub), ключи Claude и ключи сервера — раз в 10 минут, только то, что изменилось. Для этого нужен токен машинного аккаунта Bitwarden. Токен хранится только здесь, зашифрованным, и больше нигде не показывается.</p>';
+    if (d.set) {
+      h += '<div class="card' + (s.ok ? ' act' : '') + '"><div class="kh"><b>Токен …' + esc(d.last4) + '</b>'
+        + (s.ok ? '<span class="tag ok">в порядке</span>' : s.err ? '<span class="tag err">' + esc(s.err) + '</span>' : '<span class="tag">ждёт первой отправки (до минуты)</span>') + '</div>'
+        + (s.project ? '<div class="ks">Проект в сейфе: <b>' + esc(s.project) + '</b>' + (s.items ? ' · записей: ' + s.items.length : '') + '</div>' : '')
+        + (s.saved_at ? '<div class="ks">Последнее сохранение ' + dmy(s.saved_at) + ' ' + hm(s.saved_at) + (s.last ? ': ' + esc(s.last.join(', ')) : '') + '</div>' : '')
+        + (s.checked_at ? '<div class="ks">Проверено ' + dmy(s.checked_at) + ' ' + hm(s.checked_at) + '</div>' : '')
+        + '<div class="row" style="margin-top:8px"><button class="btn red sm" onclick="bwDel()">Убрать токен</button></div></div>';
+      h += '<h4 style="margin:16px 0 8px">Заменить токен</h4>';
+    }
+    h += '<div class="row"><input class="inp" id="bwVal" type="text" name="kosmos-bw-t" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:240px;font-family:monospace" placeholder="0.xxxxxxxx-…:…"><button class="btn" onclick="bwSave()">Сохранить</button></div>'
+      + '<p class="note">Где взять: Bitwarden → Secrets Manager → Machine accounts → аккаунт сервера → Access tokens → Create access token. Токен показывается один раз — скопируйте и вставьте сюда.</p>';
+    $('setBody').innerHTML = h;
+  });
+}
+function bwSave(){
+  var v = $('bwVal').value.trim(); if (!v) { toast('Вставьте токен'); return; }
+  api('bw_set', { token: v }).then(function(d){ if (!d.ok) { toast(d.error || 'Не сохранилось'); return; } toast('Токен сохранён — сервер отправит всё в сейф в течение минуты'); setBw(); });
+}
+function bwDel(){
+  if (!confirm('Убрать токен сейфа? Сервер перестанет класть данные в Bitwarden.')) return;
+  api('bw_del', {}).then(function(d){ if (!d.ok) { toast(d.error || 'Ошибка'); return; } setBw(); });
 }
 function gitCopy(){ var e = $('gitPub'); e.select(); try { navigator.clipboard.writeText(e.value).then(function(){ toast('Ключ скопирован'); }, function(){ document.execCommand('copy'); toast('Ключ скопирован'); }); } catch (x) { document.execCommand('copy'); toast('Ключ скопирован'); } }
 function setUsage(){

@@ -350,6 +350,50 @@ try:
     db = sqlite3.connect(old); got = {d: c for d, c in db.execute('SELECT day, cost_u FROM usage')}; kc = [x[1] for x in db.execute('PRAGMA table_info(keys)')]; db.close()
     check('старая база: стоимость пересчитана один раз (Sonnet, Haiku большой и малый)', r1.stdout == r2.stdout == 'ok' and got == {'2026-11-10': 85000, '2026-11-11': 122500, '2026-11-12': 5000}, (got, r1.stderr[-300:]))
     check('у ключей появилась колонка счёта (org)', 'org' in kc, kc)
+
+    print('13. Сейф Bitwarden: токен в настройках, агент сам кладёт паспорт и ключи (0.3.4)')
+    TOK = '0.' + '1b2c3d4e-0000-4000-8000-00000000abcd' + '.' + 'S3cretPart0123456789' + ':' + 'QUJDREVGR0hJSktMTU5PUFFSU1RVVg=='
+    c, j = call('bw', S); check('сейф — только руководителю', c == 403, (c, j))
+    c, j = call('bw', B); check('токена ещё нет', j.get('ok') and j['set'] is False, j)
+    c, j = call('bw_set', B, {'token': 'просто текст'}); check('не токен — понятный отказ', c == 400 and 'токен' in j.get('error', ''), (c, j))
+    c, j = call('bw_set', B, {'token': TOK}); c2, j2 = call('bw', B)
+    check('токен сохранён, наружу — только 4 последних знака', j.get('ok') and j2['set'] and j2['last4'] == TOK[-4:] and TOK not in json.dumps(j2), j2)
+    db = sqlite3.connect(f'{TMP}/kosmos.sqlite'); raw = db.execute("SELECT v FROM settings WHERE k='bw_token'").fetchone()[0]; db.close()
+    check('в базе токен зашифрован', raw and TOK not in raw and 'S3cret' not in raw, raw[:30])
+    G = f'{TMP}/git'; os.makedirs(f'{G}/docs', exist_ok=True)
+    big = '# Паспорт\n' + ''.join(f'\n## {i}. Раздел\n' + ('строка паспорта ' * 900) for i in range(4))
+    open(f'{G}/docs/ITC_pasport_sistemy.md', 'w').write(big); open(f'{G}/docs/SEICHAS_V_RABOTE.md', 'w').write('# Сейчас в работе\n\nвсё хорошо\n')
+    open(f'{TMP}/gitkey', 'w').write('-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----\n'); open(f'{TMP}/gw.key', 'w').write('ab' * 32 + '\n')
+    FB = f'{TMP}/fake_bws.json'
+    ac = f'{TMP}/agent_conf.php'
+    open(ac, 'w').write(CONF.replace("];", f"  'bws_bin' => '{ROOT}/tests/fake_bws.py', 'git_dir' => '{G}', 'git_key' => '{TMP}/gitkey', 'db_user' => '', 'agent_state' => '{TMP}/agent_state.json',\n];"))
+    aenv = dict(env, KOSMOS_CONFIG=ac, FAKE_BWS_DB=FB)
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'bw'], env=aenv, capture_output=True, text=True, timeout=60)
+    st = json.load(open(f'{TMP}/bw.json')) if os.path.exists(f'{TMP}/bw.json') else {}
+    fb = json.load(open(FB)) if os.path.exists(FB) else {'secrets': [], 'calls': []}
+    keys = {x['key']: x for x in fb['secrets']}
+    check('агент положил в сейф паспорт частями до 24 000 байт', r.returncode == 0 and 'SYSTEM_HANDOVER' in keys and 'SYSTEM_HANDOVER_2' in keys
+          and all(len(keys[k]['value'].encode()) <= 24000 for k in keys if k.startswith('SYSTEM_HANDOVER'))
+          and ''.join(keys[k]['value'] for k in sorted((k for k in keys if k.startswith('SYSTEM_HANDOVER')), key=lambda k: int(k.split('_')[-1]) if k[-1].isdigit() else 1)) == big, (r.stdout[-400:], r.stderr[-400:], list(keys)))
+    check('и «Сейчас в работе», ключи сервера', 'SEICHAS_V_RABOTE' in keys and keys['KOSMOS_GW_KEY']['value'] == 'ab' * 32 and 'KOSMOS_GITHUB_DEPLOY_KEY' in keys and len(keys.get('KOSMOS_MASTER_KEY', {}).get('value', '')) > 40, list(keys))
+    ck = [k for k in keys if k.startswith('CLAUDE_KEY_')]
+    db = sqlite3.connect(f'{TMP}/kosmos.sqlite'); nk = db.execute('SELECT COUNT(*) FROM keys WHERE deleted=0').fetchone()[0]; db.close()
+    check('ключи Claude — каждый своей записью, сам ключ (sk-ant-…)', len(ck) == nk and all(keys[k]['value'].startswith('sk-ant-') for k in ck) and 'CLAUDE_KEY_VTOROY_SCHET' in ck, ck)
+    check('состояние для настроек: в порядке, проект «Авто», токена нет', st.get('ok') and st.get('project') == 'Авто' and TOK not in json.dumps(st) and 'S3cret' not in r.stdout + r.stderr, st)
+    n1 = len(fb['calls'])
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'bw'], env=aenv, capture_output=True, text=True, timeout=60); fb = json.load(open(FB))
+    check('повторно — ничего не переписывает (только проверка)', [c for c in fb['calls'][n1:] if c[1] in ('create', 'edit')] == [], fb['calls'][n1:])
+    open(f'{G}/docs/SEICHAS_V_RABOTE.md', 'w').write('# Сейчас в работе\n\nновое\n'); n1 = len(fb['calls'])
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'bw'], env=aenv, capture_output=True, text=True, timeout=60); fb = json.load(open(FB))
+    keys = {x['key']: x for x in fb['secrets']}
+    check('изменился файл — правится только он', [c[1] for c in fb['calls'][n1:] if c[1] in ('create', 'edit')] == ['edit'] and 'новое' in keys['SEICHAS_V_RABOTE']['value'], fb['calls'][n1:])
+    c, j = call('bw', B); check('настройки видят: в порядке, сколько записей', j['state']['ok'] and len(j['state']['items']) == len(keys), j.get('state'))
+    call('bw_set', B, {'token': TOK.replace('S3cret', 'S3bad0')})
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'bw'], env=aenv, capture_output=True, text=True, timeout=60)
+    c, j = call('bw', B); check('сейф не принял токен — понятная причина в настройках', not j['state']['ok'] and 'новый токен' in j['state'].get('err', ''), j['state'])
+    call('bw_del', B); c, j = call('bw', B); check('токен можно убрать', j['set'] is False, j)
+    html = open(f'{ROOT}/www/index.html', encoding='utf-8').read()
+    check('вкладка «Сейф» в настройках, поле не password', 'data-t="bw"' in html and 'id="bwVal" type="text"' in html)
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

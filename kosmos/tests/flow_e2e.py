@@ -19,7 +19,7 @@ open(f'{TMP}/config.php', 'w').write(f'''<?php return [
   'gw_key_file' => '{TMP}/gw.key', 'claude_url' => 'http://127.0.0.1:8768/v1/messages',
   'dev_users' => ['boss-token' => ['+996555000001', 'Алексей', 'boss', true]],
 ];''')
-subprocess.run(['mysql', '-uroot', 'itc', '-e', 'DROP TABLE IF EXISTS itc_ks_log, itc_ks_conv, itc_ks_task, itc_fc_log, itc_fil_conv, itc_fil_task, itc_skill; DELETE FROM itc_secret WHERE k LIKE "ks_%" OR k LIKE "fil_%" OR k = "sp_voice"'], capture_output=True)
+subprocess.run(['mysql', '-uroot', 'itc', '-e', 'DROP TABLE IF EXISTS itc_ks_log, itc_ks_conv, itc_ks_task, itc_fc_log, itc_fil_conv, itc_fil_task, itc_skill, itc_skill_copy; DELETE FROM itc_secret WHERE k LIKE "ks_%" OR k LIKE "fil_%" OR k = "sp_voice" OR k LIKE "nvk_%"'], capture_output=True)
 for f in glob.glob(f'{ST}/uploads/kosmos/*/gw.json'): os.remove(f)
 env = dict(os.environ, KOSMOS_CONFIG=f'{TMP}/config.php', PHP_CLI_SERVER_WORKERS='4')
 procs = [subprocess.Popen([sys.executable, f'{ROOT}/tests/mock_claude.py', '8768', f'{TMP}/mock.log']),
@@ -310,6 +310,9 @@ try:
     kdb("UPDATE keys SET deleted=1 WHERE id=?", (kz,)); report(agent_money()); c, s, x = status()
     check('удалённый ключ не показывается, но его траты в остатке учтены', [k['name'] for k in x['money'][0]['keys']] == ['Аккаунт 1', 'Сломанный'] and x['money'][0]['mark']['amount'] == 36.27, x['money'])
     kdb("UPDATE keys SET deleted=0, status='ok' WHERE id=?", (kz,)); report(agent_money())
+    c, j = http(f'{STORE}/api/kosmos.php?a=report', {'ver': '0.3.4', 'bw': {'set': True, 'ok': True, 'at': '2026-11-14 11:00:00', 'err': '', 'n': 9, 'project': 'Авто', 'token': 'не должен сохраниться'}}, {'X-Kosmos-Token': tok})
+    c, s, x = status(); check('№542: состояние сейфа Bitwarden видно руководителю (без лишних полей)', x.get('bw') == {'set': True, 'ok': True, 'at': '2026-11-14 11:00:00', 'err': '', 'n': 9, 'project': 'Авто'}, x.get('bw'))
+    report(agent_money())
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

@@ -64,11 +64,12 @@ try:
         pg.unroute('**/api/kosmos.php?a=status*')
         pg.route('**/api/kosmos.php?a=status*', lambda r: fake(r, {'ok': True, 'online': False, 'ver': '0.3.3', 'detail': {'at_ts': int(time.time()) - 900, 'now': int(time.time()), 'https': True,
                  'dns_ok': True, 'worker': True, 'key': True, 'disk_free_gb': 30, 'backup': '20261113', 'host': 'kosmos.itcpartner.store', 'load': 0.1, 'up': '', 'git': {'ok': False, 'hash': '', 'at': '', 'err': 'нет доступа к GitHub'},
-                 'money': [{'g': 'k1', 'keys': [{'id': 1, 'name': 'Киргизия', 'last4': 'AB12', 'active': True, 'out': True, 'st': ''}], 'active': True, 'out': True, 'today': 0, 'week': 7.7, 'month': 20, 'per_day': 1.1, 'span': 7,
+                 'bw': {'set': True, 'ok': False, 'at': '', 'err': 'сейф не принял ключ — вставьте новый токен', 'n': 0, 'project': ''}, 'money': [{'g': 'k1', 'keys': [{'id': 1, 'name': 'Киргизия', 'last4': 'AB12', 'active': True, 'out': True, 'st': ''}], 'active': True, 'out': True, 'today': 0, 'week': 7.7, 'month': 20, 'per_day': 1.1, 'span': 7,
                             'mark': {'amount': 10, 'at': '13.11.2026 10:00', 'spent': 8.9, 'left': 1.1, 'days': 1}}]}}))
         pg.reload(); pg.wait_for_function("document.getElementById('sgBox').innerText.indexOf('нет связи') >= 0", timeout=10000)
         s = pg.inner_text('#sgBox'); html = pg.inner_html('#sgBox')
         check('нет связи 15 мин — красная строка; GitHub — причина', 'Сингапур («Космос»): нет связи 15 мин' in s and 'GitHub: нет доступа к GitHub' in s and 'row bad' in html, s)
+        check('№542: ошибка сейфа Bitwarden — красной строкой', 'Сейф Bitwarden: сейф не принял ключ' in s, s)
         check('денег мало и «закончились» — красным и с подсказкой', 'пора пополнить' in s and 'закончились деньги' in s and 'class="bad"' in html and 'хватит примерно на 1 дн.' in s, s)
         pg.locator('#sgBox').screenshot(path=f'{OUT}/sg_3.png')
         check('и здесь ошибок на странице нет', not errs, errs)

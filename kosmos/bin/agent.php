@@ -7,12 +7,18 @@
 //   — пока нет https: когда DNS-запись kosmos.itcpartner.store указывает сюда, получает сертификат (certbot);
 //   — ночью (03:00–04:59 по Бишкеку) делает копию базы и отправляет в магазин (там хранятся 7 последних);
 //   — 0.3.0: раз в 10 минут обновляет рабочую копию хранилища кода ИТК из GitHub (/srv/itc-system, только чтение).
-// Подкоманды: ip | update | backup | git | restore [force] | dbinfo | dbbackup <файл>  (две последние — от www-data).
+// Подкоманды: ip | update | backup | git | bw | restore [force] | dbinfo | bwinfo | dbbackup <файл>  (три последние — от www-data).
+//   — 0.3.4: раз в 10 минут (и сразу после смены ключа сейфа) кладёт в сейф Bitwarden паспорт системы из GitHub и ключи сервера.
 
 if (PHP_SAPI !== 'cli') exit;
 const A_HOST = 'kosmos.itcpartner.store';
 // 0.3.0 · опубликованный ключ github.com (сверяем при входе в GitHub; константы — до первого exit)
 const A_GIT_HOSTKEY = 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl';
+// 0.3.4 · программа bws (сейф Bitwarden): версия и отпечатки архивов с GitHub (bitwarden/sdk-sm, сверены 14.11.2026)
+const A_BWS_VER = '2.1.0';
+const A_BWS_ZIP = ['x86_64' => 'f59ee150e42b82128d437087e9bac920053c6bfddcb960d20ce9386e5ac9bba6',
+                   'aarch64' => 'eb0f1ae61d1c3b74244d2841233276e05c77e8be4da197ed90fc6248387005e1'];
+const A_BW_PART = 24000;   // байт на запись: сейф берёт до 35 000 знаков в зашифрованном виде
 
 $cfgFile = getenv('KOSMOS_CONFIG') ?: '/etc/kosmos/config.php';
 $C = (is_file($cfgFile) ? (array)(require $cfgFile) : []) + [
@@ -22,12 +28,16 @@ $C = (is_file($cfgFile) ? (array)(require $cfgFile) : []) + [
   'db_user' => 'www-data', 'meta_url' => 'http://100.100.100.200/latest/meta-data/',
   // 0.3.0 · хранилище кода ИТК на GitHub и его рабочая копия на этом сервере
   'git_repo' => 'git@github.com:interseal/itc-system.git', 'git_dir' => '/srv/itc-system', 'git_key' => '/etc/kosmos/github_deploy',
+  // 0.3.4 · сейф Bitwarden: программа bws (Secrets Manager CLI) и ключ шифрования базы (его копия — в сейф)
+  'bws_bin' => '/usr/local/bin/bws', 'master_key_file' => '/etc/kosmos/master.key',
 ];
 date_default_timezone_set((string)$C['tz']);
 $cmd = (string)($argv[1] ?? '');
 
 switch ($cmd) {
   case 'dbinfo':   echo json_encode(a_dbinfo()); exit;
+  case 'bwinfo':   echo json_encode(a_bwinfo()); exit;   // 0.3.4 · от www-data: токен сейфа и ключи Claude (расшифровка — ключом базы)
+  case 'bw':       a_lock(); exit(a_bw(true) ? 0 : 1);
   case 'dbbackup': exit(a_dbbackup((string)($argv[2] ?? '')) ? 0 : 1);
   case 'ip':       echo a_ip(), "\n"; exit;
   case 'update':   a_lock(); a_update(true); exit;
@@ -42,6 +52,7 @@ switch ($cmd) {
     a_backup(false);
     a_report();
     a_git(false);
+    a_bw(false);
     exit;
 }
 fwrite(STDERR, "неизвестная команда\n"); exit(2);
@@ -179,6 +190,10 @@ function a_report(): void {
   if ($g) $rep['git'] = ['ok' => !empty($g['ok']), 'hash' => substr((string)($g['head']['hash'] ?? ''), 0, 7),
                          'at' => (string)($g['pulled_at'] ?? ''), 'err' => mb_substr((string)($g['err'] ?? ''), 0, 160)];
   if (isset($db['money']) && is_array($db['money'])) $rep['money'] = $db['money'];
+  // 0.3.4 · сейф Bitwarden: вставлен ли ключ, когда сохранено, ошибка
+  $bw = is_file(a_bw_file()) ? (array)json_decode((string)file_get_contents(a_bw_file()), true) : [];
+  if ($bw) $rep['bw'] = ['set' => !empty($bw['set']), 'ok' => !empty($bw['ok']), 'at' => (string)($bw['saved_at'] ?? $bw['checked_at'] ?? ''),
+                         'err' => mb_substr((string)($bw['err'] ?? ''), 0, 200), 'n' => count((array)($bw['items'] ?? [])), 'project' => mb_substr((string)($bw['project'] ?? ''), 0, 60)];
   [$code, $body] = a_store('a=report', json_encode($rep, JSON_UNESCAPED_UNICODE), null, 20);
   if ($code !== 200) { a_log('магазин не принял отчёт: ' . $code); return; }
   $j = json_decode((string)$body, true); if (!is_array($j)) return;
@@ -357,5 +372,137 @@ function a_git(bool $force): bool {
   $g['head'] = $new; $g['ok'] = true; $g['pulled_at'] = date('Y-m-d H:i:s'); unset($g['err']);
   $g['files'] = (int)trim((string)shell_exec('git -C ' . $q . ' ls-files | wc -l'));
   a_git_save($g);
+  return true;
+}
+
+/* ---------------- 0.3.4 · сейф Bitwarden ----------------
+   Руководитель вставляет в настройках «Космоса» (вкладка «Сейф») токен машинного аккаунта Bitwarden.
+   Раз в 10 минут агент сам кладёт в сейф: паспорт системы и «Сейчас в работе» (из рабочей копии GitHub),
+   ключи Claude (из базы «Космоса»), ключи сервера. Пишет только в проекты, открытые этому аккаунту;
+   записи не удаляет; меняет только то, что изменилось. Программа bws ставится сама, файл сверяется по SHA-256. */
+
+function a_bwinfo(): array {   // от www-data: расшифровать токен сейфа и ключи Claude может только код «Космоса»
+  require_once __DIR__ . '/../lib/boot.php';
+  $tok = ''; $enc = setting('bw_token', '');
+  if ($enc !== '') $tok = key_dec($enc);
+  $keys = [];
+  foreach (db()->query('SELECT id, name, enc, last4 FROM keys WHERE deleted=0 ORDER BY id')->fetchAll() as $r) {
+    $k = key_dec((string)$r['enc']); if ($k !== '') $keys[] = ['id' => (int)$r['id'], 'name' => (string)$r['name'], 'last4' => (string)$r['last4'], 'key' => $k];
+  }
+  return ['token' => $tok, 'claude' => $keys];
+}
+function a_bw_file(): string { global $C; return dirname((string)$C['db']) . '/bw.json'; }
+function a_bw_save(array $s): void { $f = a_bw_file(); @file_put_contents($f, json_encode($s, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)); @chmod($f, 0644); }
+function a_bw_name(string $s): string {
+  $tr = ['а'=>'A','б'=>'B','в'=>'V','г'=>'G','д'=>'D','е'=>'E','ё'=>'E','ж'=>'ZH','з'=>'Z','и'=>'I','й'=>'Y','к'=>'K','л'=>'L','м'=>'M','н'=>'N','о'=>'O','п'=>'P','р'=>'R','с'=>'S','т'=>'T','у'=>'U','ф'=>'F','х'=>'H','ц'=>'TS','ч'=>'CH','ш'=>'SH','щ'=>'SCH','ъ'=>'','ы'=>'Y','ь'=>'','э'=>'E','ю'=>'YU','я'=>'YA'];
+  $s = strtr(mb_strtolower($s), $tr);
+  return trim((string)preg_replace('~[^A-Z0-9]+~', '_', strtoupper($s)), '_');
+}
+/* Текст по частям не больше A_BW_PART байт, режем по разделам «## ». */
+function a_bw_split(string $t): array {
+  $parts = []; $cur = '';
+  foreach (preg_split('~(?=^## )~m', $t) as $sec) {
+    while (strlen($sec) > A_BW_PART) { if ($cur !== '') { $parts[] = $cur; $cur = ''; } $cut = mb_strcut($sec, 0, A_BW_PART); $parts[] = $cut; $sec = substr($sec, strlen($cut)); }
+    if (strlen($cur) + strlen($sec) > A_BW_PART && $cur !== '') { $parts[] = $cur; $cur = ''; }
+    $cur .= $sec;
+  }
+  if ($cur !== '') $parts[] = $cur;
+  return $parts;
+}
+function a_bws_install(): string {
+  global $C;
+  $bin = (string)$C['bws_bin'];
+  if (is_file($bin) && is_executable($bin)) return '';
+  $arch = php_uname('m') === 'aarch64' ? 'aarch64' : 'x86_64';
+  $zip = sys_get_temp_dir() . '/kosmos-bws.zip';
+  $url = 'https://github.com/bitwarden/sdk-sm/releases/download/bws-v' . A_BWS_VER . '/bws-' . $arch . '-unknown-linux-musl-' . A_BWS_VER . '.zip';
+  a_log('ставлю bws ' . A_BWS_VER);
+  $ch = curl_init($url); $fh = fopen($zip, 'wb');
+  curl_setopt_array($ch, [CURLOPT_FILE => $fh, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 180, CURLOPT_CONNECTTIMEOUT => 20]);
+  curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); fclose($fh);
+  if ($code !== 200 || !hash_equals(A_BWS_ZIP[$arch], hash_file('sha256', $zip))) { @unlink($zip); return 'не удалось скачать программу bws (код ' . $code . ' или не сошёлся отпечаток файла)'; }
+  $tmp = sys_get_temp_dir() . '/kosmos-bws'; @mkdir($tmp, 0700);
+  $ok = false;
+  if (class_exists('ZipArchive')) { $z = new ZipArchive(); if ($z->open($zip) === true) { $ok = $z->extractTo($tmp, 'bws'); $z->close(); } }
+  if (!$ok) { exec('command -v unzip >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q unzip >/dev/null 2>&1; unzip -o -q ' . escapeshellarg($zip) . ' bws -d ' . escapeshellarg($tmp) . ' 2>&1', $o, $rc); $ok = $rc === 0; }
+  @unlink($zip);
+  if (!$ok || !is_file("$tmp/bws")) return 'не удалось распаковать bws';
+  @mkdir(dirname($bin), 0755, true);
+  rename("$tmp/bws", $bin); @chmod($bin, 0755); @rmdir($tmp);
+  return '';
+}
+/* Запуск bws без оболочки (токен — в окружении, не в строке команды). Возвращает [код, разобранный JSON, текст ошибки]. */
+function a_bws(string $tok, array $args): array {
+  global $C;
+  $env = ['BWS_ACCESS_TOKEN' => $tok, 'HOME' => '/root', 'PATH' => '/usr/local/bin:/usr/bin:/bin', 'NO_COLOR' => '1'];
+  foreach (['FAKE_BWS_DB'] as $k) if (getenv($k) !== false) $env[$k] = getenv($k);   // для проверок
+  // параметры — сразу после команды, значения — через «--» и «--value=»: ключ вида «-----BEGIN…» иначе принимается за параметр
+  $cmd = array_merge([(string)$C['bws_bin']], array_slice($args, 0, 2), ['-o', 'json', '-c', 'no'], array_slice($args, 2));
+  $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $env);
+  if (!is_resource($p)) return [1, null, 'bws не запускается'];
+  $out = stream_get_contents($pipes[1]); $err = stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]);
+  $rc = proc_close($p);
+  $err = str_replace($tok, '…', trim($err));
+  return [$rc, json_decode((string)$out, true), mb_substr($err !== '' ? $err : trim((string)$out), 0, 300)];
+}
+function a_bw(bool $force): bool {
+  global $C;
+  $info = json_decode(a_as_db('bwinfo'), true);
+  $tok = is_array($info) ? (string)($info['token'] ?? '') : '';
+  $old = is_file(a_bw_file()) ? (array)json_decode((string)file_get_contents(a_bw_file()), true) : [];
+  if ($tok === '') { if (!empty($old['set']) || !$old) a_bw_save(['set' => false, 'checked_at' => date('Y-m-d H:i:s')]); return true; }
+  $th = substr(hash('sha256', $tok), 0, 16);
+  if (!$force && ($old['th'] ?? '') === $th && time() - (int)(a_state()['bw_at'] ?? 0) < 600) return true;
+  a_state_put(['bw_at' => time()]);
+  $st = ['set' => true, 'th' => $th, 'ok' => false, 'checked_at' => date('Y-m-d H:i:s')];
+  foreach (['saved_at', 'project', 'items'] as $k) if (isset($old[$k])) $st[$k] = $old[$k];
+  $fail = function (string $e) use (&$st) { $st['err'] = $e; a_bw_save($st); a_log('сейф: ' . $e); return false; };
+  if (($e = a_bws_install()) !== '') return $fail($e);
+  [$rc, $pr, $e] = a_bws($tok, ['project', 'list']);
+  if ($rc !== 0 || !is_array($pr)) return $fail(stripos($e, 'access token') !== false || stripos($e, 'unauthorized') !== false || stripos($e, 'invalid') !== false ? 'сейф не принял ключ — вставьте новый токен' : 'нет связи с сейфом: ' . $e);
+  if (!$pr) return $fail('у машинного аккаунта нет ни одного проекта — откройте ему проект «Авто» в Bitwarden');
+  $proj = $pr[0];
+  foreach ($pr as $x) if (mb_strtolower((string)($x['name'] ?? '')) === 'авто') $proj = $x;
+  $pid = (string)$proj['id']; $st['project'] = (string)($proj['name'] ?? '');
+  [$rc, $list, $e] = a_bws($tok, ['secret', 'list', $pid]);
+  if ($rc !== 0 || !is_array($list)) return $fail('не удалось прочитать записи сейфа: ' . $e);
+  $have = []; foreach ($list as $x) $have[(string)$x['key']] = $x;
+  // что должно лежать в сейфе
+  $want = [];
+  $gd = rtrim((string)$C['git_dir'], '/');
+  foreach (['ITC_pasport_sistemy.md' => ['SYSTEM_HANDOVER', 'Паспорт системы ИТК (docs/ITC_pasport_sistemy.md в GitHub), часть %d из %d. Кладёт сервер «Космоса» сам.'],
+            'SEICHAS_V_RABOTE.md' => ['SEICHAS_V_RABOTE', '«Сейчас в работе» (docs/SEICHAS_V_RABOTE.md в GitHub), часть %d из %d. Кладёт сервер «Космоса» сам.']] as $f => [$name, $note]) {
+    if (!is_file("$gd/docs/$f")) continue;
+    $parts = a_bw_split((string)file_get_contents("$gd/docs/$f"));
+    foreach ($parts as $i => $t) $want[$i ? $name . '_' . ($i + 1) : $name] = [$t, sprintf($note, $i + 1, count($parts))];
+  }
+  $used = [];
+  foreach ((array)($info['claude'] ?? []) as $k) {
+    $n = 'CLAUDE_KEY_' . (a_bw_name((string)$k['name']) ?: 'K' . $k['id']);
+    if (isset($used[$n])) $n .= '_' . $k['id'];
+    $used[$n] = 1;
+    $want[$n] = [(string)$k['key'], 'Ключ Claude «' . $k['name'] . '» …' . $k['last4'] . ' из настроек «Космоса». Кладёт сервер «Космоса» сам.'];
+  }
+  $files = ['KOSMOS_MASTER_KEY' => [(string)$C['master_key_file'], true, 'Ключ шифрования базы «Космоса» (/etc/kosmos/master.key, base64). Без него ключи Claude из копии базы не читаются.'],
+            'KOSMOS_GITHUB_DEPLOY_KEY' => [(string)$C['git_key'], false, 'Ключ сервера «Космоса» для GitHub (/etc/kosmos/github_deploy), только чтение хранилища itc-system.'],
+            'KOSMOS_GW_KEY' => [(string)$C['gw_key_file'], false, 'Ключ шлюза магазин → «Космос» (/etc/kosmos/gw.key). Магазин выдаёт его сам.'],
+            'KOSMOS_STORE_TOKEN' => [(string)$C['store_token_file'], false, 'Служебный ключ сервера «Космоса» для магазина (/etc/kosmos/store_token).']];
+  foreach ($files as $n => [$f, $bin, $note]) {
+    if (!is_file($f)) continue;
+    $v = (string)file_get_contents($f); $v = $bin ? base64_encode($v) : trim($v);
+    if ($v !== '') $want[$n] = [$v, $note];
+  }
+  $done = [];
+  foreach ($want as $n => [$v, $note]) {
+    if (!isset($have[$n])) [$rc, , $e] = a_bws($tok, ['secret', 'create', '--note=' . $note, '--', $n, $v, $pid]);
+    elseif ((string)$have[$n]['value'] !== $v) [$rc, , $e] = a_bws($tok, ['secret', 'edit', '--value=' . $v, '--note=' . $note, '--', (string)$have[$n]['id']]);
+    else continue;
+    if ($rc !== 0) return $fail('не удалось записать ' . $n . ': ' . $e);
+    $done[] = $n;
+  }
+  $st['ok'] = true; unset($st['err']);
+  $st['items'] = array_keys($want);
+  if ($done) { $st['saved_at'] = date('Y-m-d H:i:s'); $st['last'] = $done; a_log('сейф: записано ' . implode(', ', $done)); }
+  a_bw_save($st);
   return true;
 }

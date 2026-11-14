@@ -125,7 +125,7 @@ switch ($a) {
         'pkgs' => array_values(array_map(function ($m) { return $m['ver']; }, ks_pkgs())),
         // №541 · для строки «Сингапур» на странице обновлений и денег Claude
         'at_ts' => (int)($st['at'] ?? 0), 'now' => time(), 'load' => $st['load'] ?? null, 'up' => (string)($st['up'] ?? ''),
-        'git' => $st['git'] ?? null, 'money' => ks_money_view($st)];
+        'git' => $st['git'] ?? null, 'money' => ks_money_view($st), 'bw' => $st['bw'] ?? null];
     }
     ks_out($out);
   }
@@ -206,6 +206,9 @@ switch ($a) {
     if (is_array($b['git'] ?? null)) $st['git'] = ['ok' => !empty($b['git']['ok']), 'hash' => preg_replace('~[^a-f0-9]~', '', substr((string)($b['git']['hash'] ?? ''), 0, 12)),
       'at' => mb_substr((string)($b['git']['at'] ?? ''), 0, 20), 'err' => mb_substr((string)($b['git']['err'] ?? ''), 0, 160)];
     if (is_array($b['money'] ?? null)) $st['money'] = ks_money_clean($b['money']);
+    // №542 · сейф Bitwarden: сервер сам кладёт туда паспорт и ключи
+    if (is_array($b['bw'] ?? null)) $st['bw'] = ['set' => !empty($b['bw']['set']), 'ok' => !empty($b['bw']['ok']), 'at' => mb_substr((string)($b['bw']['at'] ?? ''), 0, 20),
+      'err' => mb_substr((string)($b['bw']['err'] ?? ''), 0, 200), 'n' => max(0, (int)($b['bw']['n'] ?? 0)), 'project' => mb_substr((string)($b['bw']['project'] ?? ''), 0, 60)];
     ks_put(ks_dir() . '/status.json', $st);
     // №533 · в ответ — ключ шлюза (им магазин спрашивает Claude от имени «Космоса») и адрес, по которому сервер раз в минуту будит фоновые задачи
     $g = ks_gw();

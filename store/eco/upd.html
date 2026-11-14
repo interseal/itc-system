@@ -441,6 +441,11 @@ function sgHtml(){
   if (g) p.push(g.ok ? 'копия кода с GitHub ' + esc(g.hash || '') + (g.at ? ' (проверена ' + esc(dtShort(g.at)) + ')' : '') : 'GitHub: ' + esc(g.err || 'не обновляется'));
   if (x.up) p.push('без перезагрузки ' + esc(x.up));
   h += '<div class="mut">Сингапур: ' + p.join(' · ') + '</div>';
+  /* №542 · сейф Bitwarden: сервер сам кладёт туда паспорт и ключи */
+  var w = x.bw;
+  if (w && w.set) h += w.ok ? '<div class="mut">Сейф Bitwarden: в порядке' + (w.project ? ', проект «' + esc(w.project) + '»' : '') + ', записей ' + (w.n || 0) + (w.at ? ' · последнее сохранение ' + esc(dtShort(w.at)) : '') + '</div>'
+    : '<div class="err">Сейф Bitwarden: ' + esc(w.err || 'ещё не отправлялось') + '</div>';
+  else if (w) h += '<div class="mut">Сейф Bitwarden: токен не вставлен (настройки «Космоса» → «Сейф»)</div>';
   return h + moneyHtml(x);
 }
 function moneyHtml(x){
