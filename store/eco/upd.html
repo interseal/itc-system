@@ -470,12 +470,21 @@ function rdDraw(){
       + '<div class="mut" style="margin-top:4px">' + esc(p.note) + '</div>'
       + '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn g" style="flex:1" onclick="dpDecide(' + p.id + ',1)">Одобрить и выпустить</button><button class="btn" style="flex:1;background:#c62828;color:#fff" onclick="dpDecide(' + p.id + ',0)">Отклонить</button></div></div>';
   });
+  // №574 · всегда одна кнопка «Установить»: берём первое обновление, которое можно поставить сейчас.
+  // Обновления, которые ждут номер, которого никогда не будет (он не вышел и его нет в списке), — устарели: прячем.
+  list.sort(function(a, b){ return a.n - b.n; });
+  var have = {}; list.forEach(function(y){ have[y.n] = 1; });
+  var reach = function(y, d){ if (!y.needs || y.needs <= cur) return true; if (d > 50 || !have[y.needs]) return false; return reach(list.filter(function(z){ return z.n === y.needs; })[0], d + 1); };
+  var hidden = list.filter(function(y){ return !reach(y, 0); }).length;
+  list = list.filter(function(y){ return reach(y, 0); });
   if (list.length) {
-    var x = list[0], can = !x.needs || x.needs === cur;
+    var x = list.filter(function(y){ return !y.needs || y.needs <= cur; })[0] || list[0], can = !x.needs || x.needs <= cur;
+    list = [x].concat(list.filter(function(y){ return y !== x; }));
     h += '<div class="note" style="margin-top:12px"><b>Готово к установке: обновление №' + x.n + '</b> — ' + esc(x.title) + (x.by ? '<br>' + byTag(x.by) : '') + (x.what && x.what.length ? '<ul style="margin:6px 0 0 18px;padding:0">' + x.what.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '')
       + (can ? '<button class="btn g" style="margin-top:10px;width:100%" onclick="rdInstall(' + x.n + ')">Установить №' + x.n + '</button>' : '<div class="mut">Сначала нужно обновление №' + x.needs + '.</div>')
       + (list.length > 1 ? '<div class="mut">После него ждут: ' + list.slice(1).map(function(y){ return '№' + y.n; }).join(', ') + '</div>' : '') + '</div>';
   }
+  if (hidden) h += '<div class="mut" style="margin-top:6px">Скрыто устаревших обновлений: ' + hidden + ' — всё из них уже вошло в следующие.</div>';
   if (RD.err) h += '<div class="err">Сервер не смог собрать обновление: ' + esc(RD.err) + '</div>';
   b.innerHTML = h;
 }

@@ -60,7 +60,14 @@ what = [
 if a.what: what = a.what
 # №573 · какое обновление нужно перед этим: по умолчанию предыдущий номер; в releases/N.json можно указать "needs",
 # если предыдущие номера так и не вышли (14.11.2026: №562–564 не собрались — №565–572 нельзя было поставить).
+# №574 · по умолчанию — последнее обновление, которое сервер на самом деле собрал и отдал в магазин
+# (state.json агента): если какое-то не собралось, следующее не будет ждать его вечно.
 needs = a.n - 1
+try:
+    _st = json.load(open(os.environ.get('KOSMOS_RELEASE_STATE', '/var/lib/kosmos-releases/state.json'), encoding='utf-8'))
+    _ok = [int(k) for k, v in (_st.get('done') or {}).items() if str(k).isdigit() and int(k) < a.n and isinstance(v, dict) and v.get('ok')]
+    if _ok: needs = max(_ok)
+except Exception: pass
 try:
     _rj = json.load(open(os.path.join(os.path.dirname(ROOT), 'releases', f'{a.n}.json'), encoding='utf-8'))
     if isinstance(_rj.get('needs'), int) and 0 <= _rj['needs'] < a.n: needs = _rj['needs']
