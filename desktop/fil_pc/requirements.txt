@@ -1,0 +1,8 @@
+pyautogui
+pyperclip
+pygetwindow
+psutil
+pywin32
+pillow
+wxauto
+wxauto4

@@ -520,6 +520,48 @@ try:
     check('непонятный формат всё равно принят и сохранён', c == 200 and j.get('ok') and 'сохранён' in j.get('preview', '') and q1(f"SELECT path FROM itc_fc_file WHERE id='{j.get('id')}'").endswith('.dwg'), j)
     c, j = kf('fc_file', data={'name': 'вирус.php', 'mime': 'text/plain', 'data': base64.b64encode(b'<?php echo 1;').decode()})
     check('исполняемый файл не сохраняется как файл на сервере', q1(f"SELECT path FROM itc_fc_file WHERE id='{j.get('id')}'") == '', j)
+    print('21. «Фил на компьютере»: подключение, чтение WeChat, файлы, письмо поставщику (№559)')
+    q1("DROP TABLE IF EXISTS itc_pc_dev, itc_pc_job; DELETE m FROM itc_wc_msg m JOIN itc_wc_chat c ON c.id=m.chat_id WHERE c.emp_id LIKE 'pc:%'; DELETE FROM itc_wc_chat WHERE emp_id LIKE 'pc:%'; DELETE FROM itc_sup_log WHERE source='wechat'")
+    os.environ['FIL_PC_STORE'] = STORE; os.environ['FIL_PC_HOME'] = f'{TMP}/filpc'; shutil.rmtree(f'{TMP}/filpc', ignore_errors=True)
+    sys.path.insert(0, f'{os.path.dirname(ROOT)}/desktop/fil_pc'); import importlib, core as _pc; importlib.reload(_pc)
+    os.makedirs(f'{TMP}/wxfiles', exist_ok=True); open(f'{TMP}/wxfiles/GP Solar 2026 price.xlsx', 'wb').write(b'PK fake'); _Im.new('RGB', (300, 300), (1, 2, 3)).save(f'{TMP}/wxfiles/catalog.pdf')
+    class FakeWX:
+        sent = []
+        def info(self): return {'wx_ver': '3.9.12.17', 'backend': 'uia3'}
+        def sessions(self): return [{'name': 'SolarOne Ningbo', 'unread': 2}]
+        def read(self, chat, days): return [{'dir': 'in', 'who': 'Lily', 'text': '新价格 0.55 USD/W，交期 18天', 'at': '2026-11-14 09:10:00', 'type': 'text'},
+                                            {'dir': 'out', 'who': 'я', 'text': 'OK', 'at': '2026-11-14 09:20:00', 'type': 'text'}]
+        def send(self, chat, text): self.sent.append((chat, text)); return True
+        def files(self, days): return [{'path': f'{TMP}/wxfiles/catalog.pdf', 'chat': 'SolarOne Ningbo', 'at': '2026-11-14 09:12'}]
+    fw = FakeWX(); ag = _pc.Agent(fw, store=_pc.Store(STORE), sleep=lambda s: time.sleep(0.05))
+    import threading as _th
+    shown = {}
+    ag.ui = lambda t: shown.setdefault('code', (_re.search(r'(\d{6})', t) or [None, None])[1] if 'Код' in t else shown.get('code'))
+    th = _th.Thread(target=lambda: shown.__setitem__('paired', ag.pair(wait=30, step=0.5))); th.start()
+    for _ in range(40):
+        if shown.get('code'): break
+        time.sleep(0.2)
+    c, j = kf('fc_cmd', 'mgr-t', {'text': f"Проверка подключи компьютер {shown.get('code')}", 'conv': 'new'})
+    th.join(timeout=35)
+    check('компьютер подключён по коду через Фила (ключ — только у компьютера)', shown.get('paired') and 'подключён' in j.get('say', '') and q1("SELECT COUNT(*) FROM itc_pc_dev WHERE tok<>'' AND revoked=0") == '1', (shown, j.get('say')))
+    q1("UPDATE itc_wc_chat SET sup_id='s1' WHERE title='SolarOne Ningbo'")
+    c, j = kf('fc_cmd', 'mgr-t', {'text': 'Проверка WeChat: прочитай сегодняшнюю переписку', 'conv': 'new'})
+    check('Фил дал поручение компьютеру', 'поручение компьютеру' in j.get('say', ''), j.get('say'))
+    d = ag.tick()
+    msgs = q1("SELECT GROUP_CONCAT(text) FROM itc_wc_msg m JOIN itc_wc_chat c ON c.id=m.chat_id WHERE c.emp_id LIKE 'pc:%'")
+    check('переписка с компьютера легла в базу (как WeCom), файл — к поставщику', '0.55 USD/W' in msgs and q1("SELECT COUNT(*) FROM itc_sup_log WHERE source='wechat'") >= '1', (msgs, d))
+    ag.tick(); check('повторное чтение не задваивает сообщения', q1("SELECT COUNT(*) FROM itc_wc_msg m JOIN itc_wc_chat c ON c.id=m.chat_id WHERE c.emp_id LIKE 'pc:%'") == '2')
+    c, j = kf('fc_cmd', 'mgr-t', {'text': 'Проверка WeChat письмо: попроси вес и объём', 'conv': 'new'}); ag.tick()
+    check('письмо поставщику ушло через компьютер сотрудника', fw.sent == [('SolarOne Ningbo', '请发一下重量和体积')] and q1("SELECT status FROM itc_pc_job WHERE op='send'") == 'done', (fw.sent, j.get('say')))
+    c, j = kf('fc_cmd', data={'text': 'Проверка WeChat: прочитай', 'conv': 'new'})
+    check('у руководителя свой компьютер не подключён — Фил честно говорит, как подключить', 'не подключён' in j.get('say', ''), j.get('say'))
+    r = urllib.request.Request(f'{STORE}/api/flow.php?action=pc_poll', data=b'{}', headers={'X-PC-Token': 'x' * 64, 'Content-Type': 'application/json'}, method='POST')
+    try: urllib.request.urlopen(r, timeout=10); cc = 200
+    except urllib.error.HTTPError as e: cc = e.code
+    check('чужой ключ компьютера — отказ', cc == 403, cc)
+    c, j = kf('pc_list', 'mgr-t', {}, flow='flow'); did = j['devs'][0]['id'] if j.get('devs') else ''
+    kf('pc_revoke', 'mgr-t', {'id': did}, flow='flow'); ag.tick()
+    check('отключил компьютер — ключ больше не работает, программа просит подключить заново', not ag.paired(), ag.st)
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

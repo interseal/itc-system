@@ -30,7 +30,9 @@ function sh_add($me, $a) {
   [$sup, $err] = sh_sup((string)($a['sup'] ?? '')); if (!$sup) return $err;
   $kind = mb_strtolower(trim((string)($a['kind'] ?? 'заметка'))); if (!in_array($kind, SH_KINDS, true)) $kind = 'заметка';
   $text = trim(mb_substr((string)($a['text'] ?? ''), 0, 20000));
-  $at = (string)($a['at'] ?? ''); $at = preg_match('~^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?~', $at) ? substr($at . ' 12:00:00', 0, 19) : date('Y-m-d H:i:s');
+  $at = trim((string)($a['at'] ?? ''));
+  if (preg_match('~^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2})(:\d{2})?)?~', $at, $am)) $at = $am[1] . ' ' . (isset($am[2]) && $am[2] !== '' ? $am[2] . ($am[3] ?? '' ?: ':00') : '12:00:00'); else $at = date('Y-m-d H:i:s');
+  if (strlen($at) === 16) $at .= ':00';
   $files = []; $ocr = ''; $fnote = '';
   $ids = array_slice(array_filter(array_map('strval', (array)($a['files'] ?? []))), 0, 6);
   if ($ids && function_exists('fs_attach')) {   // оригиналы — в карточку поставщика (файлы поставщика), ссылки — в запись

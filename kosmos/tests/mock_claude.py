@@ -62,6 +62,15 @@ def plan(req, key):
         ans = json.dumps({'do': 'answer', 'say': f'Здравствуйте! Я {who}. На Claude: {"да" if claude else "нет"}. Ключ …{key[-4:]}. Вопрос: {text[-40:]}'}, ensure_ascii=False)
         # №538: навыки — решил в 2 шага и записал способ; повторно — делает по навыку из правил
         # №550: комплексное КП из нескольких поставщиков и разработчик (только руководителю)
+        if 'Проверка подключи компьютер' in text:   # №559
+            if 'РЕЗУЛЬТАТ pc_pair' not in text:
+                return [{'type': 'text', 'text': json.dumps({'tool': 'pc_pair', 'args': {'code': re.search(r'(\d{6})', text).group(1)}}, ensure_ascii=False)}], 'end_turn'
+            return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': text.split('РЕЗУЛЬТАТ pc_pair', 1)[1][:300]}, ensure_ascii=False)}], 'end_turn'
+        if 'Проверка WeChat' in text:
+            tool, args = ('wechat_send', {'chat': 'SolarOne Ningbo', 'text': '请发一下重量和体积', 'ru': 'Пришлите вес и объём'}) if 'письмо' in text else ('wechat_read', {'chats': ['SolarOne Ningbo'], 'days': 1})
+            if f'РЕЗУЛЬТАТ {tool}' not in text:
+                return [{'type': 'text', 'text': json.dumps({'tool': tool, 'args': args}, ensure_ascii=False)}], 'end_turn'
+            return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': text.split(f'РЕЗУЛЬТАТ {tool}', 1)[1][:400]}, ensure_ascii=False)}], 'end_turn'
         if 'Проверка запроса' in text:   # №556 · коммерческий запрос в фирменном стиле
             if 'РЕЗУЛЬТАТ make_request' not in text:
                 return [{'type': 'text', 'text': json.dumps({'tool': 'make_request', 'args': {'sup': 'SolarOne', 'lang': 'en', 'items': [{'name': 'Solar panel 550W', 'spec': 'mono, 144 cells', 'qty': '1x40HQ'}, {'name': 'Inverter 10 kW', 'qty': '20 pcs'}]}}, ensure_ascii=False)}], 'end_turn'
