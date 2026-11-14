@@ -1,0 +1,35 @@
+{
+ "n": 591,
+ "needs": 567,
+ "title": "Всё после №567 одним обновлением + сервер «Космоса» 0.4.8",
+ "what": [
+  "Одно обновление вместо застрявших: Alex Trade (кнопка «Анализ» снова открывается, меню инструментов по группам, стеклянная шапка, биржи для паспорта РФ с выбором биржи), Фил и Космос (видят фото и файлы, поле ввода как у Claude, файлы до 500 МБ, здороваются один раз в день), вход в отдельные приложения с заставкой и логотипом ИТК.",
+  "Сервер «Космоса» обновится до 0.4.8 сам: обновления больше не застревают за сборкой Android-приложений.",
+  "После него придут Android-приложения с новыми значками (№592–594)."
+ ],
+ "files": [
+  "store/api/flow.php",
+  "store/api/kosmos_flow.php",
+  "store/api/kosmos_lib.php",
+  "store/api/tdemo.php",
+  "store/api/tdemo_bt.php",
+  "store/api/trade.php",
+  "store/apps/crm/index.html",
+  "store/apps/fil/files.js",
+  "store/apps/fil/index.html",
+  "store/apps/kosmos/files.js",
+  "store/apps/kosmos/index.html",
+  "store/apps/trade/app3.js",
+  "store/apps/trade/app50.js",
+  "store/apps/trade/app55.js",
+  "store/apps/trade/app65.js",
+  "store/apps/trade/app66.js",
+  "store/apps/trade/app67.js",
+  "store/apps/trade/app68.js",
+  "store/apps/trade/app69.js",
+  "store/apps/trade/index.html",
+  "store/eco/upd.html",
+  "store/index.html"
+ ],
+ "kosmos": true
+}

@@ -599,11 +599,12 @@ function a_release(bool $force): bool {
   unset($st['wait']);
   foreach ($todo as $n => $r) {
     $err = a_release_one($n, $r, $dir);
-    if ($err === '__wait') { $st['wait'] = "№$n: собираю Android-приложения"; break; }   // 0.4.1 · сборка идёт в фоне, проверим через минуту
+    if ($err === '__wait') { $st['wait'] = "№$n: собираю Android-приложения"; continue; }   // 0.4.8 · Android собирается в фоне — остальные обновления не ждут
     $st['done'][(string)$n] = ['at' => date('Y-m-d H:i:s'), 'ok' => $err === '', 'err' => $err, 'title' => mb_substr((string)($r['title'] ?? ''), 0, 120)];
-    if ($err !== '') { a_log("обновление №$n: $err"); unset($st['done'][(string)$n]['ok']); $st['done'][(string)$n]['ok'] = false; $st['last_err'] = "№$n: $err"; break; }
+    if ($err !== '') { a_log("обновление №$n: $err"); unset($st['done'][(string)$n]['ok']); $st['done'][(string)$n]['ok'] = false; $st['last_err'] = "№$n: $err"; a_release_save($st); continue; }
     a_log("обновление №$n собрано, подписано и отдано в магазин");
     unset($st['last_err']);
+    a_release_save($st);   // 0.4.8 · сразу: следующее в этом же проходе должно знать, что это уже собрано (цепочка «после №…»)
   }
   if (count($st['done']) > 40) $st['done'] = array_slice($st['done'], -40, null, true);
   a_release_save($st);
