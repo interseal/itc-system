@@ -22,6 +22,7 @@ ap.add_argument('--out', required=True)
 ap.add_argument('--title', default='«Космос»: второй помощник на Claude — страница и подключение сервера')
 ap.add_argument('--extra', help='папка с дополнительными файлами обновления (пути внутри — как в обновлении: store/…, site/…)')
 ap.add_argument('--what', action='append', help='пункт «что нового» для руководителя (можно несколько); без него — стандартный текст')
+ap.add_argument('--by', default='', help='кто подготовил: Claude, Космос, Фил (№553 — видно руководителю на странице «Обновления»)')
 ap.add_argument('--no-pkg', action='store_true', help='без пакета сервера «Космоса» (только файлы магазина)')
 a = ap.parse_args()
 
@@ -57,7 +58,7 @@ what = [
     f'Магазин хранит ночные копии памяти «Космоса» (7 последних) и отдаёт серверу новые версии с проверкой подписи. Версия сервера: {info["ver"]}.',
 ]
 if a.what: what = a.what
-man = json.dumps({'n': a.n, 'needs': a.n - 1, 'title': a.title, 'what': what, 'cats': [],
+man = json.dumps({'n': a.n, 'needs': a.n - 1, 'title': a.title, 'what': what, 'cats': [], **({'by': a.by} if a.by else {}),
                   'files': [{'p': p, 'h': sha(b)} for p, b in files]}, ensure_ascii=False, indent=1).encode()
 sig = hmac.new(upd_key, man, hashlib.sha256).hexdigest().encode()
 with zipfile.ZipFile(a.out, 'w', zipfile.ZIP_DEFLATED) as z:

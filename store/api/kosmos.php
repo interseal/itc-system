@@ -153,7 +153,7 @@ switch ($a) {
     $m = json_decode($man, true);
     if (!is_array($m) || (int)($m['n'] ?? 0) !== $n || !hash_equals(hash_hmac('sha256', $man, $uk), $sig)) { @unlink($tmp); ks_out(['ok' => false, 'error' => 'подпись или номер не сходятся'], 400); }
     $d = ks_ready_dir(); rename($tmp, "$d/obnovlenie_$n.zip"); @chmod("$d/obnovlenie_$n.zip", 0600);
-    ks_put("$d/obnovlenie_$n.json", ['n' => $n, 'needs' => (int)($m['needs'] ?? 0), 'title' => (string)($m['title'] ?? ''), 'what' => array_values(array_map('strval', (array)($m['what'] ?? []))), 'size' => strlen($zip), 'at' => time()]);
+    ks_put("$d/obnovlenie_$n.json", ['n' => $n, 'needs' => (int)($m['needs'] ?? 0), 'title' => (string)($m['title'] ?? ''), 'by' => (string)($m['by'] ?? ''), 'what' => array_values(array_map('strval', (array)($m['what'] ?? []))), 'size' => strlen($zip), 'at' => time()]);
     $all = ks_ready_list(); foreach (array_slice($all, 0, max(0, count($all) - 10)) as $old) { @unlink("$d/obnovlenie_{$old['n']}.zip"); @unlink("$d/obnovlenie_{$old['n']}.json"); }
     ks_out(['ok' => true]);
   }
@@ -162,6 +162,26 @@ switch ($a) {
     $S = ks_staff(); if (!ks_boss($S)) ks_out(['ok' => false, 'error' => 'Только для руководителя'], 403);
     $r = ks_json(ks_dir() . '/releases.json');
     ks_out(['ok' => true, 'items' => ks_ready_list(), 'err' => (string)($r['last_err'] ?? '')]);
+  }
+
+  /* №553 · правки разработчиков, которые ждут решения руководителя, — прямо на странице «Обновления» */
+  case 'dev_pending': {
+    $S = ks_staff(); if (!ks_boss($S)) ks_out(['ok' => false, 'error' => 'Только для руководителя'], 403);
+    [$c, $j] = ks_gw_call(['a' => 'dev', 'op' => 'list'], 10);
+    if ($c !== 200 || empty($j['ok'])) ks_out(['ok' => true, 'items' => [], 'off' => true]);
+    $it = [];
+    foreach ((array)($j['tasks'] ?? []) as $t) if (($t['status'] ?? '') === 'needs_ok')
+      $it[] = ['id' => (int)$t['id'], 'by' => ($t['engine'] ?? '') === 'deepseek' ? 'Фил' : 'Космос', 'text' => mb_substr((string)$t['text'], 0, 600),
+               'result' => mb_substr((string)$t['result'], 0, 1500), 'note' => (string)$t['error'], 'n' => (int)$t['release_n']];
+    usort($it, function ($a, $b) { return $a['id'] - $b['id']; });   // старые — первыми
+    ks_out(['ok' => true, 'items' => $it]);
+  }
+  case 'dev_decide': {
+    $S = ks_staff(); if (!ks_boss($S)) ks_out(['ok' => false, 'error' => 'Только для руководителя'], 403);
+    $in = json_decode((string)file_get_contents('php://input'), true) ?: [];
+    [$c, $j] = ks_gw_call(['a' => 'dev', 'op' => 'decide', 'id' => (int)($in['id'] ?? 0), 'ok' => !empty($in['ok']), 'who' => (string)($S['name'] ?? $S['phone'] ?? 'руководитель')], 15);
+    if ($c !== 200 || empty($j['ok'])) ks_out(['ok' => false, 'error' => (string)($j['error'] ?? 'нет связи с сервером «Космоса»')], 400);
+    ks_out(['ok' => true]);
   }
 
   case 'upd_get': {

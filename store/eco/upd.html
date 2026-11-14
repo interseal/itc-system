@@ -416,13 +416,36 @@ var RD = null;
 function rdLoad(){
   fetch('/api/kosmos.php?a=upd_ready&t=' + encodeURIComponent(T), {cache:'no-store'}).then(function(r){ return r.json(); })
     .then(function(d){ RD = d; rdDraw(); }).catch(function(){});
+  fetch('/api/kosmos.php?a=dev_pending&t=' + encodeURIComponent(T), {cache:'no-store'}).then(function(r){ return r.json(); })
+    .then(function(d){ DP = d; rdDraw(); }).catch(function(){});
+}
+var DP = null;
+/* №553 · кто подготовил: Claude, «Космос» (Claude на сервере), Фил (DeepSeek) — Фила проверять внимательнее */
+function byTag(by){
+  var c = {'Фил': ['#fff4e0', '#a35a00', 'Фил (DeepSeek) — проверьте внимательнее'], 'Космос': ['#eef2ff', '#1f3a9e', '«Космос» (Claude на сервере)'], 'Claude': ['#eaf7ee', '#1d7a3a', 'Claude']}[by];
+  return c ? '<span style="display:inline-block;margin:4px 0;padding:2px 8px;border-radius:10px;font-size:12px;background:' + c[0] + ';color:' + c[1] + '">Подготовил: ' + c[2] + '</span>' : '';
+}
+function dpDecide(id, ok){
+  if (!ok && !confirm('Отклонить поручение №' + id + '? Правки не будут выпущены.')) return;
+  fetch('/api/kosmos.php?a=dev_decide&t=' + encodeURIComponent(T), {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id: id, ok: !!ok})})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if (!d.ok) { alert(d.error || 'Не получилось'); return; }
+      DP.items = DP.items.filter(function(x){ return x.id !== id; }); rdDraw();
+      alert(ok ? 'Одобрено. Через несколько минут здесь появится «Готово к установке».' : 'Отклонено.');
+    });
 }
 function rdDraw(){
   var b = document.getElementById('rdBox'); if (!b || !RD || !RD.ok) return;
   var cur = (ST && ST.n) || 0, list = (RD.items || []).filter(function(x){ return x.n > cur; }), h = '';
+  ((DP && DP.items) || []).forEach(function(p){
+    h += '<div class="note" style="margin-top:12px;border-left:4px solid ' + (p.by === 'Фил' ? '#e08a00' : '#3555c9') + '"><b>Ждёт вашего решения: поручение №' + p.id + (p.n ? ' (обновление №' + p.n + ')' : '') + '</b><br>' + byTag(p.by)
+      + '<div style="margin-top:4px"><b>Поручение:</b> ' + esc(p.text) + '</div>' + (p.result ? '<div style="margin-top:4px;white-space:pre-wrap"><b>Что сделано:</b> ' + esc(p.result) + '</div>' : '')
+      + '<div class="mut" style="margin-top:4px">' + esc(p.note) + '</div>'
+      + '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn g" style="flex:1" onclick="dpDecide(' + p.id + ',1)">Одобрить и выпустить</button><button class="btn" style="flex:1;background:#c62828;color:#fff" onclick="dpDecide(' + p.id + ',0)">Отклонить</button></div></div>';
+  });
   if (list.length) {
     var x = list[0], can = !x.needs || x.needs === cur;
-    h += '<div class="note" style="margin-top:12px"><b>Готово к установке: обновление №' + x.n + '</b> — ' + esc(x.title) + (x.what && x.what.length ? '<ul style="margin:6px 0 0 18px;padding:0">' + x.what.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '')
+    h += '<div class="note" style="margin-top:12px"><b>Готово к установке: обновление №' + x.n + '</b> — ' + esc(x.title) + (x.by ? '<br>' + byTag(x.by) : '') + (x.what && x.what.length ? '<ul style="margin:6px 0 0 18px;padding:0">' + x.what.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '')
       + (can ? '<button class="btn g" style="margin-top:10px;width:100%" onclick="rdInstall(' + x.n + ')">Установить №' + x.n + '</button>' : '<div class="mut">Сначала нужно обновление №' + x.needs + '.</div>')
       + (list.length > 1 ? '<div class="mut">После него ждут: ' + list.slice(1).map(function(y){ return '№' + y.n; }).join(', ') + '</div>' : '') + '</div>';
   }

@@ -429,6 +429,14 @@ try:
         if os.path.exists(f'{TMP}/rel/android/9012/fail.txt'): break
         time.sleep(0.5)
     check('больше 6 приложений за раз — просит разбить (магазин принимает до 60 МБ)', 'не больше 6' in (open(f'{TMP}/rel/android/9012/fail.txt').read() if os.path.exists(f'{TMP}/rel/android/9012/fail.txt') else ''))
+    print('15. Кто подготовил обновление: Claude, «Космос» или Фил (№553)')
+    check('обновление №9010 (от Claude) помечено «Claude»', it.get('by') == 'Claude', it)
+    json.dump({'n': 9013, 'title': 'От Фила', 'what': ['проба'], 'files': ['store/eco/skills.html'], 'kosmos': False}, open(f'{GD}/releases/9013.json', 'w'), ensure_ascii=False)
+    subprocess.run(f'cd {GD} && git init -q && git add releases/9013.json && git -c user.name="Фил-разработчик" -c user.email=f@f commit -qm fil', shell=True, check=True)
+    st0 = json.load(open(f'{TMP}/rel/state.json')); st0['done'].update({'9011': {'ok': True}, '9012': {'ok': True}}); json.dump(st0, open(f'{TMP}/rel/state.json', 'w'))
+    subprocess.run(['php', f'{ROOT}/bin/agent.php', 'release'], env=aenv2, capture_output=True, text=True, timeout=120)
+    c, j = http(f'{STORE}/api/kosmos.php?a=upd_ready&t=boss-t', {}); it13 = next((x for x in j.get('items', []) if x.get('n') == 9013), {})
+    check('обновление из правок Фила помечено «Фил» (по автору в GitHub)', it13.get('by') == 'Фил', (it13, json.load(open(f'{TMP}/rel/state.json')).get('done', {}).get('9013')))
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

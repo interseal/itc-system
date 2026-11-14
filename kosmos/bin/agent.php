@@ -637,6 +637,9 @@ function a_release_one(int $n, array $r, string $dir): string {
           '--out', "$tmp/obnovlenie_$n.zip", '--title', mb_substr((string)($r['title'] ?? ('Обновление №' . $n)), 0, 200)];
   if ((array)($r['files'] ?? []) || !empty($r['android'])) array_push($cmd, '--extra', "$tmp/extra");
   foreach ((array)($r['what'] ?? []) as $w) array_push($cmd, '--what', mb_substr((string)$w, 0, 600));
+  // 0.4.3 · кто подготовил обновление — по автору releases/N.json в GitHub: Фил-разработчик, Космос-разработчик или Claude
+  $an = trim(a_sh('git -C ' . escapeshellarg($dir) . ' log -1 --format=%an -- ' . escapeshellarg("releases/$n.json")));
+  array_push($cmd, '--by', mb_stripos($an, 'Фил') !== false ? 'Фил' : (mb_stripos($an, 'Космос') !== false ? 'Космос' : 'Claude'));
   if (empty($r['kosmos'])) $cmd[] = '--no-pkg';
   $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $dir);
   $out = stream_get_contents($pipes[1]); $e = stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]); $rc = proc_close($p);
