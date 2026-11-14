@@ -31,6 +31,8 @@ $C = (is_file($cfgFile) ? (array)(require $cfgFile) : []) + [
   // 0.3.4 · сейф Bitwarden: программа bws (Secrets Manager CLI) и ключ шифрования базы (его копия — в сейф)
   'bws_bin' => '/usr/local/bin/bws', 'master_key_file' => '/etc/kosmos/master.key',
   // 0.3.7 · сервер сам собирает и подписывает обновления магазина из GitHub (releases/N.json)
+  // 0.3.9 · «Космос»-разработчик: Claude Code от пользователя kosmosdev в /srv/itc-dev; писать в GitHub — ключом github_dev (только root)
+  'dev_user' => 'kosmosdev', 'dev_dir' => '/srv/itc-dev', 'dev_key' => '/etc/kosmos/github_dev', 'claude_bin' => 'claude', 'dev_timeout' => 5400,
   'upd_key_file' => '/etc/kosmos/upd_key.php', 'own_sign_key' => '/etc/kosmos/sign_own.pem', 'release_dir' => '/var/lib/kosmos-releases', 'python' => 'python3',
 ];
 date_default_timezone_set((string)$C['tz']);
@@ -39,6 +41,9 @@ $cmd = (string)($argv[1] ?? '');
 switch ($cmd) {
   case 'dbinfo':   echo json_encode(a_dbinfo()); exit;
   case 'claudeskills': require_once __DIR__ . '/../lib/boot.php'; echo json_encode(skill_sync_claude((string)($argv[2] ?? ''), (string)($argv[3] ?? 'claude') === 'hist' ? 'hist' : 'claude')); exit;   // 0.3.5 · от www-data
+  case 'devclaim':  require_once __DIR__ . '/../lib/boot.php'; echo json_encode(dev_claim()); exit;   // 0.3.9 · от www-data
+  case 'devfinish': require_once __DIR__ . '/../lib/boot.php'; dev_finish((int)($argv[2] ?? 0), (array)json_decode((string)($argv[3] ?? '{}'), true)); echo 'ok'; exit;
+  case 'devrun':    exit(a_devrun() ? 0 : 1);
   case 'bwinfo':   echo json_encode(a_bwinfo()); exit;   // 0.3.4 · от www-data: токен сейфа и ключи Claude (расшифровка — ключом базы)
   case 'bw':       a_lock(); exit(a_bw(true) ? 0 : 1);
   case 'skills':   a_lock(); exit(a_claude_skills(true) ? 0 : 1);
@@ -59,6 +64,7 @@ switch ($cmd) {
     a_git(false);
     a_claude_skills(false);
     a_release(false);
+    a_dev_kick();
     a_bw(false);
     exit;
 }
@@ -625,4 +631,112 @@ function a_release_one(int $n, array $r, string $dir): string {
   $j = json_decode($body, true);
   if ($code !== 200 || empty($j['ok'])) return 'магазин не принял файл: ' . (is_array($j) ? (string)($j['error'] ?? '') : '') . ' (' . $code . ')';
   return '';
+}
+
+/* ---------------- 0.3.9 · «Космос»-разработчик ----------------
+   Поручения руководителя (lib/dev.php) выполняет Claude Code на этом сервере. Каждую минуту агент проверяет,
+   не ждёт ли поручение, и запускает отдельный фоновый процесс (agent.php devrun) — долгие задачи не мешают отчётам. */
+function a_dev_file(): string { global $C; return dirname((string)$C['db']) . '/dev.json'; }
+function a_dev_save(array $add): void { $f = a_dev_file(); $s = $add + (is_file($f) ? (array)json_decode((string)file_get_contents($f), true) : []); @file_put_contents($f, json_encode($s, JSON_UNESCAPED_UNICODE)); @chmod($f, 0644); }
+function a_dev_kick(): void {
+  global $C;
+  a_dev_key();   // ключ записи создаём заранее: руководителю нужно один раз добавить его в GitHub
+  $lock = sys_get_temp_dir() . '/kosmos-dev.lock';
+  $h = @fopen($lock, 'c'); if (!$h) return;
+  if (!flock($h, LOCK_EX | LOCK_NB)) { fclose($h); return; }   // поручение уже выполняется
+  flock($h, LOCK_UN); fclose($h);
+  $cfg = getenv('KOSMOS_CONFIG') ?: '';
+  exec(($cfg !== '' ? 'KOSMOS_CONFIG=' . escapeshellarg($cfg) . ' ' : '') . 'nohup ' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' devrun >> ' . escapeshellarg(sys_get_temp_dir() . '/kosmos-dev.log') . ' 2>&1 &');
+}
+function a_dev_key(): string {
+  global $C; $k = (string)$C['dev_key'];
+  if (!is_file($k)) {
+    @mkdir(dirname($k), 0750, true);
+    exec('ssh-keygen -q -t ed25519 -N "" -C ' . escapeshellarg('kosmos-dev ' . date('Y-m-d')) . ' -f ' . escapeshellarg($k) . ' 2>&1', $o, $rc);
+    if (!is_file($k)) return '';
+    @chmod($k, 0600); a_log('создан ключ записи в GitHub для «Космоса»-разработчика');
+  }
+  $pub = trim((string)@file_get_contents($k . '.pub'));
+  $st = is_file(a_dev_file()) ? (array)json_decode((string)file_get_contents(a_dev_file()), true) : [];
+  if (($st['pub'] ?? '') !== $pub) a_dev_save(['pub' => $pub]);
+  return $k;
+}
+function a_git_env(string $key): string {
+  global $C;
+  $kh = dirname((string)$C['git_key']) . '/github_known_hosts';
+  if (!is_file($kh)) @file_put_contents($kh, A_GIT_HOSTKEY . "\n");
+  return 'GIT_SSH_COMMAND=' . escapeshellarg('ssh -i ' . $key . ' -o IdentitiesOnly=yes -o UserKnownHostsFile=' . $kh . ' -o StrictHostKeyChecking=yes') . ' ';
+}
+function a_sh(string $cmd, ?int &$rc = null): string { $o = []; exec($cmd . ' 2>&1', $o, $rc); return implode("\n", $o); }
+function a_devrun(): bool {
+  global $C;
+  $h = fopen(sys_get_temp_dir() . '/kosmos-dev.lock', 'c');
+  if (!$h || !flock($h, LOCK_EX | LOCK_NB)) return true;
+  $j = json_decode(a_as_db('devclaim'), true);
+  if (!is_array($j) || empty($j['task'])) return true;
+  $t = $j['task']; $id = (int)$t['id']; $res = ['status' => 'failed', 'branch' => 'kosmos/' . $id];
+  $finish = function (array $r) use ($id) { a_as_db('devfinish', (string)$id, json_encode($r, JSON_UNESCAPED_UNICODE)); a_dev_save(['last' => $id, 'at' => date('Y-m-d H:i:s')]); a_log('поручение разработчику №' . $id . ': ' . ($r['status'] ?? '')); };
+  $dev = rtrim((string)$C['dev_dir'], '/'); $u = (string)$C['dev_user']; $q = escapeshellarg($dev);
+  // рабочее место: пользователь, Claude Code, копия кода
+  if (trim(a_sh('id -u ' . escapeshellarg($u))) === '' || !ctype_digit(trim(a_sh('id -u ' . escapeshellarg($u))))) a_sh('useradd -m -s /bin/bash ' . escapeshellarg($u));
+  if (trim(a_sh('command -v ' . escapeshellarg((string)$C['claude_bin']))) === '') {
+    a_log('ставлю Claude Code');
+    a_sh('command -v npm >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q nodejs npm');
+    a_sh('npm install -g @anthropic-ai/claude-code');
+    if (trim(a_sh('command -v ' . escapeshellarg((string)$C['claude_bin']))) === '') { $res['error'] = 'не удалось поставить Claude Code'; $finish($res); return false; }
+  }
+  $rk = (string)$C['git_key']; $wk = a_dev_key();
+  if (!is_dir("$dev/.git")) { a_sh(a_git_env($rk) . 'git clone -q ' . escapeshellarg((string)$C['git_repo']) . ' ' . $q, $rc); if ($rc !== 0) { $res['error'] = 'не удалось взять код из GitHub'; $finish($res); return false; } }
+  if (strpos(a_sh('git config --global --get-all safe.directory'), $dev) === false) a_sh("git config --global --add safe.directory $q");
+  a_sh(a_git_env($rk) . "git -C $q fetch -q origin", $rc);
+  if ($rc !== 0) { $res['error'] = 'нет связи с GitHub'; $finish($res); return false; }
+  a_sh("git -C $q checkout -q -f -B " . escapeshellarg($res['branch']) . " origin/main && git -C $q clean -qfdx");
+  a_sh('chown -R ' . escapeshellarg($u) . ': ' . $q);
+  $rules = is_file("$dev/kosmos/dev/RULES.md") ? (string)file_get_contents("$dev/kosmos/dev/RULES.md") : '';
+  $model = ['opus' => 'claude-opus-5-5', 'sonnet' => 'claude-sonnet-5-5', 'fable' => 'claude-fable-5-2'][(string)$t['model']] ?? 'claude-opus-5-5';
+  $cmd = ['timeout', (string)(int)$C['dev_timeout'], 'runuser', '-u', $u, '--', (string)$C['claude_bin'], '-p', (string)$t['text'], '--output-format', 'json', '--model', $model,
+          '--max-budget-usd', (string)$j['budget'], '--permission-mode', 'acceptEdits', '--permission-prompts', 'none',
+          '--allowedTools', 'Bash,Read,Edit,Write,Glob,Grep,WebFetch,WebSearch,Agent,TodoWrite', '--append-system-prompt', $rules];
+  $env = ['HOME' => '/home/' . $u, 'PATH' => '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'ANTHROPIC_API_KEY' => (string)$j['key'], 'LANG' => 'C.UTF-8'];
+  if ((string)($j['ws'] ?? '') !== '') $env['ANTHROPIC_CUSTOM_HEADERS'] = 'anthropic-workspace-id: ' . $j['ws'];
+  $p = proc_open($cmd, [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $dev, $env);
+  $out = stream_get_contents($pipes[1]); $err = stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]); $rc = proc_close($p);
+  $r = json_decode((string)$out, true);
+  $res['cost'] = is_array($r) ? (float)($r['total_cost_usd'] ?? 0) : 0;
+  $res['result'] = is_array($r) ? (string)($r['result'] ?? '') : '';
+  if (!is_array($r)) { $res['error'] = 'Claude Code не ответил (' . $rc . '): ' . mb_substr(str_replace((string)$j['key'], '…', trim($err . ' ' . $out)), -400); $finish($res); return false; }
+  // проверки: что изменилось, нет ли ключей, синтаксис, проверки «Космоса»
+  a_sh('chown -R root: ' . $q);
+  $changed = array_values(array_filter(array_map(function ($l) { return trim(substr($l, 3)); }, explode("\n", a_sh("git -C $q status --porcelain")))));
+  if (!$changed) { $res['status'] = !empty($r['is_error']) ? 'failed' : 'done'; if (!empty($r['is_error'])) $res['error'] = 'Claude Code остановился с ошибкой'; $finish($res); return true; }
+  $checks = [];
+  $diff = a_sh("git -C $q add -A && git -C $q diff --cached");
+  if (preg_match('~sk-ant-[A-Za-z0-9_\-]{20,}|BEGIN [A-Z ]*PRIVATE KEY|define\(\s*.UPD_KEY~', $diff)) { $res['error'] = 'в правках найден ключ — ничего не записано'; a_sh("git -C $q reset -q --hard"); $finish($res); return false; }
+  $ok = true;
+  foreach ($changed as $f) {
+    if (!is_file("$dev/$f")) continue;
+    if (substr($f, -4) === '.php') { $o = a_sh('php -l ' . escapeshellarg("$dev/$f"), $c); if ($c !== 0) { $ok = false; $checks[] = 'ошибка PHP: ' . $f; } }
+    if (substr($f, -3) === '.js') { $o = a_sh('command -v node >/dev/null && node --check ' . escapeshellarg("$dev/$f"), $c); if ($c !== 0) { $ok = false; $checks[] = 'ошибка JS: ' . $f; } }
+  }
+  if ($ok && preg_grep('~^kosmos/~', $changed)) {
+    $o = a_sh('cd ' . $q . ' && runuser -u ' . escapeshellarg($u) . ' -- timeout 900 python3 kosmos/tests/run_tests.py | tail -3', $c);
+    $checks[] = 'проверки сервера: ' . trim(preg_replace('~\s+~', ' ', $o)); if ($c !== 0 || stripos($o, 'не прошло') === false || !preg_match('~\b0 не прошло~u', $o)) $ok = false;
+  }
+  $res['checks'] = $checks ? implode('; ', $checks) : 'синтаксис в порядке (' . count($changed) . ' файлов)';
+  a_sh("git -C $q -c user.name='Космос-разработчик' -c user.email=kosmos@itcpartner.store commit -q -m " . escapeshellarg('Космос-разработчик, поручение №' . $id . ': ' . mb_substr((string)$t['text'], 0, 120)));
+  $res['commit'] = trim(a_sh("git -C $q rev-parse --short HEAD"));
+  if ($wk === '') { $res['error'] = 'нет ключа записи'; $finish($res); return false; }
+  a_sh(a_git_env($wk) . "git -C $q push -q -f origin " . escapeshellarg($res['branch']), $prc);
+  if ($prc !== 0) { $res['status'] = 'failed'; $res['error'] = 'GitHub не принял правки — добавьте ключ записи (настройки «Космоса» → «Разработчик»)'; $finish($res); return false; }
+  if (!$ok) { $res['status'] = 'checks_failed'; $finish($res); return false; }
+  $rel = array_values(preg_grep('~^releases/\d+\.json$~', $changed));
+  if ($rel) {   // поручение выпускает обновление: в главную ветку, сервер соберёт его и предложит руководителю «Установить»
+    a_sh(a_git_env($rk) . "git -C $q fetch -q origin && git -C $q rebase -q origin/main", $c1);
+    a_sh(a_git_env($wk) . "git -C $q push -q origin HEAD:main", $c2);
+    if ($c1 === 0 && $c2 === 0) { $res['merged'] = 1; $res['release_n'] = (int)basename($rel[0], '.json'); }
+    else $res['error'] = 'правки в ветке ' . $res['branch'] . ', но в главную не попали (кто-то изменил код раньше) — нужен Claude';
+  }
+  $res['status'] = 'done';
+  $finish($res);
+  return true;
 }

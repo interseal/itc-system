@@ -437,6 +437,35 @@ try:
     c, j = gw({'a': 'skills', 'op': 'pick', 'q': 'как появился машинный аккаунт и проект Авто в сейфе'}, key='ab' * 32)
     h = next((x for x in j.get('items', []) if x.get('history')), None)
     check('запись истории перенесена и находится по вопросу (отметка «история»)', 'история Claude: новых 1' in r.stdout and h and h['claude'] == 1 and 'Сейф' in h['title'] or 'сейф' in (h or {}).get('title', ''), (r.stdout[-300:], j))
+    print('17. «Космос»-разработчик (0.3.9)')
+    O = f'{TMP}/origin.git'; W = f'{TMP}/seed'
+    subprocess.run(f'rm -rf {O} {W} {TMP}/itcdev && git init -q --bare -b main {O} && git init -q -b main {W} && mkdir -p {W}/releases {W}/store {W}/kosmos/dev && echo "<?php echo 1;" > {W}/store/a.php && echo x > {W}/releases/README.md && echo "Правила" > {W}/kosmos/dev/RULES.md'
+                   f' && cd {W} && git add -A && git -c user.name=t -c user.email=t@t commit -qm init && git push -q {O} main', shell=True, check=True)
+    dc = f'{TMP}/agent_dev.php'
+    open(dc, 'w').write(CONF.replace("];", f"  'git_repo' => '{O}', 'git_key' => '{TMP}/gitkey', 'dev_dir' => '{TMP}/itcdev', 'dev_key' => '{TMP}/devkey', 'claude_bin' => '/tmp/fake_claude.py', 'dev_user' => 'kosmosdev', 'db_user' => '', 'agent_state' => '{TMP}/agent_state.json',\n];"))
+    denv = dict(env, KOSMOS_CONFIG=dc)
+    c, j = call('dev', S); check('разработчик — только руководителю', c == 403, (c, j))
+    c, j = call('dev_add', B, {'text': 'Сделай новую страницу и выпусти обновление', 'model': 'opus'}); tid = j.get('id')
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'devrun'], env=denv, capture_output=True, text=True, timeout=120)
+    c, j = call('dev', B); t = next(x for x in j['tasks'] if x['id'] == tid); fa = json.load(open('/tmp/fake_claude_args.json'))
+    check('поручение выполнено: Claude Code от отдельного пользователя, модель Opus, с правилами и ключом', t['status'] == 'done' and fa['model'] == 'claude-opus-5-5' and fa['rules'] and fa['key'] and fa['user'] != 0, (t, fa, r.stdout[-300:], r.stderr[-300:]))
+    lg = subprocess.run(f'git --git-dir={O} log --oneline main', shell=True, capture_output=True, text=True).stdout
+    check('проверки прошли — правки в GitHub, обновление №9100 в главной ветке', t['merged'] == 1 and t['release_n'] == 9100 and 'Космос-разработчик' in lg and t['cost'] == 1.23, (t, lg))
+    check('ответ руководителю виден в настройках', 'Босс, готово' in t['result'])
+    c, j = call('dev_add', B, {'text': 'Тут сломай php файл нарочно', 'model': 'sonnet'}); tid2 = j['id']
+    subprocess.run(['php', f'{ROOT}/bin/agent.php', 'devrun'], env=denv, capture_output=True, text=True, timeout=120)
+    c, j = call('dev', B); t2 = next(x for x in j['tasks'] if x['id'] == tid2)
+    lg2 = subprocess.run(f'git --git-dir={O} log --oneline main', shell=True, capture_output=True, text=True).stdout
+    br = subprocess.run(f'git --git-dir={O} branch', shell=True, capture_output=True, text=True).stdout
+    check('проверки не прошли — в главную не попало, правки только в своей ветке', t2['status'] == 'checks_failed' and lg2 == lg and f'kosmos/{tid2}' in br and 'ошибка PHP' in t2['checks'], (t2, br))
+    c, j = call('dev_add', B, {'text': 'Запиши ключ в файл', 'model': 'opus'}); tid3 = j['id']
+    subprocess.run(['php', f'{ROOT}/bin/agent.php', 'devrun'], env=denv, capture_output=True, text=True, timeout=120)
+    c, j = call('dev', B); t3 = next(x for x in j['tasks'] if x['id'] == tid3)
+    br = subprocess.run(f'git --git-dir={O} branch', shell=True, capture_output=True, text=True).stdout
+    check('ключ в правках — ничего не записано в GitHub', t3['status'] == 'failed' and 'ключ' in t3['error'] and f'kosmos/{tid3}' not in br, (t3, br))
+    c, j = call('dev_limit', B, {'limit': '2'}); c, j = call('dev_add', B, {'text': 'Ещё одно поручение на сегодня', 'model': 'opus'})
+    check('лимит расходов в день — поручение не принимается', c == 400 and 'Лимит' in j.get('error', ''), j)
+    c, j = call('dev', B); check('ключ записи в GitHub создан и показан руководителю', j['state'].get('pub', '').startswith('ssh-ed25519'), j['state'])
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

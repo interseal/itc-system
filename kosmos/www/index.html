@@ -236,6 +236,7 @@ table.t td.n{text-align:right;font-variant-numeric:tabular-nums}
       <button class="tab" data-t="usage" onclick="setTab('usage')">Расход</button>
       <button class="tab" data-t="git" onclick="setTab('git')">GitHub</button>
       <button class="tab" data-t="bw" onclick="setTab('bw')">Сейф</button>
+      <button class="tab" data-t="dev" onclick="setTab('dev')">Разработчик</button>
     </div>
     <div class="win-b" id="setBody"></div>
   </div>
@@ -554,7 +555,7 @@ function setTab(t){
   SET.tab = t;
   Array.prototype.forEach.call(document.querySelectorAll('#setTabs .tab'), function(b){ b.classList.toggle('on', b.getAttribute('data-t') === t); });
   $('setBody').innerHTML = '<div class="note">Загружаю…</div>';
-  ({ keys: setKeys, models: setModels, users: setUsers, memory: setMemory, usage: setUsage, git: setGit, bw: setBw })[t]();
+  ({ keys: setKeys, models: setModels, users: setUsers, memory: setMemory, usage: setUsage, git: setGit, bw: setBw, dev: setDev })[t]();
 }
 function keyStatus(k){ if (!k.status) return '<span class="tag">не проверен</span>'; return k.status === 'ok' ? '<span class="tag ok">работает</span>' : '<span class="tag err">' + esc(k.status) + '</span>'; }
 function setKeys(){
@@ -698,6 +699,27 @@ function setGit(){
     $('setBody').innerHTML = h;
   });
 }
+/* 0.3.9 · «Космос»-разработчик: поручения руководителя выполняет Claude Code на сервере */
+var DEV_ST = {draw: 'не начато', queued: 'в очереди', running: 'работает', done: 'готово', failed: 'не получилось', checks_failed: 'проверки не прошли', cancelled: 'отменено'};
+function setDev(){
+  api('dev').then(function(d){
+    if (!d.ok) { $('setBody').innerHTML = '<div class="note">' + esc(d.error) + '</div>'; return; }
+    var h = '<p class="note">«Космос»-разработчик меняет код ИТК по вашему поручению: читает код, правит, проверяет, зовёт помощников. Работает только для руководителя. Обновление выпускается, только если проверки прошли, а ставите его вы кнопкой «Установить» на странице «Обновления».</p>';
+    h += '<div class="card"><div class="kh"><b>Расход сегодня: $' + d.spent.toFixed(2) + ' из $' + d.limit + '</b></div><div class="row" style="margin-top:6px"><input class="inp" id="devLim" style="width:110px" value="' + d.limit + '"><button class="btn sm" onclick="devLimit()">Лимит в день, $</button></div></div>';
+    if (d.state && d.state.pub) h += '<details style="margin:10px 0"><summary>Ключ записи в GitHub (один раз)</summary><p class="note">GitHub → interseal/itc-system → Settings → Deploy keys → Add deploy key. Title: «Космос-разработчик», Key: строка ниже, <b>поставьте галочку Allow write access</b>.</p><div class="row"><input class="inp" id="devPub" readonly style="flex:1;font-family:monospace;font-size:12px" value="' + esc(d.state.pub) + '"><button class="btn sm" onclick="var e=$(\'devPub\');e.select();try{navigator.clipboard.writeText(e.value)}catch(x){document.execCommand(\'copy\')};toast(\'Скопировано\')">Скопировать</button></div></details>';
+    h += '<h4 style="margin:14px 0 8px">Новое поручение</h4><textarea class="inp" id="devText" rows="5" style="width:100%" placeholder="Например: на странице «Навыки» добавь сортировку по числу применений"></textarea>'
+      + '<div class="row" style="margin-top:6px"><select class="inp" id="devModel">' + Object.keys(d.models).map(function(k){ return '<option value="' + k + '">' + esc(d.models[k]) + '</option>'; }).join('') + '</select><button class="btn" onclick="devAdd()">Поручить</button></div>';
+    h += '<h4 style="margin:16px 0 8px">Поручения</h4>' + (d.tasks.length ? d.tasks.map(function(t){
+      return '<div class="card"><div class="kh"><b>№' + t.id + '</b><span class="tag' + (t.status === 'done' ? ' ok' : (/fail/.test(t.status) ? ' err' : '')) + '">' + (DEV_ST[t.status] || t.status) + '</span>' + (t.cost ? '<span class="tag">$' + t.cost.toFixed(2) + '</span>' : '') + (t.release_n ? '<span class="tag ok">обновление №' + t.release_n + '</span>' : '') + '</div>'
+        + '<div class="ks">' + esc(t.text) + '</div>' + (t.result ? '<div style="white-space:pre-wrap;margin-top:6px">' + esc(t.result) + '</div>' : '')
+        + (t.checks ? '<div class="ks">Проверки: ' + esc(t.checks) + '</div>' : '') + (t.error ? '<div class="note">' + esc(t.error) + '</div>' : '')
+        + (t.status === 'queued' ? '<button class="btn red sm" onclick="devCancel(' + t.id + ')">Отменить</button>' : '') + '</div>'; }).join('') : '<p class="note">Поручений пока нет.</p>');
+    $('setBody').innerHTML = h;
+  });
+}
+function devAdd(){ var t = $('devText').value.trim(); if (t.length < 10) { toast('Опишите поручение подробнее'); return; } api('dev_add', { text: t, model: $('devModel').value }).then(function(d){ if (!d.ok) { toast(d.error); return; } toast('Поручение №' + d.id + ' принято — начну в течение минуты'); setDev(); }); }
+function devCancel(id){ api('dev_cancel', { id: id }).then(function(d){ if (!d.ok) { toast(d.error); return; } setDev(); }); }
+function devLimit(){ api('dev_limit', { limit: $('devLim').value }).then(function(d){ if (!d.ok) { toast(d.error); return; } toast('Лимит сохранён'); setDev(); }); }
 /* 0.3.4 · сейф Bitwarden: токен машинного аккаунта — сервер сам кладёт в сейф паспорт и ключи */
 function setBw(){
   api('bw').then(function(d){

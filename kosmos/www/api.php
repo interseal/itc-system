@@ -132,6 +132,25 @@ try {
       jout(['ok' => true, 'test' => $test, 'keys' => keys_list()]);
     }
 
+    case 'dev': {   // 0.3.9 · «Космос»-разработчик: поручения, расход, ключ записи в GitHub (только руководитель)
+      me_boss();
+      $st = dev_state();
+      jout(['ok' => true, 'tasks' => dev_list(), 'limit' => (float)setting('dev_limit', '30'), 'spent' => round(dev_spent_today_u() / 1000000, 2),
+            'models' => DEV_MODELS, 'state' => $st]);
+    }
+    case 'dev_add': {
+      $m = me_boss();
+      jout(['ok' => true] + dev_add((string)($in['text'] ?? ''), (string)($in['model'] ?? 'opus'), $m['phone']) + ['tasks' => dev_list()]);
+    }
+    case 'dev_cancel': {
+      $m = me_boss(); dev_cancel((int)($in['id'] ?? 0), $m['phone']); jout(['ok' => true, 'tasks' => dev_list()]);
+    }
+    case 'dev_limit': {
+      $m = me_boss(); $v = (float)str_replace(',', '.', (string)($in['limit'] ?? ''));
+      if ($v < 1 || $v > 1000) fail('Лимит — от 1 до 1000 долларов в день');
+      setting_put('dev_limit', (string)round($v, 2)); log_add($m['phone'], 'лимит разработчика', ['usd' => $v]); jout(['ok' => true]);
+    }
+
     case 'bw': {    // 0.3.4 · сейф Bitwarden: вставлен ли токен и что сделал агент (сам токен не отдаётся)
       me_boss();
       $f = dirname((string)cfg('db')) . '/bw.json';
