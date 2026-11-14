@@ -448,6 +448,31 @@ try:
     check('фото из PDF — ссылкой, файл лежит в магазине', c == 200 and links and os.path.exists(f'{ST}/uploads/fil_out/{links[0][0]}/{urllib.parse.unquote(links[0][1])}'), say[:500])
     c, j = kf('fc_file', data={'name': 'обзор.mp4', 'mime': 'video/mp4', 'data': base64.b64encode(open(f'{TMP}/cat2.pdf', 'rb').read()).decode()})
     check('видео принимается (до 20 МБ), Фил знает, что его можно обработать', c == 200 and j.get('kind') == 'видео', j)
+    print('17. История поставщика: записи, переписка WeChat, сделки — одной лентой (№555)')
+    q1("DROP TABLE IF EXISTS itc_sup_log; DELETE FROM itc_wc_msg WHERE chat_id='wcS1'; DELETE FROM itc_wc_chat WHERE id='wcS1'")
+    q1("INSERT INTO itc_wc_chat (id, ext_id, emp_id, title, sup_id, last_at) VALUES ('wcS1','x1','e1','SolarOne Ningbo','s1','2026-03-01 10:00:00');"
+       "INSERT INTO itc_wc_msg (id, chat_id, dir, who, text, ru, at) VALUES ('m1','wcS1','in','Lily','新报价 0.58','Новая цена 0,58 $/Вт на панели 550 Вт, срок 20 дней','2026-03-01 10:00:00'),"
+       "('m2','wcS1','out','Алексей','OK','Хорошо, пришлите каталог','2026-03-01 11:00:00')")
+    _Im.new('RGB', (400, 300), (250, 250, 250)).save(f'{TMP}/shot.jpg')
+    c, j = kf('fc_file', data={'name': 'скриншот wechat.jpg', 'mime': 'image/jpeg', 'text': 'SolarOne Lily: 550W panel 0.62 USD/W FOB MOQ 1x40HQ lead time 25 days', 'data': base64.b64encode(open(f'{TMP}/shot.jpg', 'rb').read()).decode()})
+    fid2 = j.get('id')
+    c, j = kf('fc_cmd', data={'text': 'Проверка истории записи: занеси в базу', 'conv': 'new', 'files': [fid2]})
+    check('скриншот → запись в истории поставщика (нашёл SolarOne сам, дата, вид «цены»)', c == 200 and 'SolarOne' in j.get('say', '') and '2025-06-10' in j.get('say', '')
+          and q1("SELECT kind FROM itc_sup_log WHERE sup_id='s1'") == 'цены', (j.get('say', '')[:400], q1('SELECT * FROM itc_sup_log')))
+    check('в записи — текст со скриншота (для поиска через год)', '0.62 USD/W' in q1("SELECT text FROM itc_sup_log WHERE sup_id='s1'"))
+    c, j = kf('fc_cmd', data={'text': 'Проверка истории вопрос: какие цены давал SolarOne?', 'conv': 'new'})
+    say = j.get('say', '').replace('\\/', '/')
+    check('вопрос через год: Фил видит и запись менеджера, и переписку WeChat из CRM, по датам', c == 200 and '0,62 $/Вт' in say and 'Новая цена 0,58' in say and 'WeChat' in say
+          and say.split('новые сверху')[1].index('2026-03-01') < say.split('новые сверху')[1].index('2025-06-10'), say[:900])
+    c, j = kf('sh_view', data={'id': 's1'}, flow='flow')
+    kinds = [x['type'] for x in j.get('items', [])]
+    check('страница ленты: записи и переписка, новые сверху', c == 200 and j['sup']['name'] == 'SolarOne' and kinds[:2] == ['WeChat', 'WeChat'] and 'запись' in kinds, (c, kinds, str(j)[:300]))
+    c, j = kf('sh_view', data={'id': 's1', 'q': '0,58'}, flow='flow'); check('поиск по ленте', len(j.get('items', [])) == 1 and '0,58' in j['items'][0]['text'], j.get('items'))
+    c, j = kf('sh_add', 'mgr-t', {'id': 's1', 'kind': 'сроки', 'text': 'Сроки выросли до 35 дней из-за праздников', 'at': '2026-10-01'}, flow='flow'); check('менеджер добавил запись вручную', j.get('ok'), j)
+    rid = q1("SELECT id FROM itc_sup_log WHERE kind='сроки'")
+    c, j = kf('sh_hide', 'mgr-t', {'rid': rid}, flow='flow'); check('скрыть запись менеджер не может', c == 403, c)
+    c, j = kf('sh_hide', data={'rid': rid}, flow='flow'); c, j = kf('sh_view', data={'id': 's1'}, flow='flow')
+    check('руководитель скрыл ошибочную запись — в ленте её нет', not any('35 дней' in x['text'] for x in j['items']))
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

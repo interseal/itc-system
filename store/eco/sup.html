@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>История поставщика · Экосистема ИТК</title>
+<style>
+:root{--navy:#0a1a5c;--navy2:#13287e;--green:#1a8f0e;--green2:#0b5c02;--red:#b3261e;--bg:#f2f4f8;--card:#fff;--line:#dfe3ec;--mut:#5b6476;--txt:#141a2b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.top{background:var(--navy);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5}
+.top a{color:#fff;display:flex;align-items:center;text-decoration:none}
+.top h1{font-size:18px;margin:0;font-weight:600}
+.wrap{max-width:760px;margin:0 auto;padding:16px}
+.card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(10,26,92,.08)}
+.card h2{font-size:16px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.ok{color:var(--green2)} .bad{color:var(--red)} .mut{color:var(--mut);font-size:13.5px}
+svg{width:20px;height:20px;flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:6px;padding:12px 18px;font:600 15px/1 inherit;cursor:pointer;color:#fff;background:var(--navy);box-shadow:inset 0 -4px 0 #050d33;width:100%;margin-top:8px}
+.btn.g{background:var(--green);box-shadow:inset 0 -4px 0 var(--green2)}
+.btn.w{background:#fff;color:var(--navy);border:1px solid var(--line);box-shadow:inset 0 -4px 0 var(--navy)}
+.btn.r{background:#fff;color:var(--red);border:1px solid #f0c9c6;box-shadow:inset 0 -4px 0 var(--red)}
+.btn:disabled{opacity:.5;cursor:default}
+.bar{height:10px;background:#e7eaf2;border-radius:6px;overflow:hidden;margin:10px 0 4px}
+.bar i{display:block;height:100%;width:0;background:var(--green);transition:width .2s}
+.step{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
+.note{background:#fff7e0;border-left:4px solid #e0a800;padding:10px 12px;border-radius:6px;margin:8px 0}
+.err{background:#fdecea;border-left:4px solid var(--red);padding:10px 12px;border-radius:6px;margin:8px 0}
+.hist{border-top:1px solid var(--line);padding:8px 0;font-size:14px}
+.hist:first-child{border-top:0}
+input[type=text]{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.cat{border-top:1px solid var(--line);padding:10px 0}
+.cat:first-child{border-top:0}
+.hide{display:none}
+.ya h3{font-size:15px;margin:14px 0 6px;display:flex;align-items:center;gap:6px}
+.ya .site{font-weight:600;margin:10px 0 4px}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:6px 0}
+.kv div{background:#f5f7fb;border-radius:8px;padding:8px 10px}
+.kv b{display:block;font-size:20px;color:var(--navy)}
+.kv span{font-size:12.5px;color:var(--mut)}
+table.t{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0}
+table.t th,table.t td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:right}
+table.t th:first-child,table.t td:first-child{text-align:left}
+table.t th{color:var(--mut);font-weight:500;font-size:12.5px}
+.lnk{background:none;border:0;color:var(--navy);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+.kv b.bad{color:#c62828}
+.mbox{border-top:1px solid #e6eaf2;margin-top:10px;padding-top:8px}
+input[type=password]{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit;margin-top:6px}
+
+/* №544 · навыки */
+.sk{border-top:1px solid var(--line);padding:12px 0}
+.sk:first-child{border-top:0}
+.sk-h{display:flex;align-items:flex-start;gap:8px;cursor:pointer}
+.sk-h b{flex:1;font-size:15.5px}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;background:#eef1f8;color:var(--navy);margin:2px 4px 0 0;white-space:nowrap}
+.tag.p{background:#fff1d6;color:#8a5a00}.tag.c{background:#e6f4ea;color:var(--green2)}
+.sk-b{margin-top:8px;font-size:14.5px}
+.sk-b pre{white-space:pre-wrap;font:inherit;background:#f5f7fb;border-radius:8px;padding:10px;margin:6px 0}
+.sk.off .sk-h b{color:var(--mut)}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.acts .btn{padding:9px 14px;font-size:14px}
+textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit;min-height:120px}
+label.l{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+.filt{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 0}
+.filt button{border:1px solid var(--line);background:#fff;border-radius:16px;padding:6px 12px;font:inherit;font-size:13.5px;cursor:pointer;color:var(--navy)}
+.filt button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+</style>
+<style>
+.it{border-left:4px solid var(--line);padding:8px 10px;margin:8px 0;background:#fff;border-radius:8px}
+.it.k-цены{border-color:#1a8f0e}.it.k-каталог{border-color:#3555c9}.it.k-условия,.it.k-сроки{border-color:#e08a00}.it.k-переписка{border-color:#8a8fa3}.it.k-сделка{border-color:#a14fc4}
+.it .h{font-size:13px;color:var(--mut)} .it .t{font-weight:600;margin:2px 0} .it .x{white-space:pre-wrap;font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0} .chip{border:1px solid var(--line);border-radius:14px;padding:4px 10px;background:#fff;font-size:13px;cursor:pointer} .chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+input,textarea,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff}
+.more{color:var(--navy);cursor:pointer;font-size:13px}
+</style>
+</head>
+<body>
+<div class="top"><a href="javascript:history.back()" aria-label="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></a><h1 id="ttl">История поставщика</h1></div>
+<div class="wrap">
+  <div class="card"><div class="row"><input id="q" placeholder="Поставщик (название) или слово в истории: цена, модель, срок…"><button class="btn" onclick="go()">Найти</button></div>
+    <div class="chips" id="kinds"></div><div class="mut" id="sum"></div></div>
+  <div id="list"><div class="mut">Загружаю…</div></div>
+  <div class="card" id="addBox" style="display:none"><h2>Добавить запись вручную</h2>
+    <div class="row"><select id="aKind"></select><input id="aAt" type="date"></div>
+    <textarea id="aText" rows="4" placeholder="Что предложили, какие цены, сроки, условия"></textarea>
+    <button class="btn g" style="margin-top:8px;width:100%" onclick="add()">Записать</button>
+    <div class="mut" style="margin-top:6px">Проще всего — сказать Филу или «Космосу»: «занеси в базу» и приложить скриншот или каталог. Они сами найдут поставщика.</div></div>
+</div>
+<script>
+var T = (function(){
+  var q = new URLSearchParams(location.search).get('t'); if (q) return q;
+  try { var s = sessionStorage.getItem('eco_t'); if (s) return s; } catch(e){}
+  try { var a = JSON.parse(localStorage.getItem('itc_auth')||'null'); if (a && a.token) return a.token; } catch(e){}
+  return '';
+})();
+try { if (T) sessionStorage.setItem('eco_t', T); } catch(e){}
+var P = new URLSearchParams(location.search), SUP = P.get('id') || '', KIND = '', Q = '', D = null;
+function esc(x){ return String(x == null ? '' : x).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function api(action, data){
+  return fetch('/api/flow.php?action=' + action + '&t=' + encodeURIComponent(T), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({t:T}, data || {}))})
+    .then(function(r){ return r.json(); });
+}
+function dt(s){ s = String(s || ''); return s ? s.substr(8, 2) + '.' + s.substr(5, 2) + '.' + s.substr(0, 4) : ''; }
+function load(){
+  if (!SUP) { document.getElementById('list').innerHTML = '<div class="card mut">Введите название поставщика.</div>'; return; }
+  api('sh_view', {id: SUP, q: Q, kind: KIND}).then(function(d){
+    var L = document.getElementById('list');
+    if (!d.ok) { L.innerHTML = '<div class="card bad">' + esc(d.error || 'Не получилось') + '</div>'; return; }
+    D = d; SUP = d.sup.id;
+    document.getElementById('ttl').textContent = d.sup.name;
+    document.getElementById('kinds').innerHTML = ['все'].concat(d.kinds, ['сделка']).map(function(k){ var on = (k === 'все' ? '' : k) === KIND; return '<span class="chip' + (on ? ' on' : '') + '" onclick="setK(\'' + (k === 'все' ? '' : k) + '\')">' + esc(k) + '</span>'; }).join('');
+    var it = d.items || [];
+    document.getElementById('sum').textContent = it.length ? ('Записей: ' + it.length + ' · с ' + dt(it[it.length - 1].at) + ' по ' + dt(it[0].at) + (d.sup.city ? ' · ' + d.sup.city : '')) : '';
+    L.innerHTML = it.length ? it.map(function(x){
+      var long = x.text && x.text.length > 400;
+      return '<div class="it k-' + esc(x.kind) + '"><div class="h">' + dt(x.at) + ' · ' + esc(x.type) + ' · ' + esc(x.kind) + (x.who ? ' · ' + esc(x.who) : '') + (d.boss && x.id ? ' · <span class="more" onclick="hide(' + x.id + ')">скрыть</span>' : '') + '</div>'
+        + '<div class="t">' + esc(x.title) + '</div>'
+        + (x.text ? '<div class="x"' + (long ? ' data-full="' + esc(x.text) + '"' : '') + '>' + esc(long ? x.text.substr(0, 400) + '…' : x.text) + '</div>' + (long ? '<span class="more" onclick="full(this)">показать полностью</span>' : '') : '')
+        + (x.files && x.files.length ? '<div style="margin-top:4px">' + x.files.map(function(f){ return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener">' + esc(f.name || 'файл') + '</a>'; }).join(' · ') + '</div>' : '') + '</div>';
+    }).join('') : '<div class="card mut">С этим поставщиком ещё ничего не записано и переписки в CRM нет.</div>';
+    var ab = document.getElementById('addBox'); ab.style.display = '';
+    var ks = document.getElementById('aKind'); if (!ks.options.length) ks.innerHTML = d.kinds.map(function(k){ return '<option>' + esc(k) + '</option>'; }).join('');
+  }).catch(function(){ document.getElementById('list').innerHTML = '<div class="card bad">Нет связи</div>'; });
+}
+function setK(k){ KIND = k; load(); }
+function go(){ var v = document.getElementById('q').value.trim(); if (!v) return; if (!D || !SUP) { SUP = v; Q = ''; } else { Q = v; } load(); }
+function full(el){ var x = el.previousElementSibling; x.textContent = x.getAttribute('data-full'); el.remove(); }
+function hide(id){ if (!confirm('Скрыть запись? Она останется в базе, но не будет видна.')) return; api('sh_hide', {rid: id}).then(function(d){ if (!d.ok) alert(d.error); load(); }); }
+function add(){
+  var t = document.getElementById('aText').value.trim(); if (!t) { alert('Напишите, что записать'); return; }
+  api('sh_add', {id: SUP, kind: document.getElementById('aKind').value, at: document.getElementById('aAt').value, text: t}).then(function(d){
+    if (!d.ok) { alert(d.error); return; } document.getElementById('aText').value = ''; load(); });
+}
+document.getElementById('q').addEventListener('keydown', function(e){ if (e.key === 'Enter') go(); });
+load();
+</script>
+<script src="/ptr.js"></script>
+</body>
+</html>

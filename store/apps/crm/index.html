@@ -1628,7 +1628,7 @@ html.crm-dark .fl-modal-in{background:#fff}
     }).catch(function(){ out.innerHTML = '<div style="color:#c62828">Нет связи с сервером</div>'; });
   };
   function supsRender(){
-    $('flSups').innerHTML = (F.cur.sups||[]).map(function(s, i){ return '<span class="fl-tag">'+esc(s.name)+'<b onclick="flSupDel('+i+')">×</b></span>'; }).join('');
+    $('flSups').innerHTML = (F.cur.sups||[]).map(function(s, i){ return '<span class="fl-tag">'+esc(s.name)+(s.id ? ' <a href="/eco/sup.html?id='+encodeURIComponent(s.id)+'" target="_blank" title="История поставщика: переписка, цены, каталоги" style="text-decoration:none">🕘</a>' : '')+'<b onclick="flSupDel('+i+')">×</b></span>'; }).join('');   // №555
   }
   window.flSupDel = function(i){ F.cur.sups.splice(i, 1); supsRender(); };
   window.flIn = function(n){ if (n === '') return; var t = new Date(); t.setDate(t.getDate() + (+n)); $('flNa').value = t.toISOString().substr(0,10); };

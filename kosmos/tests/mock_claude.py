@@ -62,6 +62,16 @@ def plan(req, key):
         ans = json.dumps({'do': 'answer', 'say': f'Здравствуйте! Я {who}. На Claude: {"да" if claude else "нет"}. Ключ …{key[-4:]}. Вопрос: {text[-40:]}'}, ensure_ascii=False)
         # №538: навыки — решил в 2 шага и записал способ; повторно — делает по навыку из правил
         # №550: комплексное КП из нескольких поставщиков и разработчик (только руководителю)
+        if 'Проверка истории записи' in text:   # №555 · скриншот → в историю поставщика
+            if 'РЕЗУЛЬТАТ sup_note' not in text:
+                m = re.search(r'id файла ([A-Za-z0-9_]+)', text)
+                return [{'type': 'text', 'text': json.dumps({'tool': 'sup_note', 'args': {'sup': 'SolarOne', 'kind': 'цены', 'at': '2025-06-10', 'files': [m.group(1)] if m else [],
+                    'text': 'Панель 550 Вт — 0,62 $/Вт FOB, MOQ 1 контейнер, срок 25 дней, оплата 30/70'}}, ensure_ascii=False)}], 'end_turn'
+            return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': 'Записал: ' + text.split('РЕЗУЛЬТАТ sup_note', 1)[1][:600]}, ensure_ascii=False)}], 'end_turn'
+        if 'Проверка истории вопрос' in text:
+            if 'РЕЗУЛЬТАТ sup_history' not in text:
+                return [{'type': 'text', 'text': json.dumps({'tool': 'sup_history', 'args': {'sup': 'SolarOne'}}, ensure_ascii=False)}], 'end_turn'
+            return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': 'История: ' + text.split('РЕЗУЛЬТАТ sup_history', 1)[1][:3000]}, ensure_ascii=False)}], 'end_turn'
         if 'Проверка файлов' in text:   # №554 · достать фото из приложенного PDF
             if 'РЕЗУЛЬТАТ files' not in text:
                 m = re.search(r'id файла ([A-Za-z0-9_]+)', text)
