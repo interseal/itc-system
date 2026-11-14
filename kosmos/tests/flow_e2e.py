@@ -502,6 +502,12 @@ try:
     c, j = kf('fc_cmd', 'mgr-t', {'text': 'Проверка запроса: ещё раз', 'conv': 'new'}); pdf2, _ = last_pdf(kid)
     check('у всех менеджеров сразу новый стиль (цвет руководителя)', b'0.667 0.000 0.000 rg' in pdf2 and b'0.051 0.165 0.420 rg' not in pdf2, len(pdf2))
     q1("DELETE FROM itc_secret WHERE k='brand'")
+    print('19. Фото без текста (портрет, товар) принимается (№557)')
+    _Im.new('RGB', (600, 800), (180, 160, 150)).save(f'{TMP}/face.jpg')
+    c, j = kf('fc_file', data={'name': 'Денис.jpg', 'mime': 'image/jpeg', 'data': base64.b64encode(open(f'{TMP}/face.jpg', 'rb').read()).decode()})
+    check('фото без текста принято и сохранено', c == 200 and j.get('ok') and j.get('kind') == 'фото' and q1(f"SELECT path FROM itc_fc_file WHERE id='{j.get('id')}'") != '', j)
+    c, j = kf('fc_file', data={'name': 'пусто.txt', 'mime': 'text/plain', 'data': base64.b64encode(b'  ').decode()})
+    check('пустой документ — по-прежнему понятная ошибка', c == 400, j)
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')
