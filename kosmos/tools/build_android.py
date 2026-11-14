@@ -51,10 +51,25 @@ def sh(cmd, **kw):
     return r.stdout
 
 
+UA = 'Mozilla/5.0 (X11; Linux x86_64) ITC-Kosmos-build/1.0'   # №601 · без «подписи» некоторые сайты отвечают 403
+
+
 def fetch(url, dest, what=''):
-    """Качаем с видимым ходом (шаг «качаю … N МБ») и общим пределом 30 минут на файл — без «вечного» ожидания."""
+    """Качаем с видимым ходом (шаг «качаю … N МБ») и общим пределом 30 минут на файл — без «вечного» ожидания.
+    Несколько адресов через « | » — пробуем по очереди (запасные источники)."""
+    errs = []
+    for u in [x.strip() for x in url.split('|') if x.strip()]:
+        try: return _fetch1(u, dest, what)
+        except SystemExit: raise
+        except Exception as e:
+            code = getattr(e, 'code', None); errs.append(f'{u.split("/")[2]}: {code or type(e).__name__}'); log('не скачалось', u, e)
+    raise SystemExit(f'не удалось скачать {what or url}: ' + '; '.join(errs))
+
+
+def _fetch1(url, dest, what):
     log('качаю', url); t = time.time(); got = 0; last = 0
-    with urllib.request.urlopen(url, timeout=120) as r, open(dest, 'wb') as f:
+    req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': '*/*'})
+    with urllib.request.urlopen(req, timeout=120) as r, open(dest, 'wb') as f:
         total = int(r.headers.get('Content-Length') or 0)
         while True:
             b = r.read(1 << 20)
@@ -91,8 +106,10 @@ JDK = os.environ.get('ITC_JDK', '/opt/jdk-17')
 
 
 def jdk_url():
+    """№601 · Java 17: Amazon Corretto (постоянная ссылка, CloudFront), запасной — Eclipse Temurin."""
     arch = {'x86_64': 'x64', 'amd64': 'x64', 'aarch64': 'aarch64', 'arm64': 'aarch64'}.get(os.uname().machine.lower(), 'x64')
-    return f'https://api.adoptium.net/v3/binary/latest/17/ga/linux/{arch}/jdk/hotspot/normal/eclipse'
+    return (f'https://corretto.aws/downloads/latest/amazon-corretto-17-{arch}-linux-jdk.tar.gz'
+            f' | https://api.adoptium.net/v3/binary/latest/17/ga/linux/{arch}/jdk/hotspot/normal/eclipse')
 
 
 def use_jdk():
@@ -110,7 +127,7 @@ def setup():
             fetch(jdk_url(), f'{td}/jdk.tgz', 'Java 17')
             import tarfile
             with tarfile.open(f'{td}/jdk.tgz') as tf: tf.extractall(td)
-            top = [d for d in os.listdir(td) if d.startswith('jdk')][0]
+            top = [d for d in os.listdir(td) if os.path.isdir(f'{td}/{d}') and os.path.exists(f'{td}/{d}/bin/java')][0]   # jdk-17… или amazon-corretto-17…
             shutil.rmtree(JDK, ignore_errors=True); shutil.move(f'{td}/{top}', JDK)
         use_jdk()
         if not java_ok(): raise SystemExit('Java 17 не запустилась после установки')
@@ -130,7 +147,7 @@ def setup():
     if not os.path.exists(f'{GRADLE_HOME}/bin/gradle'):
         url = f'https://services.gradle.org/distributions/gradle-{GRADLE_VER}-bin.zip'
         with tempfile.TemporaryDirectory() as td:
-            step('ставлю Gradle 8.2'); fetch(url, f'{td}/g.zip', 'Gradle'); fetch(url + '.sha256', f'{td}/g.sha')
+            step('ставлю Gradle 8.2'); fetch(url, f'{td}/g.zip', 'Gradle'); fetch(url + '.sha256', f'{td}/g.sha', 'контрольная сумма Gradle')
             want = open(f'{td}/g.sha').read().strip().split()[0]
             got = hashlib.sha256(open(f'{td}/g.zip', 'rb').read()).hexdigest()
             if want != got: raise SystemExit('Gradle скачался с ошибкой (контрольная сумма не сходится)')
