@@ -68,7 +68,15 @@ function gw_ask(array $in): void {
   $model = str($in['model'] ?? '', 60);
   if (!preg_match('~^claude-[a-z0-9.\-]{3,50}$~', $model)) $model = model('deep');
   $max = max(256, min(32000, (int)($in['max_tokens'] ?? 4000)));
-  $payload = ['model' => $model, 'max_tokens' => $max, 'messages' => [['role' => 'user', 'content' => $user]]];
+  // 0.4.6 · фото к вопросу: Claude видит сами снимки (до 4, каждый до 5 МБ), а не только распознанный текст
+  $content = $user; $imgs = [];
+  foreach (array_slice((array)($in['images'] ?? []), 0, 4) as $im) {
+    $mt = (string)($im['media_type'] ?? ''); $d = (string)($im['data'] ?? '');
+    if (!in_array($mt, ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], true) || $d === '' || strlen($d) > 7000000 || !preg_match('~^[A-Za-z0-9+/=]+$~', substr($d, 0, 200))) continue;
+    $imgs[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mt, 'data' => $d]];
+  }
+  if ($imgs) $content = array_merge($imgs, [['type' => 'text', 'text' => $user]]);
+  $payload = ['model' => $model, 'max_tokens' => $max, 'messages' => [['role' => 'user', 'content' => $content]]];
   // большая постоянная часть (правила, инструменты, памятка) — в кеш Claude: следующие шаги той же команды дешевле и быстрее
   if (trim($sys) !== '') $payload['system'] = [['type' => 'text', 'text' => $sys, 'cache_control' => ['type' => 'ephemeral']]];
   $switched = '';

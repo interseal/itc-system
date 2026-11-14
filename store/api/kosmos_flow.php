@@ -2465,6 +2465,21 @@ function ff_attach_text($me, $ids) {
   return $o;
 }
 
+/* №575 · «Космос» (Claude) видит сами фото, а не только распознанный текст: снимки идут к Claude вместе с вопросом */
+function ff_attach_imgs($me, $ids) {
+  $ids = array_slice(array_filter(array_map('strval', (array)$ids)), 0, 6); if (!$ids) return [];
+  ff_cols(); $in = implode(',', array_fill(0, count($ids), '?'));
+  $q = db()->prepare("SELECT name,kind,path,mime FROM itc_fc_file WHERE phone=? AND id IN ($in)"); $q->execute(array_merge([$me['phone']], $ids));
+  $o = []; $tot = 0;
+  foreach ($q->fetchAll() as $f) {
+    $fn = ff_dir() . '/' . basename((string)$f['path']); if ((string)$f['path'] === '' || !is_file($fn)) continue;
+    $ext = strtolower(pathinfo($fn, PATHINFO_EXTENSION)); $m = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif'][$ext] ?? '';
+    if ($m === '' || filesize($fn) > 4500000 || $tot + filesize($fn) > 15000000 || count($o) >= 4) continue;
+    $tot += filesize($fn); $o[] = ['m' => $m, 'd' => base64_encode((string)file_get_contents($fn)), 'n' => (string)$f['name']];
+  }
+  return $o;
+}
+
 /* ========== №554 · ФАЙЛЫ: PDF-каталоги, фото, видео — обрабатывает сервер «Космоса» (там есть программы), готовое — ссылками ========== */
 function ag_files($me, $a) {
   $op = (string)($a['op'] ?? ''); $bin = ''; $name = 'file';
@@ -3982,6 +3997,8 @@ try {
     $t = mb_substr($t, 0, 1500);
     $ctx = fc_context($me);
     $att = ff_attach_text($me, fl_in('files', []));     // №16: приложенные фото и файлы
+    $GLOBALS['FC_IMGS'] = defined('KS_MODEL0') ? ff_attach_imgs($me, fl_in('files', [])) : [];   // №575 · «Космос» видит сами фото
+    if ($GLOBALS['FC_IMGS']) $att .= "\n\n(Сами снимки тоже приложены к этому сообщению — ты их ВИДИШЬ: " . implode(', ', array_map(function ($x) { return '«' . $x['n'] . '»'; }, $GLOBALS['FC_IMGS'])) . '. Смотри на них, а не только на распознанный текст.)';
     $CONV = fm_conv_for($me, fl_in('conv', 'old'), $t);      // №50: каждый разговор — отдельно, Космос помнит его целиком
     $talk = ''; try { if ($CONV !== '') { $q = db()->prepare("SELECT said,reply FROM itc_ks_log WHERE phone=? AND conv_id=? AND kind<>'deal_voice' ORDER BY id DESC LIMIT 8"); $q->execute([$me['phone'], $CONV]); }
       else { $q = db()->prepare("SELECT said,reply FROM itc_ks_log WHERE phone=? AND kind<>'deal_voice' AND created_at > NOW() - INTERVAL 3 HOUR ORDER BY id DESC LIMIT 6"); $q->execute([$me['phone']]); }

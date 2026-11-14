@@ -667,7 +667,8 @@ html.fil-talk .hd .snd-t{background:#e5484d}
     if (!text && ATT.some(function(a){ return a.id; })) text = 'Посмотри приложенный файл: что это и что с ним сделать';
     if (!text) { st('Ничего не расслышал — скажите ещё раз'); return; }
     if (ATT.some(function(a){ return a.busy; })) { st('Подождите — Фил ещё читает файл'); setTimeout(function(){ run(text); }, 1500); return; }
-    add('me', text); BUSY = true; st('Фил думает…'); $('mic').classList.add('busy'); busyMark();
+    var FN = ATT.filter(function(a){ return a.id; }).map(function(a){ return a.name; });   // №575 · в сообщении видно, какие файлы ушли
+    add('me', text + (FN.length ? '\n📎 Отправлено Филу: ' + FN.join(', ') : '')); BUSY = true; st('Фил думает…'); $('mic').classList.add('busy'); busyMark();
     var TY = add('fil', ''), RID = Math.random().toString(36).slice(2, 10) + Date.now().toString(36), PK = 'p' + RID, PT = null, LIVE = true;
     var tyDraw = function(steps){ if (!LIVE) return; var f = $('feed'), low = f.scrollHeight - f.scrollTop - f.clientHeight < 80; TY.querySelector('div').innerHTML = stpHtml(PK, steps, true); if (low) f.scrollTop = 1e9; };
     var poll = function(){ PT = setTimeout(function(){ api('fc_prog', {rid:RID}).then(function(p){ if (LIVE && p && p.ok) tyDraw(p.steps); }).catch(function(){}).then(function(){ if (LIVE) poll(); }); }, 1300); };

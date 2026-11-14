@@ -85,7 +85,9 @@ function ks_gw_call($data, $timeout = 150) {
 function ks_gw_ask($sys, $user, $maxTok, $model, $me) {
   $who = ['phone' => (string)($me['phone'] ?? ''), 'name' => (string)($me['name'] ?? ''), 'role' => (string)($me['role'] ?? ''), 'boss' => !empty($me['boss'])];
   $GLOBALS['KS_STOP'] = '';
-  [$code, $j] = ks_gw_call(['a' => 'ask', 'system' => (string)$sys, 'user' => (string)$user, 'max_tokens' => (int)$maxTok, 'model' => (string)$model, 'who' => $who]);
+  $req = ['a' => 'ask', 'system' => (string)$sys, 'user' => (string)$user, 'max_tokens' => (int)$maxTok, 'model' => (string)$model, 'who' => $who];
+  if (!empty($GLOBALS['FC_IMGS'])) $req['images'] = array_map(function ($x) { return ['media_type' => $x['m'], 'data' => $x['d']]; }, (array)$GLOBALS['FC_IMGS']);   // №575 · фото — самому Claude
+  [$code, $j] = ks_gw_call($req, !empty($req['images']) ? 240 : 150);
   if ($code === 200 && !empty($j['ok']) && is_string($j['text'] ?? null)) {
     $GLOBALS['KS_STOP'] = (string)($j['stop'] ?? '');   // №535: max_tokens — ответ не уместился
     if (!empty($j['switched'])) $GLOBALS['KS_SWITCHED'] = (string)$j['switched'];

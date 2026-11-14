@@ -544,7 +544,9 @@ html.crm-dark .fl-modal-in{background:#fff}
   window.filGot = function(inp){
     var fs = inp.files; if (!fs || !fs.length) return;
     FilVoice.init(api); if (FM.voice === null) { FM.voice = false; api('sp_status', {}).then(function(r){ FM.voice = !!(r && r.set); }).catch(function(){}); }
-    var show = function(list){ fmShow('Фил читает:', list.map(function(a){ return '• ' + a.name + ' — ' + (a.err || (a.busy ? 'читаю…' : a.kind + ', ' + a.chars + ' зн.')); }).join('\n')); };
+    var show = function(list){   // №575 · понятно, дошли ли файлы: ✓ получил и прочитал / ✗ не дошёл
+      var busy = list.some(function(a){ return a.busy; });
+      fmShow(busy ? 'Фил получает файлы…' : 'Фил получил файлы — разбирает:', list.map(function(a){ return (a.err ? '✗ ' : a.busy ? '… ' : '✓ ') + a.name + ' — ' + (a.err ? 'не дошёл: ' + a.err : (a.busy ? 'загружаю' : (a.kind || 'файл') + (a.chars ? ', прочитал ' + a.chars + ' знаков' : ''))); }).join('\n')); };
     FilFiles.read(fs, api, show).then(function(list){
       inp.value = '';
       var ids = list.filter(function(a){ return a.id; }).map(function(a){ return a.id; });
