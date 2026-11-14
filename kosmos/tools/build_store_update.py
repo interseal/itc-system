@@ -58,7 +58,14 @@ what = [
     f'Магазин хранит ночные копии памяти «Космоса» (7 последних) и отдаёт серверу новые версии с проверкой подписи. Версия сервера: {info["ver"]}.',
 ]
 if a.what: what = a.what
-man = json.dumps({'n': a.n, 'needs': a.n - 1, 'title': a.title, 'what': what, 'cats': [], **({'by': a.by} if a.by else {}),
+# №573 · какое обновление нужно перед этим: по умолчанию предыдущий номер; в releases/N.json можно указать "needs",
+# если предыдущие номера так и не вышли (14.11.2026: №562–564 не собрались — №565–572 нельзя было поставить).
+needs = a.n - 1
+try:
+    _rj = json.load(open(os.path.join(os.path.dirname(ROOT), 'releases', f'{a.n}.json'), encoding='utf-8'))
+    if isinstance(_rj.get('needs'), int) and 0 <= _rj['needs'] < a.n: needs = _rj['needs']
+except Exception: pass
+man = json.dumps({'n': a.n, 'needs': needs, 'title': a.title, 'what': what, 'cats': [], **({'by': a.by} if a.by else {}),
                   'files': [{'p': p, 'h': sha(b)} for p, b in files]}, ensure_ascii=False, indent=1).encode()
 sig = hmac.new(upd_key, man, hashlib.sha256).hexdigest().encode()
 with zipfile.ZipFile(a.out, 'w', zipfile.ZIP_DEFLATED) as z:
@@ -70,4 +77,4 @@ with zipfile.ZipFile(a.out, 'w', zipfile.ZIP_DEFLATED) as z:
 with zipfile.ZipFile(a.out) as z:
     m = z.read('manifest.json'); assert hmac.compare_digest(hmac.new(upd_key, m, hashlib.sha256).hexdigest().encode(), z.read('sig.txt'))
     for f in json.loads(m)['files']: assert sha(z.read(f['p'])) == f['h'], f['p']
-print(json.dumps({'out': a.out, 'n': a.n, 'needs': a.n - 1, 'size': os.path.getsize(a.out), 'kosmos': info['ver'], 'files': [p for p, _ in files]}, ensure_ascii=False, indent=1))
+print(json.dumps({'out': a.out, 'n': a.n, 'needs': needs, 'size': os.path.getsize(a.out), 'kosmos': info['ver'], 'files': [p for p, _ in files]}, ensure_ascii=False, indent=1))

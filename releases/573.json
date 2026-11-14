@@ -1,0 +1,27 @@
+{
+ "n": 573,
+ "needs": 561,
+ "title": "Всё накопившееся одним обновлением: Alex Trade, баланс Selectel, «Работа ботов»",
+ "what": [
+  "Это №565, 566, 570, 571 и 572 вместе — ставится сразу после №561 (№562–564 так и не вышли, поэтому прежние номера не ставились).",
+  "Из №565: Alex Trade: «Проверить на истории» — какой стоп и какая свеча дали бы больше",
+  "Из №566: Баланс Selectel (хранилище каталогов) — на странице «Обновления»",
+  "Из №570: Alex Trade: кнопки на экране «Торговля» собраны в меню",
+  "Из №571: Alex Trade: шапка торговли на нескольких монетах — стеклянная плашка",
+  "Из №572: Alex Trade: «Работа ботов» без каши; «Анализ» больше не застывает"
+ ],
+ "files": [
+  "store/api/tdemo.php",
+  "store/api/tdemo_bt.php",
+  "store/apps/trade/app65.js",
+  "store/apps/trade/index.html",
+  "store/api/flow.php",
+  "store/api/kosmos_flow.php",
+  "store/eco/upd.html",
+  "store/apps/trade/app66.js",
+  "store/apps/trade/app67.js",
+  "store/apps/trade/app50.js",
+  "store/apps/trade/app68.js"
+ ],
+ "kosmos": false
+}
