@@ -11,7 +11,7 @@
   const k=h.lastIndexOf('<div class="row" style="margin-bottom:0">');return k<0?h:h.slice(0,k)+`<div class="row" style="margin-bottom:6px">${b}</div>`+h.slice(k)};
  const TFN={'1m':'1 мин','3m':'3 мин','5m':'5 мин','15m':'15 мин','30m':'30 мин','1h':'1 час','2h':'2 часа','4h':'4 часа','1d':'1 день'};
  let BT=null;
- function box(html){let w=document.getElementById('pkbt');if(!w){w=document.createElement('div');w.id='pkbt';w.style.cssText='position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center';
+ function box(html){let w=document.getElementById('pkbt');if(!w){w=document.createElement('div');w.id='pkbt';w.style.cssText='position:fixed;inset:0;z-index:2147483500;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center';
    w.addEventListener('click',e=>{if(e.target===w||e.target.closest('[data-x="close"]')){BT&&(BT.stop=true);w.remove()}else{const d=e.target.closest('[data-days]');if(d&&BT&&!BT.busy)run(BT.gid,+d.dataset.days)}});document.body.appendChild(w)}
   w.innerHTML=`<div style="background:var(--bg,#131722);color:var(--tx,#d1d4dc);width:100%;max-width:720px;max-height:92vh;overflow:auto;border-radius:14px 14px 0 0;padding:14px 14px 22px;box-sizing:border-box">
    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="flex:1;font-size:17px">Проверка на истории</b><button class="btn2 sm" data-x="close">Закрыть</button></div>${html}</div>`}
