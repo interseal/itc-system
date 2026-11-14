@@ -144,7 +144,7 @@ html.fil-busy .av:before{opacity:1}.av img{position:relative;z-index:1}
 .edf{margin:8px 0 4px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:10px}.edf b{display:block;font-size:.92rem;margin-bottom:6px}.edb{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.edb .cb{padding:8px 12px;font-size:.85rem}.eds{color:#bbed21;font-weight:700;font-size:.88rem}.edi{margin:6px 0 10px}.edn{font-size:.82rem;opacity:.9;margin-bottom:4px;overflow-wrap:anywhere}.edl{font-size:.78rem;opacity:.75;margin:4px 0 2px}.edp{white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;margin:0;padding:8px;border-radius:8px;font:400 .8rem/1.35 Roboto,sans-serif;background:rgba(0,0,0,.3)}.edp.o{border-left:3px solid #ef5350}.edp.n{border-left:3px solid #bbed21}
 .kpf{margin:8px 0 4px;display:flex;flex-direction:column;gap:6px}.kpf .kpr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:8px 10px}.kpf .kpr b{flex:1 1 140px;font-size:.9rem}.kpf a{display:inline-flex;align-items:center;gap:5px;color:#fff;text-decoration:none;font-size:.82rem;border:1px solid rgba(255,255,255,.35);border-radius:14px;padding:4px 10px;background:rgba(255,255,255,.08)}.kpf a svg{width:16px;height:16px}
 .cmp{background:var(--glass);border:1px solid var(--line);border-radius:28px;padding:8px}
-.crow{display:flex;align-items:flex-end;gap:8px}.crow[hidden]{display:none}
+.crow{display:flex;align-items:center;gap:8px}.crow[hidden]{display:none}.crow .sp{flex:1}.trow textarea{width:100%;display:block;resize:none;background:transparent;border:0;color:#fff;padding:8px 10px 6px;font:400 1.05rem/1.4 'Roboto',sans-serif;outline:0;min-height:44px;max-height:180px;overflow-y:auto;box-sizing:border-box}.trow textarea::placeholder{color:rgba(220,232,255,.5)}.cmp{border-radius:26px!important;padding:10px!important}.stopb svg{width:18px!important;height:18px!important}.st:empty{display:none}
 .crow textarea{flex:1;min-width:0;resize:none;background:transparent;border:0;color:#fff;padding:12px 4px;font:400 1rem/1.35 'Roboto',sans-serif;outline:0;max-height:140px;overflow-y:auto;box-sizing:border-box}
 .crow textarea::placeholder{color:rgba(220,232,255,.5)}
 .crow .snd{width:44px;height:44px}
@@ -224,24 +224,12 @@ html.fil-talk .hd .snd-t{background:#e5484d}
 <div class="feed" id="feed"></div>
 <div class="undo" id="undo"><span id="undoT">Сделано</span><button onclick="undo()">Отменить <span id="undoN">10</span></button></div>
 <div class="bar">
-  <div class="st" id="st">Нажмите микрофон и скажите, что сделать</div>
+  <div class="st" id="st"></div>
   <div class="cmp" id="cmp">
     <div class="att" id="att"></div>
-    <div class="crow" id="rowIdle">
-      <button class="snd" onclick="addOpen()" title="Добавить фото или файл"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></button>
-      <textarea id="txt" rows="1" placeholder="Скажите или напишите Филу…" autocomplete="off" oninput="txtGrow()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendText()}"></textarea>
-      <input type="file" id="fCam" accept="image/*" capture="environment" hidden onchange="gotFiles(this)">
-      <input type="file" id="fPic" accept="image/*" multiple hidden onchange="gotFiles(this)">
-      <input type="file" id="fAny" accept="*/*" multiple hidden onchange="gotFiles(this)">
-      <button class="mic" id="mic" title="Нажмите — говорить; нажмите ещё раз — отправить"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg></button>
-      <button class="gosnd" id="go" onclick="sendText()" title="Отправить"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg></button>
-    </div>
-    <div class="crow" id="rowRec" hidden>
-      <button class="snd" onclick="recCancel()" title="Отменить запись"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-      <div class="wave" id="wave"></div>
-      <button class="mic rec" id="recGo" title="Нажмите ещё раз — отправить Филу"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg></button>
-      <button class="snd" onclick="recStop()" title="Остановить и поправить текст"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
-    </div>
+    <div class="trow"><textarea id="txt" rows="1" placeholder="Напишите или скажите Филу" autocomplete="off" oninput="txtGrow()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendText()}"></textarea></div><input type="file" id="fCam" accept="image/*" capture="environment" hidden onchange="gotFiles(this)"><input type="file" id="fPic" accept="image/*" multiple hidden onchange="gotFiles(this)"><input type="file" id="fAny" accept="*/*" multiple hidden onchange="gotFiles(this)">
+    <div class="crow" id="rowIdle"><button class="snd" onclick="addOpen()" title="Добавить фото или файл"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></button><span class="sp"></span><button class="mic" id="mic" title="Нажмите — говорить; нажмите ещё раз — отправить"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg></button><button class="gosnd" id="go" onclick="sendText()" title="Отправить"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg></button></div>
+    <div class="crow" id="rowRec" hidden><button class="snd" onclick="recCancel()" title="Отменить запись"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button><div class="wave" id="wave"></div><button class="snd stopb" onclick="recStop()" title="Остановить — текст останется в поле, можно поправить"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg></button><button class="mic rec" id="recGo" title="Нажмите ещё раз — отправить Филу"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg></button></div>
   </div>
   </div>
 </div>
@@ -478,7 +466,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
   }
   window.convOpen = function(c){
     mnuClose(); pnlCloseAll(); convSet(c); $('feed').innerHTML = ''; st('Загружаю разговор…');
-    api('fc_hist', {conv:c}).then(function(r){ st('Нажмите микрофон и скажите, что сделать'); if (r && r.conv) convSet(r.conv); if (r && r.ok && (r.items || []).length) histDraw(r.items); else hint(); }).catch(function(){ st('Нет связи'); });
+    api('fc_hist', {conv:c}).then(function(r){ st(''); if (r && r.conv) convSet(r.conv); if (r && r.ok && (r.items || []).length) histDraw(r.items); else hint(); }).catch(function(){ st('Нет связи'); });
   };
   window.convNew = function(){ mnuClose(); pnlCloseAll(); convSet('new'); $('feed').innerHTML = ''; hint(); st('Новый разговор. Скажите или напишите, что сделать'); try { $('txt').focus(); } catch(e){} };
   function pnlShow(title, body, filt){ $('pnlT').textContent = title; $('pnlB').innerHTML = body; $('pnlF').innerHTML = filt || ''; $('pnl').classList.add('on'); $('pnlB').scrollTop = 0; }
@@ -667,7 +655,9 @@ html.fil-talk .hd .snd-t{background:#e5484d}
     if (!text && ATT.some(function(a){ return a.id; })) text = 'Посмотри приложенный файл: что это и что с ним сделать';
     if (!text) { st('Ничего не расслышал — скажите ещё раз'); return; }
     if (ATT.some(function(a){ return a.busy; })) { st('Подождите — Фил ещё читает файл'); setTimeout(function(){ run(text); }, 1500); return; }
-    var FN = ATT.filter(function(a){ return a.id; }).map(function(a){ return a.name; });   // №575 · в сообщении видно, какие файлы ушли
+    var FN = ATT.filter(function(a){ return a.id; }).map(function(a){ return a.name; });
+    var FE = ATT.filter(function(a){ return a.err && !a.id; }).map(function(a){ return a.name + ' — ' + a.err; });
+    if (FE.length) { ATT = ATT.filter(function(a){ return a.id || a.busy; }); attRender(); add('fil', 'Эти файлы не загрузились, и я их не получу: ' + FE.join('; ') + '. Прикрепите их ещё раз (лучше по одному) или пришлите ссылкой.'); if (!FN.length && /^Посмотри приложенный файл/.test(text)) return; }   // №575 · в сообщении видно, какие файлы ушли
     add('me', text + (FN.length ? '\n📎 Отправлено Филу: ' + FN.join(', ') : '')); BUSY = true; st('Фил думает…'); $('mic').classList.add('busy'); busyMark();
     var TY = add('fil', ''), RID = Math.random().toString(36).slice(2, 10) + Date.now().toString(36), PK = 'p' + RID, PT = null, LIVE = true;
     var tyDraw = function(steps){ if (!LIVE) return; var f = $('feed'), low = f.scrollHeight - f.scrollTop - f.clientHeight < 80; TY.querySelector('div').innerHTML = stpHtml(PK, steps, true); if (low) f.scrollTop = 1e9; };
@@ -677,7 +667,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
     if (fl.length) { ATT = []; attRender(); }
     api('fc_cmd', {text:text, files:fl, rid:RID}).then(function(r){
       LIVE = false; clearTimeout(PT); if (r && r.conv) convSet(r.conv);
-      BUSY = false; $('mic').classList.remove('busy'); st('Нажмите микрофон и скажите, что сделать'); TY.remove(); busyMark();
+      BUSY = false; $('mic').classList.remove('busy'); st(''); TY.remove(); busyMark();
       if (!r || !r.ok) { add('fil', (r && r.error) || 'Ошибка'); return; }
       var stpAdd = function(bb){ if (r.steps && r.steps.length) { var w = document.createElement('div'); w.innerHTML = stpHtml(PK, r.steps, false); var d = bb.querySelector('div'); d.insertBefore(w.firstChild, d.firstChild); } };
       if (r.do === 'task' && r.task) { var bt = add('fil', r.say); stpAdd(bt); taskAttach(bt, r.task); speak(r.say); return; }
@@ -694,7 +684,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
         api('fc_hist', {conv: CONV === 'new' ? 'last' : CONV}).then(function(r){
           if (r && r.conv) convSet(r.conv);
           var it = (r && r.ok && r.items) || [], last = it[it.length - 1];
-          if (last && String(last.said || '').replace(/\s+/g, ' ').trim() === want) { fin('Нажмите микрофон и скажите, что сделать'); histDraw(it); speak(last.reply); return; }
+          if (last && String(last.said || '').replace(/\s+/g, ' ').trim() === want) { fin(''); histDraw(it); speak(last.reply); return; }
           if (Date.now() - t0 > 600000) { fin('Фил не ответил — попробуйте ещё раз'); return; }
           wait();
         }).catch(function(){ if (Date.now() - t0 > 600000) fin('Нет связи — попробуйте ещё раз'); else wait(); });
@@ -764,7 +754,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
   /* №239 · микрофон «как у Claude»:
      нажали — пошла запись: внизу «отменить», волна, «стоп» (текст в поле, можно поправить) и «отправить»;
      зажали и держите — говорите, отпустили — сразу отправилось; сам замолчал надолго — тоже отправится */
-  var RM = 'send', HOLD = false, HT = 0, WV = [];
+  var RM = 'send', HOLD = false, HT = 0, WV = [], PRE = '';
   function waveInit(native){ var w = $('wave'); w.className = 'wave' + (native ? ' auto' : ''); var h = ''; for (var i = 0; i < 28; i++) h += '<i' + (native ? ' style="animation-delay:' + ((i * 97) % 1000) + 'ms"' : '') + '></i>'; w.innerHTML = h; WV = [].slice.call(w.children); }
   function waveLevel(l){ if (!WV.length) return; for (var i = 0; i < WV.length - 1; i++) WV[i].style.height = WV[i + 1].style.height; WV[WV.length - 1].style.height = Math.max(4, Math.min(36, Math.round(l * 900))) + 'px'; }
   function recUi(on){ $('rowRec').hidden = !on; $('rowIdle').hidden = on; }
@@ -774,18 +764,18 @@ html.fil-talk .hd .snd-t{background:#e5484d}
     RM = 'send';
     FilVoice.listen({
       keep:true,
-      start:function(mode){ document.documentElement.classList.add('fil-listen'); $('hsub').textContent = 'Слушает…'; waveInit(mode === 'native'); if (!HOLD) recUi(true); st('Говорите сколько нужно. Нажмите красную кнопку ещё раз — и Фил получит'); },
+      start:function(mode){ PRE = $('txt').value.trim(); document.documentElement.classList.add('fil-listen'); $('hsub').textContent = 'Слушает…'; waveInit(mode === 'native'); if (!HOLD) recUi(true); st(''); },
       level:function(l){ waveLevel(l); },
-      partial:function(t){ st('«' + t + '»'); },
+      partial:function(t){ $('txt').value = (PRE ? PRE + ' ' : '') + t; txtGrow(); },
       busy:function(){ micReset(); st('Распознаю…'); },
-      final:function(t){ micReset(); if (RM === 'cancel') { st('Запись отменена'); return; }
+      final:function(t){ micReset(); $('txt').value = PRE; txtGrow(); if (RM === 'cancel') { st('Запись отменена'); return; }
         if (!t) { st('Ничего не расслышал — нажмите и скажите ещё раз'); return; }
         if (RM === 'field') { var x = $('txt'); x.value = (x.value.trim() ? x.value.trim() + ' ' : '') + t; txtGrow(); try { x.focus(); } catch(e){} st('Поправьте текст и нажмите стрелку'); return; }
         var pre = $('txt').value.trim(); $('txt').value = ''; txtGrow(); run(pre ? pre + ' ' + t : t); },
       error:function(m){ micReset(); if (RM !== 'cancel') st(m); }
     });
   }
-  window.recCancel = function(){ RM = 'cancel'; FilVoice.cancel(); micReset(); st('Запись отменена'); };
+  window.recCancel = function(){ RM = 'cancel'; FilVoice.cancel(); micReset(); $('txt').value = PRE; txtGrow(); st('Запись отменена'); };
   window.recStop = function(){ RM = 'field'; FilVoice.stop(); };
   window.recSend = function(){ RM = 'send'; FilVoice.stop(); };
   window.micTap = function(){ if (FilVoice.listening()) { recSend(); return; } HOLD = false; micGo(); };

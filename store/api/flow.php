@@ -2443,7 +2443,8 @@ function ff_attach_text($me, $ids) {
   $in = implode(',', array_fill(0, count($ids), '?'));
   $q = db()->prepare("SELECT id,name,kind,text FROM itc_fc_file WHERE phone=? AND id IN ($in)"); $q->execute(array_merge([$me['phone']], $ids));
   $o = ''; $left = 14000;
-  foreach ($q->fetchAll() as $f) { $t = mb_substr((string)$f['text'], 0, max(800, $left)); $left -= mb_strlen($t); $o .= "\n\n=== ПРИЛОЖЕН ФАЙЛ «" . $f['name'] . "» (" . $f['kind'] . ", id файла " . $f['id'] . ") ===\n" . $t . (mb_strlen((string)$f['text']) > mb_strlen($t) ? "\n…(дальше обрезано)" : ''); }
+  $GLOBALS['FF_NAMES'] = [];
+  foreach ($q->fetchAll() as $f) { $GLOBALS['FF_NAMES'][] = '«' . $f['name'] . '» (id ' . $f['id'] . ')'; $t = mb_substr((string)$f['text'], 0, max(800, $left)); $left -= mb_strlen($t); $o .= "\n\n=== ПРИЛОЖЕН ФАЙЛ «" . $f['name'] . "» (" . $f['kind'] . ", id файла " . $f['id'] . ") ===\n" . $t . (mb_strlen((string)$f['text']) > mb_strlen($t) ? "\n…(дальше обрезано)" : ''); }
   return $o;
 }
 
@@ -3997,6 +3998,7 @@ try {
     $t = mb_substr($t, 0, 1500);
     $ctx = fc_context($me);
     $att = ff_attach_text($me, fl_in('files', []));     // №16: приложенные фото и файлы
+    if (!empty($GLOBALS['FF_NAMES'])) $t .= ' [📎 приложены файлы: ' . implode(', ', $GLOBALS['FF_NAMES']) . ']';   // №578 · в истории разговора видно, что файлы были
     $GLOBALS['FC_IMGS'] = defined('KS_MODEL0') ? ff_attach_imgs($me, fl_in('files', [])) : [];   // №575 · «Космос» видит сами фото
     if ($GLOBALS['FC_IMGS']) $att .= "\n\n(Сами снимки тоже приложены к этому сообщению — ты их ВИДИШЬ: " . implode(', ', array_map(function ($x) { return '«' . $x['n'] . '»'; }, $GLOBALS['FC_IMGS'])) . '. Смотри на них, а не только на распознанный текст.)';
     $CONV = fm_conv_for($me, fl_in('conv', 'old'), $t);      // №50: каждый разговор — отдельно, Фил помнит его целиком
