@@ -67,6 +67,7 @@ switch ($cmd) {
     a_report();
     a_git(false);
     a_claude_skills(false);
+    a_sys_fix();
     a_release(false);
     a_dev_kick();
     a_bw(false);
@@ -675,6 +676,20 @@ function a_media_tools(): void {
    Сборка — отдельным фоновым процессом (agent.php android N): Java 17, Android SDK и Gradle ставятся сами (kosmos/tools/build_android.py),
    ключ подписи и пароли — из сейфа «Авто» (ANDROID_*) только на время сборки, файл ключа удаляется сразу. Готовое кладётся в
    release_dir/android/N/extra (store/app/<имя>/itc-<имя>.apk + version.json), и обновление №N собирается как обычно. */
+/* 0.4.9 · настройки системы, без которых фоновая работа не живёт (найдено 14.11.2026 на сервере через «命令助手»):
+   kosmos-agent.service — Type=oneshot, и systemd по умолчанию УБИВАЕТ все фоновые процессы, когда проход агента закончился.
+   Поэтому сборка Android ни разу не доходила до конца (ни ok.json, ни fail.txt). KillMode=process — оставлять их жить.
+   Плюс ночная перезагрузка 03:30 по Москве (08:30 по Пекину), которая ждёт, пока идёт сборка. */
+function a_sys_fix(): void {
+  if (!is_dir('/etc/systemd/system') || !function_exists('posix_geteuid') || posix_geteuid() !== 0) return;
+  $ch = false;
+  $w = function (string $f, string $body, int $mode = 0644) use (&$ch) { if (@file_get_contents($f) !== $body) { @mkdir(dirname($f), 0755, true); file_put_contents($f, $body); @chmod($f, $mode); $ch = true; } };
+  $w('/etc/systemd/system/kosmos-agent.service.d/keep-bg.conf', "# фоновая сборка Android и «Космос»-разработчик не должны убиваться, когда проход агента закончился\n[Service]\nKillMode=process\n");
+  $w('/usr/local/sbin/kosmos-nightly-reboot', "#!/bin/bash\n# ночная перезагрузка сервера «Космоса»; не посреди сборки/поручения/установки пакетов — ждём до 40 минут\nfor i in \$(seq 1 80); do\n  busy=\"\"\n  for l in /tmp/kosmos-android.lock /tmp/kosmos-dev.lock; do [ -e \"\$l\" ] && ! flock -n \"\$l\" true && busy=\"\$l\"; done\n  pgrep -f 'build_android|gradle|sdkmanager|apt-get|dpkg|unattended-upgr|kosmos-backup' >/dev/null && busy=\"\$busy process\"\n  [ -z \"\$busy\" ] && { logger -t kosmos-reboot \"ночная перезагрузка\"; /usr/bin/systemctl reboot; exit 0; }\n  sleep 30\ndone\nlogger -t kosmos-reboot \"перезагрузка пропущена: занято (\$busy)\"\n", 0755);
+  $w('/etc/systemd/system/kosmos-nightly-reboot.service', "[Unit]\nDescription=ITK Kosmos nightly reboot (skips while a build is running)\n[Service]\nType=oneshot\nExecStart=/usr/local/sbin/kosmos-nightly-reboot\n");
+  $w('/etc/systemd/system/kosmos-nightly-reboot.timer', "[Unit]\nDescription=ITK Kosmos nightly reboot at 03:30 Moscow time\n[Timer]\nOnCalendar=*-*-* 03:30:00 Europe/Moscow\nPersistent=false\n[Install]\nWantedBy=timers.target\n");
+  if ($ch) { exec('systemctl daemon-reload 2>&1; systemctl enable --now kosmos-nightly-reboot.timer 2>&1'); a_log('настройки systemd обновлены: KillMode=process, ночная перезагрузка 03:30 МСК'); }
+}
 /* 0.4.8 · запуск в фоне без унаследованных файлов (иначе фоновая задача держит замок агента) */
 function a_bg(string $run): void {
   exec('/bin/bash -c ' . escapeshellarg('for f in /proc/$$/fd/*; do n=${f##*/}; [ "$n" -gt 2 ] 2>/dev/null && eval "exec $n>&-"; done; ' . $run . ' &') . ' </dev/null >/dev/null 2>&1');

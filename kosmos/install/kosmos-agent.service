@@ -4,5 +4,7 @@ After=network-online.target
 
 [Service]
 Type=oneshot
+# 14.11.2026 · фоновые сборки (Android, «Космос»-разработчик) не убивать, когда проход закончился
+KillMode=process
 ExecStart=/usr/bin/php /opt/kosmos/bin/agent.php
 TimeoutStartSec=900
