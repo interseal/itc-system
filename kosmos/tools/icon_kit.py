@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Значки Android-приложений ИТК по ЭТАЛОНУ (android/znachki/, правила — android/znachki/README.md).
 
-Утверждено руководителем 14.11.2026: все значки одного вида, в одних пропорциях.
+Утверждено руководителем 14.11.2026 (крупный вариант — «нижний ряд»): все значки одного вида, в одних пропорциях.
 
   Сделать значок приложению (в android/ITCApp/app/src/<key>/res):
     python3 kosmos/tools/icon_kit.py make --key sklad2 --kind shar  --color "#FF1493"
@@ -23,8 +23,8 @@ ZN = os.path.join(ROOT, 'android', 'znachki')
 SRC = os.path.join(ROOT, 'android', 'ITCApp', 'app', 'src')
 DENS = {'mdpi': 48, 'hdpi': 72, 'xhdpi': 96, 'xxhdpi': 144, 'xxxhdpi': 192}
 C = 432                    # полотно переднего слоя (108dp)
-SHAR = (102, 103, 330, 330)  # шар / знак: 228 из 432 = 52,8 % полотна, по центру
-FOTO = (96, 96, 335, 335)    # рамка с фото: 239 из 432 = 55,3 %, белая рамка 14 px (≈3 %)
+SHAR = (68, 69, 364, 364)    # шар / знак: 296 из 432 = 68,5 % полотна, по центру
+FOTO = (60, 60, 371, 371)    # рамка с фото: 311 из 432 = 72 %, белая рамка 16 px (≈3,7 %)
 TOL = 8                      # допуск при проверке, px
 
 
@@ -59,7 +59,7 @@ def fg_foto(path):
 
 def write(res, fg, color):
     os.makedirs(os.path.join(res, 'drawable-nodpi'), exist_ok=True); fg.save(os.path.join(res, 'drawable-nodpi', 'ic_flv_fg.png'))
-    full = Image.new('RGBA', (C, C), _rgb(color)); full.alpha_composite(fg); vis = full.crop((60, 60, 372, 372))
+    full = Image.new('RGBA', (C, C), _rgb(color)); full.alpha_composite(fg); vis = full.crop((72, 72, 360, 360))
     for d, px in DENS.items():
         os.makedirs(os.path.join(res, f'mipmap-{d}'), exist_ok=True); im = vis.resize((px, px), Image.LANCZOS)
         for suf, rnd in (('', False), ('_round', True)):
