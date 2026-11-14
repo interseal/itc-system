@@ -58,6 +58,17 @@ input[type=password]{width:100%;padding:10px;border:1px solid var(--line);border
   <h1>Обновления</h1>
 </div>
 <div class="wrap">
+  <div class="card" id="cUp">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>Установить обновление</h2>
+    <div id="rdBox"></div>   <!-- №549 · обновления, собранные сервером: «Готово к установке» -->
+    <div class="mut">Выберите файл obnovlenie_…zip, который прислал Claude. Сайт сам разложит файлы, перенесёт фабрики в базу и покажет отчёт.<br>Можно выбрать сразу несколько файлов (зажмите Ctrl и щёлкайте по файлам) — они встанут в очередь и установятся сами по порядку номеров, вместе с переносом фабрик. Страницу можно свернуть, только не закрывайте её.</div>
+    <input type="file" id="fUp" multiple accept="application/zip,application/x-zip-compressed" class="hide" onchange="upPick(this.files)">
+    <input type="file" id="fUpAll" multiple class="hide" onchange="upPick(this.files)">
+    <button class="btn" id="bPick" onclick="document.getElementById('fUp').click()">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>Выбрать файлы обновлений</button>
+    <div class="mut" style="margin-top:8px;text-align:center">Нет файла в списке? <a href="#" onclick="document.getElementById('fUpAll').click();return false">Показать все файлы</a></div>
+    <div id="upBox"></div>
+  </div>
   <a class="btn g" href="/eco/skills.html" style="width:100%;margin-bottom:14px;text-decoration:none">Навыки «Фила», «Космоса» и Claude</a>
 
   <div class="card" id="cState"><div class="mut">Загрузка…</div></div>
@@ -67,17 +78,6 @@ input[type=password]{width:100%;padding:10px;border:1px solid var(--line);border
     <div class="mut">В папке лежат фабрики, которые ещё не перенесены. Нажмите — перенос продолжится.</div>
     <button class="btn g" onclick="runSeed()">Завершить перенос</button>
     <div id="seedLog"></div>
-  </div>
-
-  <div class="card" id="cUp">
-    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>Установить обновление</h2>
-    <div class="mut">Выберите файл obnovlenie_…zip, который прислал Claude. Сайт сам разложит файлы, перенесёт фабрики в базу и покажет отчёт.<br>Можно выбрать сразу несколько файлов (зажмите Ctrl и щёлкайте по файлам) — они встанут в очередь и установятся сами по порядку номеров, вместе с переносом фабрик. Страницу можно свернуть, только не закрывайте её.</div>
-    <input type="file" id="fUp" multiple accept="application/zip,application/x-zip-compressed" class="hide" onchange="upPick(this.files)">
-    <input type="file" id="fUpAll" multiple class="hide" onchange="upPick(this.files)">
-    <button class="btn" id="bPick" onclick="document.getElementById('fUp').click()">
-      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>Выбрать файлы обновлений</button>
-    <div class="mut" style="margin-top:8px;text-align:center">Нет файла в списке? <a href="#" onclick="document.getElementById('fUpAll').click();return false">Показать все файлы</a></div>
-    <div id="upBox"></div>
   </div>
 
   <div class="card hide" id="cCats">
@@ -404,7 +404,6 @@ function drawState(){
     h += '<div class="mut">Гонконг: свободно ' + (inf.free_mb >= 1024 ? (inf.free_mb/1024).toFixed(1).replace('.', ',') + ' ГБ' : (inf.free_mb||0) + ' МБ') + ', нагрузка ' + String(inf.load||0).replace('.', ',') + (k.bk ? ' · копия данных ' + k.bk.slice(6,8) + '.' + k.bk.slice(4,6) + ' (' + mb(k.bk_size||0) + ')' : ' · копий данных пока нет') + (k.bk_gz ? ' · копия в Гуанчжоу ' + k.bk_gz.slice(6,8) + '.' + k.bk_gz.slice(4,6) : '') + '</div>';
   }
   /* №541 · сервер «Космоса» в Сингапуре и деньги Claude — свои данные из api/kosmos.php, отдельно от upd.php */
-  h += '<div id="rdBox"></div>';   // №545 · обновления, собранные сервером
   h += '<div id="sgBox">' + sgSafe() + '</div>';
   document.getElementById('cState').innerHTML = h;
   try { rdDraw(); } catch (e) {}
