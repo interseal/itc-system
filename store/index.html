@@ -17862,30 +17862,38 @@ try{var _sa=JSON.parse(localStorage.getItem("itc_auth")||"null");if(_sa&&_sa.tok
    Руководитель: «при загрузке открывается ИТК Глобал — так не должно быть; страница с Филом: просто войти или войти как сотрудник». */
 (function(){try{
   var b=""; var m=location.search.match(/[?&]back=([^&]+)/); if(m)b=decodeURIComponent(m[1]); else b=sessionStorage.getItem("itc_back")||""; if(!b)return;
-  var A=[["/apps/fil","fil","Фил","виртуальный руководитель","/apps/fil/fil-splash.jpg?v=1"],["/apps/kosmos","kosmos","Космос","помощник на Claude","/apps/kosmos/kosmos-splash.jpg?v=1"],
-         ["/apps/crm","crm","CRM","сделки, клиенты, счета","/apps/splash/crm.jpg?v=1"],["/apps/trade","trade","Alex Trade","криптовалюта: графики, сделки, боты","/apps/splash/trade.jpg?v=2"],
-         ["/apps/draw","draw","Рисовалка","картинки голосом или текстом","/apps/splash/draw.jpg?v=1"],["/apps/hotels","hotels","Отели","гостиницы для поездок","/apps/splash/hotels.jpg?v=1"],
-         ["/apps/perevod","perevod","Переводчик","текст, голос, фото","/apps/splash/perevod.jpg?v=1"],["/apps/nav","nav","Навигатор","маршрут с русским голосом","/apps/splash/nav.jpg?v=1"],
-         ["/esim","esim","eSIM","интернет в поездках","/apps/splash/esim.jpg?v=1"],["/sklad","sklad","Склад в Китае","приёмка, наклейки, грузы","/apps/splash/sklad.jpg?v=1"]];
+  var FX=["Ставит задачи и составляет планы","Анализирует сделки, деньги и грузы","Ищет клиентов и проверяет фабрики","Следит за сроками и напоминает"];
+  var A=[["/apps/fil","fil","Фил","виртуальный руководитель <b>ИТК</b>","/apps/fil/fil-splash.jpg?v=1",FX],["/apps/kosmos","kosmos","Космос","виртуальный руководитель <b>ИТК</b>","/apps/kosmos/kosmos-splash.jpg?v=1",FX],
+         ["/apps/crm","crm","CRM ИТК","сделки, клиенты, счета и отчёты","/apps/splash/crm.jpg?v=1",[]],["/apps/trade","trade","Alex Trade","криптовалюта: графики, сделки, боты","/apps/splash/trade.jpg?v=2",[]],
+         ["/apps/draw","draw","Рисовалка ИТК","картинки голосом или текстом","/apps/splash/draw.jpg?v=1",[]],["/apps/hotels","hotels","Отели ИТК","гостиницы для поездок","/apps/splash/hotels.jpg?v=1",[]],
+         ["/apps/perevod","perevod","ИТК Переводчик","текст, голос, фото","/apps/splash/perevod.jpg?v=1",[]],["/apps/nav","nav","ИТК Навигатор","маршрут с русским голосом","/apps/splash/nav.jpg?v=1",[]],
+         ["/esim","esim","eSIM ИТК","интернет в поездках","/apps/splash/esim.jpg?v=1",[]],["/sklad","sklad","Склад в Китае","приёмка, наклейки, грузы","/apps/splash/sklad.jpg?v=1",[]]];
   var X=null; for(var i=0;i<A.length;i++) if(b.indexOf(A[i][0])===0){X=A[i];break;} if(!X||S.auth)return;
-  var face=X[1]==="fil"||X[1]==="kosmos";
+  var face=X[1]==="fil"||X[1]==="kosmos", land=innerWidth>innerHeight;
   document.documentElement.classList.add("appgate"); document.body.classList.add("appgate");
+  /* вид — как заставка самого Фила/«Космоса»: фото, сверху логотип ИТК, внизу имя и что умеет, под ними — стеклянная плашка входа */
   var st=document.createElement("style");
-  st.textContent='html.appgate,body.appgate{background:#030b2e url('+X[4]+') '+(face?'50% 0/auto 100%':'50% 50%/cover')+' no-repeat fixed!important}'
-   +'body.appgate #app{min-height:100vh;display:flex;flex-direction:column;justify-content:flex-end;background:linear-gradient(to bottom,rgba(3,11,46,0) 30%,rgba(3,11,46,.6) 55%,rgba(3,11,46,.9));padding:0 0 max(24px,env(safe-area-inset-bottom))}'
-   +'body.appgate .gate{background:rgba(255,255,255,.12)!important;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.25);border-radius:24px;margin:0 16px;color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.35)}'
-   +'body.appgate .gate .glogo,body.appgate .gate .brandname,body.appgate .gate .tag,body.appgate .gate [data-action=closeGate],body.appgate .gate .inst-block,body.appgate #account,body.appgate .ptr{display:none!important}'
-   +'body.appgate .gate .lb,body.appgate .gate .role-desc,body.appgate .gate .hintbox{color:#e6edff!important;background:transparent!important}'
-   +'body.appgate .topbar,body.appgate .guest-veil,body.appgate .gate .role-desc{display:none!important}body.appgate .gate .card{background:transparent!important;box-shadow:none!important;border:0!important;color:#fff!important}body.appgate .gate .card *{color:inherit}body.appgate .gate input{color:#111!important;background:#fff!important}body.appgate .gate .btn.link{color:#cfe0ff!important}'
-   +'.ag-h{color:#fff;text-align:center;margin:0 0 18px;text-shadow:0 2px 10px rgba(0,0,0,.5)}.ag-h b{display:block;font:700 44px/1 Roboto,Arial,sans-serif}.ag-h span{display:block;margin-top:8px;font-size:18px;color:#dfe7ff}'
-   +'.ag-b{display:block;width:100%;border:0;border-radius:16px;padding:16px;font:600 17px Roboto,Arial,sans-serif;margin-top:10px;cursor:pointer}.ag-b.g{background:#2fb24c;color:#fff}.ag-b.w{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.35)}';
+  st.textContent='html.appgate,body.appgate{background:#030b2e url('+X[4]+') '+(face?(land?'right 0 top 0/auto 100%':'50% 0/auto 100%'):'50% 50%/cover')+' no-repeat fixed!important}'
+   +'body.appgate .topbar,body.appgate .guest-veil{display:none!important}'
+   +'body.appgate #app{min-height:100vh;display:flex;flex-direction:column;justify-content:flex-end;box-sizing:border-box;padding:0 0 max(22px,env(safe-area-inset-bottom));background:linear-gradient(to bottom,rgba(0,0,0,0) 34%,rgba(0,0,0,.55) 58%,rgba(0,0,0,.78) 100%)}'
+   +'.ag-lg{position:fixed;top:4.5vh;right:8%;height:clamp(30px,4.2vh,46px);filter:drop-shadow(0 2px 10px rgba(0,0,0,.6));z-index:2}'
+   +'.ag-tx{margin:0 9% 16px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6)}.ag-nm{font:700 clamp(36px,4.8vh,56px)/1 Roboto,Arial,sans-serif}'
+   +'.ag-rl{font-size:clamp(19px,2.5vh,30px);margin-top:10px;color:#e6edff}.ag-rl b{color:#8fe03a}'
+   +'.ag-fx{list-style:none;margin:2vh 0 0;padding:0}.ag-fx li{font-size:clamp(14px,1.85vh,20px);line-height:1.35;color:#dfe7ff;padding:.4vh 0 .4vh 1.6em;position:relative}.ag-fx li:before{content:"";position:absolute;left:0;top:.95em;width:.6em;height:.6em;border-radius:50%;background:#8fe03a}'
+   +'body.appgate .gate{background:rgba(255,255,255,.14)!important;-webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);border:1px solid rgba(255,255,255,.28);border-radius:24px;margin:0 16px;padding:16px!important;color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.35)}'
+   +'body.appgate .gate .glogo,body.appgate .gate .brandname,body.appgate .gate .tag,body.appgate .gate [data-action=closeGate],body.appgate .gate .role-desc{display:none!important}'
+   +'body.appgate .gate .card{background:transparent!important;box-shadow:none!important;border:0!important;color:#fff!important}body.appgate .gate .card *{color:inherit}body.appgate .gate input{color:#111!important;background:#fff!important}'
+   +'body.appgate .gate .lb,body.appgate .gate .hintbox{color:#e6edff!important;background:transparent!important}body.appgate .gate .btn.link{color:#cfe0ff!important}'
+   +'.ag-b{display:block;width:100%;border:0;border-radius:16px;padding:16px;font:600 17px Roboto,Arial,sans-serif;cursor:pointer}.ag-b+.ag-b{margin-top:10px}.ag-b.g{background:#2fb24c;color:#fff}.ag-b.w{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4)}';
   document.head.appendChild(st);
+  var top='<img class="ag-lg" src="/apps/kosmos/itc-logo-w.svg" alt="ИТК">';
+  var tx=function(full){return '<div class="ag-tx"><div class="ag-nm">'+X[2]+'</div>'+(full?'<div class="ag-rl">'+X[3]+'</div>'+(X[5].length?'<ul class="ag-fx">'+X[5].map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul>':''):'')+'</div>';};
   var _lv=loginView;
   loginView=function(){
-    if(S.loginStep==="role") return '<div class="ag-h"><b>'+X[2]+'</b><span>'+X[3]+'</span></div><div class="gate" style="padding:18px">'
+    if(S.loginStep==="role") return top+tx(true)+'<div class="gate">'
       +'<button class="ag-b g" data-action="loginrole" data-v="buyer">Войти</button>'
       +'<button class="ag-b w" data-action="loginrole" data-v="itc">Войти как сотрудник</button></div>';
-    var h=_lv(); return '<div class="ag-h"><b>'+X[2]+'</b></div>'+h.replace(/сотрудников ИТК/g,"сотрудников").replace(/ИТК ГЛОБАЛ|ИТК Глобал|ITC GLOBAL|ITC Global/g,"").replace(/ИТК/g,"");
+    return top+tx(false)+_lv();
   };
   S.showGate=true; S.loginStep="role";
   var sp=document.getElementById("splash"); if(sp) setTimeout(function(){try{sp.style.display="none"}catch(e){}},400);
