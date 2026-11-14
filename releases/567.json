@@ -1,0 +1,30 @@
+{
+ "n": 567,
+ "needs": 561,
+ "title": "Всё накопившееся одним обновлением (после №561) + новая страница «Обновления»",
+ "what": [
+  "Одно обновление вместо всех, что накопились: Alex Trade (проверка стопов на истории, кнопки в меню, «Работа ботов» без каши), баланс Selectel, «Космос» видит фото, поле ввода как у Claude, большие файлы до 500 МБ.",
+  "Новая страница «Обновления»: показывается только одно обновление — то, которое можно ставить следующим, с кнопкой «Установить». Ничего выбирать не нужно.",
+  "Сервер «Космоса» обновится до 0.4.7 сам."
+ ],
+ "files": [
+  "store/api/tdemo.php",
+  "store/api/tdemo_bt.php",
+  "store/apps/trade/app65.js",
+  "store/apps/trade/index.html",
+  "store/api/flow.php",
+  "store/api/kosmos_flow.php",
+  "store/eco/upd.html",
+  "store/apps/trade/app66.js",
+  "store/apps/trade/app67.js",
+  "store/apps/trade/app50.js",
+  "store/apps/trade/app68.js",
+  "store/api/kosmos_lib.php",
+  "store/apps/kosmos/index.html",
+  "store/apps/fil/index.html",
+  "store/apps/crm/index.html",
+  "store/apps/fil/files.js",
+  "store/apps/kosmos/files.js"
+ ],
+ "kosmos": true
+}

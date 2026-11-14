@@ -65,8 +65,9 @@ if a.what: what = a.what
 needs = a.n - 1
 try:
     _st = json.load(open(os.environ.get('KOSMOS_RELEASE_STATE', '/var/lib/kosmos-releases/state.json'), encoding='utf-8'))
-    _ok = [int(k) for k, v in (_st.get('done') or {}).items() if str(k).isdigit() and int(k) < a.n and isinstance(v, dict) and v.get('ok')]
-    if _ok: needs = max(_ok)
+    # №567 · цепочка — по времени сборки: нужно то, что сервер отдал в магазин последним (а не самый большой номер)
+    _ok = [(str(v.get('at', '')), int(k)) for k, v in (_st.get('done') or {}).items() if str(k).isdigit() and int(k) != a.n and isinstance(v, dict) and v.get('ok')]
+    if _ok: needs = max(_ok)[1]
 except Exception: pass
 try:
     _rj = json.load(open(os.path.join(os.path.dirname(ROOT), 'releases', f'{a.n}.json'), encoding='utf-8'))
