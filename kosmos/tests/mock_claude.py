@@ -62,6 +62,11 @@ def plan(req, key):
         ans = json.dumps({'do': 'answer', 'say': f'Здравствуйте! Я {who}. На Claude: {"да" if claude else "нет"}. Ключ …{key[-4:]}. Вопрос: {text[-40:]}'}, ensure_ascii=False)
         # №538: навыки — решил в 2 шага и записал способ; повторно — делает по навыку из правил
         # №550: комплексное КП из нескольких поставщиков и разработчик (только руководителю)
+        if 'Проверка файлов' in text:   # №554 · достать фото из приложенного PDF
+            if 'РЕЗУЛЬТАТ files' not in text:
+                m = re.search(r'id файла ([A-Za-z0-9_]+)', text)
+                return [{'type': 'text', 'text': json.dumps({'tool': 'files', 'args': {'file': m.group(1) if m else '', 'op': 'pdf_images'}}, ensure_ascii=False)}], 'end_turn'
+            return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': 'Файлы: ' + text.split('РЕЗУЛЬТАТ files', 1)[1][:800]}, ensure_ascii=False)}], 'end_turn'
         if 'Проверка комплексного КП' in text:
             if 'РЕЗУЛЬТАТ make_kp' not in text:
                 return [{'type': 'text', 'text': json.dumps({'tool': 'make_kp', 'args': {'sups': [{'sup': 'SolarOne', 'section': 'Солнечные панели'}, {'sup': 'BattCo', 'section': 'Аккумуляторы'}, {'sup': 'InvMax', 'section': 'Инверторы'}],

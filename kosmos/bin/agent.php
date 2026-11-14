@@ -70,6 +70,7 @@ switch ($cmd) {
     a_release(false);
     a_dev_kick();
     a_bw(false);
+    a_media_tools();
     exit;
 }
 fwrite(STDERR, "неизвестная команда\n"); exit(2);
@@ -653,6 +654,19 @@ function a_release_one(int $n, array $r, string $dir): string {
   return '';
 }
 
+/* 0.4.4 · программы для файлов (PDF, фото, видео) — для Фила, «Космоса» и разработчика. Ставятся один раз, проверка — раз в час */
+function a_media_tools(): void {
+  if (time() - (int)(a_state()['media_at'] ?? 0) < 3600) return;
+  a_state_put(['media_at' => time()]);
+  $need = ['pdfimages' => 'poppler-utils', 'convert' => 'imagemagick', 'ffmpeg' => 'ffmpeg', 'qpdf' => 'qpdf'];
+  $miss = []; foreach ($need as $bin => $pkg) if (trim(a_sh('command -v ' . $bin)) === '') $miss[$pkg] = 1;
+  if (!$miss) return;
+  a_log('ставлю программы для файлов: ' . implode(', ', array_keys($miss)));
+  a_sh('DEBIAN_FRONTEND=noninteractive apt-get install -y -q ' . implode(' ', array_map('escapeshellarg', array_keys($miss))) . ' 2>&1 | tail -2');
+  // ImageMagick по умолчанию не открывает PDF — разрешаем (картинки из каталогов)
+  foreach (glob('/etc/ImageMagick-*/policy.xml') ?: [] as $pf) { $x = (string)file_get_contents($pf); $y = preg_replace('~(<policy domain="coder" rights=")none(" pattern="PDF" />)~', '$1read|write$2', $x); if ($y !== $x) file_put_contents($pf, $y); }
+}
+
 /* ---------------- 0.4.1 · Android-приложения собирает сервер ----------------
    releases/N.json: "android": {"apps": ["fil", "kosmos"] | "all", "code": 27, "name": "2.2.4", "notes": "что нового"}.
    Сборка — отдельным фоновым процессом (agent.php android N): Java 17, Android SDK и Gradle ставятся сами (kosmos/tools/build_android.py),
@@ -797,9 +811,14 @@ function a_devrun(): bool {
   a_sh('chown -R ' . escapeshellarg($u) . ': ' . $q);
   $rules = is_file("$dev/kosmos/dev/RULES.md") ? (string)file_get_contents("$dev/kosmos/dev/RULES.md") : '';
   $model = ['opus' => 'claude-opus-5-5', 'sonnet' => 'claude-sonnet-5-5', 'fable' => 'claude-fable-5-2'][(string)$t['model']] ?? 'claude-opus-5-5';
-  $cmd = ['timeout', (string)(int)$C['dev_timeout'], 'runuser', '-u', $u, '--', (string)$C['claude_bin'], '-p', (string)$t['text'], '--output-format', 'json', '--model', $model,
+  // 0.4.4 · ответ руководителя на вопрос — продолжаем тот же сеанс Claude Code (он помнит всё поручение)
+  $resume = (string)($t['session'] ?? '') !== '' && (string)($t['answer'] ?? '') !== '';
+  $prompt = $resume ? "Ответ руководителя на твой вопрос:\n" . (string)$t['answer'] . "\n\nПродолжай поручение." : (string)$t['text'];
+  if ($resume && !is_dir('/home/' . $u . '/.claude')) $resume = false;
+  $cmd = ['timeout', (string)(int)$C['dev_timeout'], 'runuser', '-u', $u, '--', (string)$C['claude_bin'], '-p', $prompt, '--output-format', 'json', '--model', $model,
           '--max-budget-usd', (string)$j['budget'], '--permission-mode', 'acceptEdits', '--permission-prompts', 'none',
           '--allowedTools', 'Bash,Read,Edit,Write,Glob,Grep,WebFetch,WebSearch,Agent,TodoWrite', '--append-system-prompt', $rules];
+  if ($resume) array_push($cmd, '--resume', (string)$t['session']);
   $ds = (string)($j['engine'] ?? 'claude') === 'deepseek';
   if ($ds) { $model = 'claude-opus-5-5'; $res['branch'] = 'fil/' . $id; a_sh("git -C $q checkout -q -B " . escapeshellarg($res['branch'])); a_sh('chown -R ' . escapeshellarg($u) . ': ' . $q);
     $cmd[array_search('--model', $cmd, true) + 1] = $model;
@@ -812,10 +831,15 @@ function a_devrun(): bool {
   $r = json_decode((string)$out, true);
   $res['cost'] = is_array($r) ? ($ds ? dev_ds_cost_a((array)($r['usage'] ?? [])) : (float)($r['total_cost_usd'] ?? 0)) : 0;
   $res['result'] = is_array($r) ? (string)($r['result'] ?? '') : '';
+  $res['session'] = is_array($r) ? (string)($r['session_id'] ?? '') : '';
+  $res['cost'] = round((float)$res['cost'] + (float)($t['cost'] ?? 0), 4);   // за всё поручение, с вопросами
   if (!is_array($r)) { $res['error'] = 'Claude Code не ответил (' . $rc . '): ' . mb_substr(str_replace((string)$j['key'], '…', trim($err . ' ' . $out)), -400); $finish($res); return false; }
   // проверки: что изменилось, нет ли ключей, синтаксис, проверки «Космоса»
   a_sh('chown -R root: ' . $q);
   $changed = array_values(array_filter(array_map(function ($l) { return trim(substr($l, 3)); }, explode("\n", a_sh("git -C $q status --porcelain -uall")))));
+  // 0.4.4 · разработчик спросил и ничего не менял — ждём ответа руководителя
+  if (!$changed && empty($r['is_error']) && preg_match('~(?:^|\n)\s*\**ВОПРОС\**\s*:\s*(.+)$~su', $res['result'], $qm)) {
+    $res['status'] = 'question'; $res['question'] = trim($qm[1]); $finish($res); return true; }
   if (!$changed) { $res['status'] = !empty($r['is_error']) ? 'failed' : 'done'; if (!empty($r['is_error'])) $res['error'] = 'Claude Code остановился с ошибкой'; $finish($res); return true; }
   $checks = [];
   $diff = a_sh("git -C $q add -A && git -C $q diff --cached");

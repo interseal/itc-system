@@ -5,7 +5,7 @@
 (api/ из выгрузки + flow.php, kosmos_flow.php, kosmos_lib.php, kosmos.php, поддельный config.php).
 Запуск: python3 tests/flow_e2e.py
 """
-import json, os, shutil, subprocess, sys, time, urllib.request, urllib.error, sqlite3, hashlib, glob
+import json, os, shutil, subprocess, sys, time, urllib.request, urllib.error, urllib.parse, sqlite3, hashlib, glob
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ST = '/tmp/kft/store'
@@ -437,6 +437,17 @@ try:
     subprocess.run(['php', f'{ROOT}/bin/agent.php', 'release'], env=aenv2, capture_output=True, text=True, timeout=120)
     c, j = http(f'{STORE}/api/kosmos.php?a=upd_ready&t=boss-t', {}); it13 = next((x for x in j.get('items', []) if x.get('n') == 9013), {})
     check('обновление из правок Фила помечено «Фил» (по автору в GitHub)', it13.get('by') == 'Фил', (it13, json.load(open(f'{TMP}/rel/state.json')).get('done', {}).get('9013')))
+    print('16. Файлы: Фил/«Космос» достают фото из PDF на сервере (№554)')
+    from PIL import Image as _Im
+    _Im.new('RGB', (500, 500), (20, 120, 40)).save(f'{TMP}/cat2.pdf')
+    c, j = kf('fc_file', data={'name': 'каталог GP Solar.pdf', 'mime': 'application/pdf', 'text': 'Каталог солнечных панелей GP Solar, модели 450-600 Вт, цены по запросу', 'data': base64.b64encode(open(f'{TMP}/cat2.pdf', 'rb').read()).decode()})
+    fid = j.get('id'); check('PDF приложен, оригинал сохранён', c == 200 and fid, j)
+    c, j = kf('fc_cmd', data={'text': 'Проверка файлов: достань фото товаров', 'conv': 'new', 'files': [fid]})
+    say = j.get('say', '').replace('\\/', '/'); import re as _re
+    links = _re.findall(r'https://[^\s"\\]+/uploads/fil_out/([0-9a-f]{16})/([^\s"\\]+?\.jpg)', say)
+    check('фото из PDF — ссылкой, файл лежит в магазине', c == 200 and links and os.path.exists(f'{ST}/uploads/fil_out/{links[0][0]}/{urllib.parse.unquote(links[0][1])}'), say[:500])
+    c, j = kf('fc_file', data={'name': 'обзор.mp4', 'mime': 'video/mp4', 'data': base64.b64encode(open(f'{TMP}/cat2.pdf', 'rb').read()).decode()})
+    check('видео принимается (до 20 МБ), Фил знает, что его можно обработать', c == 200 and j.get('kind') == 'видео', j)
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

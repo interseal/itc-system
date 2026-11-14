@@ -4,8 +4,13 @@ import json, os, sys
 a = sys.argv[1:]; task = a[a.index('-p') + 1]
 model = a[a.index('--model') + 1]; budget = a[a.index('--max-budget-usd') + 1]
 open('/tmp/fake_claude_args.json', 'w').write(json.dumps({'model': model, 'budget': budget, 'user': os.getuid(), 'cwd': os.getcwd(), 'rules': '--append-system-prompt' in a,
-    'key': bool(os.environ.get('ANTHROPIC_API_KEY')), 'base': os.environ.get('ANTHROPIC_BASE_URL', ''), 'keyval': os.environ.get('ANTHROPIC_API_KEY', '')[:3]}))
+    'key': bool(os.environ.get('ANTHROPIC_API_KEY')), 'base': os.environ.get('ANTHROPIC_BASE_URL', ''), 'keyval': os.environ.get('ANTHROPIC_API_KEY', '')[:3], 'resume': a[a.index('--resume') + 1] if '--resume' in a else '', 'prompt': task}))
 n = 9101 if 'DeepSeek' in task else 9100
+if 'непонятно' in task:   # неясное поручение: спрашивает и ничего не меняет
+    print(json.dumps({'type': 'result', 'result': 'Посмотрел страницу.\nВОПРОС: какую кнопку добавить? 1) «Обновить» 2) «Скачать». Советую 1.', 'total_cost_usd': 0.5, 'is_error': False, 'session_id': 'sess-q1'})); sys.exit(0)
+if 'Ответ руководителя' in task and '--resume' in a:
+    os.makedirs('store/eco', exist_ok=True); open('store/eco/btn.html', 'w').write('<p>кнопка</p>')
+    print(json.dumps({'type': 'result', 'result': 'Босс, сделал кнопку по вашему ответу.', 'total_cost_usd': 0.7, 'is_error': False, 'session_id': 'sess-q1'})); sys.exit(0)
 if 'gradle' in task:   # правит настройки сборки Android и выпускает обновление
     os.makedirs('android/ITCApp/app', exist_ok=True); open('android/ITCApp/app/build.gradle', 'w').write('// правка')
     open('releases/9102.json', 'w').write(json.dumps({'n': 9102, 'title': 'gradle', 'what': [], 'files': [], 'kosmos': False}))

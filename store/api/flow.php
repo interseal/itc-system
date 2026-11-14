@@ -1819,7 +1819,7 @@ const FIL_SENSE = "\nКАК ПОНИМАТЬ ПРОСЬБУ (важнее все
 /* №533 · кто такой Фил на самом деле: на вопрос «на чём ты работаешь» — честно (раньше Фил мог сказать, что он Claude) */
 const FIL_SELF = "\nО СЕБЕ: ты работаешь на моделях DeepSeek (через Яндекс AI Studio или напрямую), а не на Claude. На вопрос, на чём ты работаешь, отвечай именно так.";
 const FIL_CORE = "\nГЛАВНЫЕ ПРАВИЛА (по важности):"
-  . "\n1. ВЫПОЛНИ, А НЕ ПЕРЕСПРАШИВАЙ. Понял, что сделать, — делай с тем, что сказано. Мелочи (срок, формулировку) выбери сам и скажи, что выбрал. Вопрос (do=ask) — только если без ответа сделать невозможно, и тогда один короткий вопрос. Нельзя: «уточните, какой именно…» со списком случайных записей."
+  . "\n1. РАБОТАЙ В ДИАЛОГЕ, КАК ОПЫТНЫЙ ПОМОЩНИК (№554). Простое и понятное — делай сразу. Если от ответа зависит результат — большая работа, деньги, отправка клиенту или поставщику, удаление, или просьбу можно понять по-разному — не делай вслепую: сначала посмотри в базе сам, потом спроси (do=ask) один-два коротких вопроса с вариантами 1) 2) 3) и своей рекомендацией («советую 2 — потому что…»). Видишь ошибку или риск в задаче (не тот клиент, цена ниже закупки, нет нужных данных) — скажи об этом прямо и предложи, как лучше. Мелочи (срок, формулировку) выбери сам и скажи, что выбрал. Нельзя: длинные анкеты, вопросы, ответ на которые есть в базе, «уточните, какой именно…» со списком случайных записей. После ответа — сразу делай."
   . "\n2. ПОЙМИ СМЫСЛ, А НЕ СЛОВА. Голос искажает: «центр устрою» = «Уютстрой», «с Нади» = SNADI, «пекрон» = Pecron, «силу отправь» = «срочно отправь». Названия склеивай, падеж приводи к именительному. Совпадение ищи по отличительной части названия; общие слова (центр, строй, групп, компания, отель, магазин, торг, сервис) совпадением не считаются."
   . "\n3. НЕ НАШЁЛ — ЗНАЧИТ НОВОЕ. Клиента нет по отличительной части — заведи (client_save) и скажи. Поставщика ищи через suppliers (он находит похожие по звучанию); одно похожее на 80% и выше — бери и скажи, что выбрал."
   . "\n4. ВСЕ ПОРУЧЕНИЯ ИЗ ФРАЗЫ. Сначала инструменты-действия по порядку (client_save, contact_save, plan_add, make_kp, make_invoice, add_supplier), последним — do-действие со сделкой. Ответ — коротко список сделанного."
@@ -1976,18 +1976,24 @@ function dv_tools($me) {
         return ['принято' => 'поручение №' . $j['id'], 'кто делает' => $eng === 'claude' ? 'Космос-разработчик (Claude)' : 'Фил-разработчик (DeepSeek)',
                 'когда' => 'начнёт в течение минуты; ход и итог — инструмент develop_status или настройки «Космоса» → «Разработчик»', 'расход сегодня' => '$' . ($j['spent'] ?? 0) . ' из $' . ($j['limit'] ?? 30)];
       }],
+    'develop_answer' => ['{"id":номер поручения,"text":"ответ руководителя"} — ПЕРЕДАТЬ ОТВЕТ РУКОВОДИТЕЛЯ на вопрос разработчика (статус question). Передавай его слова как есть; разработчик продолжит с того же места',
+      function ($a) use ($me) {
+        [$c, $j] = dv_gw('answer', ['id' => (int)($a['id'] ?? 0), 'text' => (string)($a['text'] ?? ''), 'who' => (string)($me['phone'] ?? '')]);
+        if ($c !== 200 || empty($j['ok'])) return 'Не получилось: ' . ((string)($j['error'] ?? '') ?: 'нет связи с сервером «Космоса»');
+        return 'Ответ передан: разработчик продолжит в течение минуты';
+      }],
     'develop_decide' => ['{"id":номер поручения,"ok":true|false} — РЕШЕНИЕ РУКОВОДИТЕЛЯ по правкам, которые ждут его решения (затронуты настройки сборки приложений). Вызывай ТОЛЬКО когда руководитель сам сказал «одобряю/выпускай» или «отклонить» про это поручение',
       function ($a) use ($me) {
         [$c, $j] = dv_gw('decide', ['id' => (int)($a['id'] ?? 0), 'ok' => !empty($a['ok']), 'who' => (string)($me['phone'] ?? '')]);
         if ($c !== 200 || empty($j['ok'])) return 'Не получилось: ' . ((string)($j['error'] ?? '') ?: 'нет связи с сервером «Космоса»');
         return !empty($a['ok']) ? 'Одобрено: правки уйдут в работу в течение минуты, потом сервер соберёт обновление — его ставят кнопкой «Установить»' : 'Отклонено: правки не выпускаются';
       }],
-    'develop_status' => ['{} — как идут поручения разработчику: статус, что сделано, выпущено ли обновление, сколько стоило. Статус needs_ok — ждёт решения руководителя: перескажи ему, что затронуто, и спроси «одобрить или отклонить?»',
+    'develop_status' => ['{} — как идут поручения разработчику: статус, что сделано, выпущено ли обновление, сколько стоило. Статус needs_ok — ждёт решения руководителя: перескажи ему, что затронуто, и спроси «одобрить или отклонить?». Статус question — разработчик спрашивает: перескажи вопрос (поле «вопрос») и передай ответ руководителя через develop_answer',
       function ($a) {
         [$c, $j] = dv_gw('list');
         if ($c !== 200 || empty($j['ok'])) return 'нет связи с сервером «Космоса»';
         return array_map(function ($t) { return ['№' => $t['id'], 'кто' => $t['engine'] === 'deepseek' ? 'Фил (DeepSeek)' : 'Космос (Claude)', 'статус' => $t['status'], 'поручение' => mb_substr($t['text'], 0, 200),
-          'итог' => mb_substr($t['result'], 0, 800), 'обновление' => $t['release_n'] ? '№' . $t['release_n'] . ' — ставит руководитель' : '', 'проверки' => $t['checks'], 'ошибка' => $t['error'], 'стоимость' => '$' . $t['cost']]; }, array_slice((array)($j['tasks'] ?? []), 0, 8));
+          'итог' => mb_substr($t['result'], 0, 800), 'вопрос' => (string)($t['question'] ?? ''), 'обновление' => $t['release_n'] ? '№' . $t['release_n'] . ' — ставит руководитель' : '', 'проверки' => $t['checks'], 'ошибка' => $t['error'], 'стоимость' => '$' . $t['cost']]; }, array_slice((array)($j['tasks'] ?? []), 0, 8));
       }],
   ];
 }
@@ -2268,6 +2274,8 @@ function ag_tools($me, $ctx) {
       function ($a) use ($me) { try { return fs_add($me, $a); } catch (Throwable $e) { return 'не получилось занести: ' . $e->getMessage(); } }],
     'make_kp' => ['{"sup":"id или название поставщика из базы","sups":[{"sup":"id поставщика","section":"раздел, напр. Солнечные панели"}] — КОМПЛЕКСНОЕ КП из нескольких поставщиков разделами (вместо sup; до 8),"kind":"coop|full","formats":["pdf","xlsx"],"client":"компания клиента или пусто","title":"заголовок или пусто","company":"наша компания или пусто"} — СДЕЛАТЬ КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ файлами PDF и Excel от нашей компании по поставщику из базы (фото, описание, модели, характеристики; цены — по запросу). Файлы сразу прикрепляются к ответу',
       function ($a) use ($me) { try { return kp_make($me, $a); } catch (Throwable $e) { return 'не получилось сделать КП: ' . $e->getMessage(); } }],
+    'files' => ['{"file":"id приложенного файла (из «ПРИЛОЖЕН ФАЙЛ … id файла …») или пусто","url":"ссылка на PDF/фото/видео в интернете — вместо file","op":"pdf_images|pdf_pages|pdf_text|img|video_frames|video_small|video_cut|info","from":1,"to":20,"count":6,"size":1600,"format":"jpg|png|webp","square":false,"white":false,"trim":false,"height":720,"len":15,"min":200,"limit":80} — ОБРАБОТАТЬ ФАЙЛ на сервере: pdf_images — достать фото товаров из PDF-каталога (from/to — страницы, min — не меньше N пикселей, limit — сколько); pdf_pages — страницы целиком картинками (сканы); pdf_text — весь текст PDF; img — фото: размер (size), формат, квадрат с белым полем (square), белый фон (white), обрезать поля (trim); video_frames — кадры из видео (count); video_small — сжать видео для WeChat/WhatsApp (height); video_cut — отрезок (from — секунда начала, len — длина); info — сведения о видео. Готовые файлы — ссылками (и одним архивом), дай их человеку',
+      function ($a) use ($me) { try { return ag_files($me, $a); } catch (Throwable $e) { return 'не получилось: ' . $e->getMessage(); } }],
     'chats' => ['{"q":"фабрика или слово"} — переписка с фабриками (WeCom): последние сообщения в переводе',
       function ($a) {
         $l = ag_like($a['q'] ?? '');
@@ -2418,6 +2426,55 @@ function ff_attach_text($me, $ids) {
   $o = ''; $left = 14000;
   foreach ($q->fetchAll() as $f) { $t = mb_substr((string)$f['text'], 0, max(800, $left)); $left -= mb_strlen($t); $o .= "\n\n=== ПРИЛОЖЕН ФАЙЛ «" . $f['name'] . "» (" . $f['kind'] . ", id файла " . $f['id'] . ") ===\n" . $t . (mb_strlen((string)$f['text']) > mb_strlen($t) ? "\n…(дальше обрезано)" : ''); }
   return $o;
+}
+
+/* ========== №554 · ФАЙЛЫ: PDF-каталоги, фото, видео — обрабатывает сервер «Космоса» (там есть программы), готовое — ссылками ========== */
+function ag_files($me, $a) {
+  $op = (string)($a['op'] ?? ''); $bin = ''; $name = 'file';
+  if (trim((string)($a['file'] ?? '')) !== '') {
+    ff_cols(); $q = db()->prepare('SELECT name,path FROM itc_fc_file WHERE id=? AND (phone=? OR ?=1)'); $q->execute([(string)$a['file'], $me['phone'], !empty($me['boss']) ? 1 : 0]);
+    $f = $q->fetch(); if (!$f) return 'нет такого файла (id из «ПРИЛОЖЕН ФАЙЛ»)';
+    if ((string)$f['path'] === '' || !is_file(ff_dir() . '/' . basename((string)$f['path']))) return 'оригинал этого файла не сохранился (бывает с большими PDF) — попросите прислать его ещё раз или дать ссылку';
+    $bin = (string)file_get_contents(ff_dir() . '/' . basename((string)$f['path'])); $name = (string)$f['name'] ?: basename((string)$f['path']);
+    if (pathinfo($name, PATHINFO_EXTENSION) === '') $name .= '.' . pathinfo((string)$f['path'], PATHINFO_EXTENSION);
+  } elseif (preg_match('~^https?://~i', (string)($a['url'] ?? ''))) {
+    $ch = curl_init((string)$a['url']); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 4, CURLOPT_TIMEOUT => 90, CURLOPT_CONNECTTIMEOUT => 10,
+      CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS, CURLOPT_USERAGENT => 'Mozilla/5.0 ITC', CURLOPT_NOPROGRESSFUNCTION => false,
+      CURLOPT_PROGRESSFUNCTION => function ($c, $dt, $d) { return $d > 40 * 1048576 ? 1 : 0; }]);
+    $bin = (string)curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    if ($code !== 200 || $bin === '') return 'не удалось скачать файл по ссылке (код ' . $code . ', или больше 40 МБ)';
+    $name = basename((string)parse_url((string)$a['url'], PHP_URL_PATH)) ?: 'file';
+  } else return 'нужен file (id приложенного файла) или url';
+  $data = ['a' => 'media', 'op' => $op, 'name' => $name, 'data' => base64_encode($bin)];
+  foreach (['from', 'to', 'count', 'size', 'format', 'square', 'white', 'trim', 'height', 'len', 'min', 'limit', 'dpi'] as $k) if (isset($a[$k])) $data[$k] = $a[$k];
+  if (!function_exists('ks_gw') || !defined('KS_SERVER')) return 'нет связи с сервером «Космоса» (обработка файлов идёт там)';
+  $ch = curl_init(KS_SERVER . '/api.php?a=gw');
+  curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_TIMEOUT => 600, CURLOPT_CONNECTTIMEOUT => 8,
+    CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Kosmos-GW: ' . ks_gw()['gw']], CURLOPT_POSTFIELDS => json_encode($data, JSON_UNESCAPED_UNICODE)]);
+  $r = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); unset($data, $bin);
+  $j = is_string($r) ? json_decode($r, true) : null;
+  if ($code !== 200 || !is_array($j) || empty($j['ok'])) return 'сервер не обработал: ' . (is_array($j) ? (string)($j['error'] ?? '') : '') . ($code ? ' (' . $code . ')' : ' (нет связи)');
+  $out = ['готово' => $op];
+  if (!empty($j['text'])) $out['текст'] = mb_substr((string)$j['text'], 0, 30000) . (mb_strlen((string)$j['text']) > 30000 ? "\n…(текст длиннее — дальше страницами: from/to)" : '');
+  if (!empty($j['info'])) $out['сведения'] = $j['info'];
+  if (!empty($j['note'])) $out['заметка'] = $j['note'];
+  $files = (array)($j['files'] ?? []);
+  if ($files) {
+    $id = bin2hex(random_bytes(8)); $d = dirname(__DIR__) . '/uploads/fil_out/' . $id; @mkdir($d, 0755, true);
+    $base = 'https://' . (preg_match('~^[a-z0-9.-]+$~i', (string)($_SERVER['HTTP_HOST'] ?? '')) ? $_SERVER['HTTP_HOST'] : 'itcpartner.store') . '/uploads/fil_out/' . $id . '/';
+    $links = []; $zip = new ZipArchive(); $zp = "$d/all.zip"; $z = count($files) > 1 && $zip->open($zp, ZipArchive::CREATE) === true;
+    foreach ($files as $f) {
+      $fn = preg_replace('~[^\p{L}\p{N}._-]~u', '_', (string)$f['name']); $b = base64_decode((string)$f['data'], true); if ($b === false || !preg_match('~\.(jpe?g|png|webp|mp4|txt|pdf)$~i', $fn)) continue;
+      file_put_contents("$d/$fn", $b); if ($z) $zip->addFile("$d/$fn", $fn);
+      $links[] = $base . rawurlencode($fn);
+    }
+    if ($z) $zip->close();
+    $out['файлов'] = count($links);
+    $out['ссылки'] = array_slice($links, 0, 12); if (count($links) > 12) $out['ещё'] = (count($links) - 12) . ' — в архиве';
+    if ($z) $out['всё одним архивом'] = $base . 'all.zip';
+    $out['как выдать'] = 'дай человеку ссылки (и архив), коротко скажи, что получилось';
+  }
+  return $out;
 }
 
 /* ========== №19 · ФИЛ ИЩЕТ В ИНТЕРНЕТЕ И ПОПОЛНЯЕТ БАЗУ КЛИЕНТОВ ==========
@@ -3681,7 +3738,10 @@ try {
     else {
       $bin = base64_decode((string)fl_in('data'), true);
       if ($bin === false || $bin === '') fl_fail('Файл не дошёл — попробуйте ещё раз');
-      if (strlen($bin) > 12 * 1024 * 1024) fl_fail('Файл больше 12 МБ — Филу его не прочитать. Пришлите частями или фото страниц');
+      $isVid = in_array($ext, ['mp4', 'mov', 'webm', 'm4v'], true) || strpos($mime, 'video/') === 0;   // №554 · видео — для обработки на сервере
+      if (strlen($bin) > ($isVid ? 20 : 12) * 1024 * 1024) fl_fail($isVid ? 'Видео больше 20 МБ — сожмите его или пришлите ссылку' : 'Файл больше 12 МБ — Филу его не прочитать. Пришлите частями или фото страниц');
+      if ($isVid) { $kind = 'видео'; $text = 'Видео «' . $name . '», ' . round(strlen($bin) / 1048576, 1) . ' МБ. Обработать — инструментом files (кадры, сжать, отрезок, сведения).'; }
+      else
       if (strpos($mime, 'image/') === 0 || in_array($ext, ['jpg', 'jpeg', 'png', 'heic', 'webp'], true)) { $kind = 'фото'; $text = ff_ocr($bin, $mime === 'image/png' ? 'image/png' : 'image/jpeg', $err); }
       elseif ($ext === 'pdf') { $kind = 'PDF-скан'; $text = ff_ocr($bin, 'application/pdf', $err); }
       elseif ($ext === 'docx') { $kind = 'Word'; $text = ff_docx($bin); }
@@ -3697,7 +3757,7 @@ try {
     db()->prepare('INSERT INTO itc_fc_file (id,phone,name,kind,text,chars) VALUES (?,?,?,?,?,?)')->execute([$id, $me['phone'], $name, $kind, $text, mb_strlen($text)]);
     /* №33 · оригинал файла храним — чтобы Фил мог приложить его к карточке поставщика */
     if (!isset($bin)) { $bin = base64_decode((string)fl_in('data'), true); }
-    if ($bin !== false && $bin !== '' && strlen($bin) <= 12 * 1024 * 1024 && preg_match('~^(pdf|jpe?g|png|webp|docx|xlsx)$~', $ext ?: ($kind === 'фото' ? 'jpg' : ''))) {
+    if ($bin !== false && $bin !== '' && strlen($bin) <= 20 * 1024 * 1024 && preg_match('~^(pdf|jpe?g|png|webp|docx|xlsx|mp4|mov|webm|m4v)$~', $ext ?: ($kind === 'фото' ? 'jpg' : ''))) {
       try { ff_cols(); $sx = $ext ?: 'jpg'; if ($kind === 'фото' && $mime === 'image/jpeg') $sx = 'jpg';
         $fn = $id . '.' . $sx; if (@file_put_contents(ff_dir() . '/' . $fn, $bin) !== false)
           db()->prepare('UPDATE itc_fc_file SET path=?,mime=?,bytes=? WHERE id=?')->execute([$fn, $mime ?: 'application/octet-stream', strlen($bin), $id]); } catch (Throwable $e) {}

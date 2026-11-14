@@ -232,7 +232,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
       <textarea id="txt" rows="1" placeholder="Скажите или напишите Филу…" autocomplete="off" oninput="txtGrow()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendText()}"></textarea>
       <input type="file" id="fCam" accept="image/*" capture="environment" hidden onchange="gotFiles(this)">
       <input type="file" id="fPic" accept="image/*" multiple hidden onchange="gotFiles(this)">
-      <input type="file" id="fAny" accept="image/*,.pdf,.docx,.xlsx,.doc,.xls,.txt,.csv,application/pdf" multiple hidden onchange="gotFiles(this)">
+      <input type="file" id="fAny" accept="image/*,video/*,.pdf,.docx,.xlsx,.doc,.xls,.txt,.csv,.mp4,.mov,application/pdf" multiple hidden onchange="gotFiles(this)">
       <button class="mic" id="mic" title="Нажмите — говорить; нажмите ещё раз — отправить"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg></button>
       <button class="gosnd" id="go" onclick="sendText()" title="Отправить"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg></button>
     </div>

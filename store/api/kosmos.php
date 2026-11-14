@@ -170,11 +170,19 @@ switch ($a) {
     [$c, $j] = ks_gw_call(['a' => 'dev', 'op' => 'list'], 10);
     if ($c !== 200 || empty($j['ok'])) ks_out(['ok' => true, 'items' => [], 'off' => true]);
     $it = [];
-    foreach ((array)($j['tasks'] ?? []) as $t) if (($t['status'] ?? '') === 'needs_ok')
-      $it[] = ['id' => (int)$t['id'], 'by' => ($t['engine'] ?? '') === 'deepseek' ? 'Фил' : 'Космос', 'text' => mb_substr((string)$t['text'], 0, 600),
+    foreach ((array)($j['tasks'] ?? []) as $t) if (in_array($t['status'] ?? '', ['needs_ok', 'question'], true))
+      $it[] = ['id' => (int)$t['id'], 'kind' => $t['status'] === 'question' ? 'q' : 'ok', 'q' => (string)($t['question'] ?? ''),
+               'by' => ($t['engine'] ?? '') === 'deepseek' ? 'Фил' : 'Космос', 'text' => mb_substr((string)$t['text'], 0, 600),
                'result' => mb_substr((string)$t['result'], 0, 1500), 'note' => (string)$t['error'], 'n' => (int)$t['release_n']];
     usort($it, function ($a, $b) { return $a['id'] - $b['id']; });   // старые — первыми
     ks_out(['ok' => true, 'items' => $it]);
+  }
+  case 'dev_answer': {   // №554 · ответ на вопрос разработчика — со страницы «Обновления»
+    $S = ks_staff(); if (!ks_boss($S)) ks_out(['ok' => false, 'error' => 'Только для руководителя'], 403);
+    $in = json_decode((string)file_get_contents('php://input'), true) ?: [];
+    [$c, $j] = ks_gw_call(['a' => 'dev', 'op' => 'answer', 'id' => (int)($in['id'] ?? 0), 'text' => (string)($in['text'] ?? ''), 'who' => (string)($S['name'] ?? $S['phone'] ?? 'руководитель')], 15);
+    if ($c !== 200 || empty($j['ok'])) ks_out(['ok' => false, 'error' => (string)($j['error'] ?? 'нет связи с сервером «Космоса»')], 400);
+    ks_out(['ok' => true]);
   }
   case 'dev_decide': {
     $S = ks_staff(); if (!ks_boss($S)) ks_out(['ok' => false, 'error' => 'Только для руководителя'], 403);

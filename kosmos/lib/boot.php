@@ -5,7 +5,7 @@ declare(strict_types=1);
 // на сервере «Космоса» (база SQLite). В аккаунте Anthropic не хранится ничего,
 // поэтому ключ Claude можно менять — «Космос» продолжает с того же места.
 
-const KOSMOS_VERSION = '0.4.3';
+const KOSMOS_VERSION = '0.4.4';
 
 // Модели Claude на выбор руководителю (настройки «Космоса»). Можно вписать и другую — по её названию в API.
 const MODEL_LIST = [
@@ -52,5 +52,6 @@ require_once __DIR__ . '/tasks.php';
 require_once __DIR__ . '/gw.php';
 require_once __DIR__ . '/skills.php';
 require_once __DIR__ . '/dev.php';    // 0.3.9 · «Космос»-разработчик (только руководитель)   // 0.3.1 · навыки «Космоса» и «Фила»
+require_once __DIR__ . '/media.php';  // 0.4.4 · обработка PDF, фото, видео для Фила и «Космоса»
 
 @date_default_timezone_set((string)cfg('tz'));

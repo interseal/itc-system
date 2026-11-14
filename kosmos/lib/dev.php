@@ -18,6 +18,9 @@ function dev_schema(PDO $d): void {
   // 0.4.0 · движок: claude — «Космос» (ключ Claude), deepseek — «Фил» (Claude Code через совместимый вход DeepSeek)
   $cols = array_column($d->query('PRAGMA table_info(dev_tasks)')->fetchAll(), 'name');
   if (!in_array('engine', $cols, true)) $d->exec("ALTER TABLE dev_tasks ADD COLUMN engine TEXT NOT NULL DEFAULT 'claude'");
+  // 0.4.4 · диалог: разработчик спрашивает — руководитель отвечает — работа продолжается с того же места
+  foreach (['session_id' => "TEXT NOT NULL DEFAULT ''", 'question' => "TEXT NOT NULL DEFAULT ''", 'answer' => "TEXT NOT NULL DEFAULT ''"] as $c => $t)
+    if (!in_array($c, $cols, true)) $d->exec("ALTER TABLE dev_tasks ADD COLUMN $c $t");
 }
 const DEV_ENGINES = ['claude' => 'Космос (Claude)', 'deepseek' => 'Фил (DeepSeek)'];
 /* примерная цена DeepSeek за миллион токенов, $ — Claude Code считает расход по ценам Claude, для DeepSeek пересчитываем сами */
@@ -36,7 +39,8 @@ function dev_row(array $r): array {
   return ['id' => (int)$r['id'], 'text' => (string)$r['text'], 'model' => (string)$r['model'], 'status' => (string)$r['status'],
           'created_at' => (string)$r['created_at'], 'started_at' => (string)$r['started_at'], 'finished_at' => (string)$r['finished_at'],
           'cost' => round((int)$r['cost_u'] / 1000000, 2), 'result' => (string)$r['result'], 'checks' => (string)$r['checks'],
-          'branch' => (string)$r['branch'], 'commit' => (string)$r['commit_hash'], 'release_n' => (int)$r['release_n'], 'merged' => (int)$r['merged'], 'error' => (string)$r['error'], 'engine' => (string)($r['engine'] ?? 'claude')];
+          'branch' => (string)$r['branch'], 'commit' => (string)$r['commit_hash'], 'release_n' => (int)$r['release_n'], 'merged' => (int)$r['merged'], 'error' => (string)$r['error'], 'engine' => (string)($r['engine'] ?? 'claude'),
+          'question' => (string)($r['question'] ?? ''), 'answer' => (string)($r['answer'] ?? ''), 'session' => (string)($r['session_id'] ?? '')];
 }
 function dev_list(int $n = 30): array {
   dev_schema(db());
@@ -62,6 +66,14 @@ function dev_cancel(int $id, string $phone): void {
   log_add($phone, 'поручение разработчику отменено', ['id' => $id]);
 }
 /* 0.4.2 · правки сборки (gradle, ключ подписи) ждут решения руководителя: «Одобрить» — агент отправит их в главную ветку и выпустит обновление */
+/* 0.4.4 · ответ руководителя на вопрос разработчика: поручение продолжается с того же места */
+function dev_answer(int $id, string $text, string $phone): void {
+  dev_schema(db());
+  $text = trim(mb_substr($text, 0, 4000)); if ($text === '') fail('Напишите ответ');
+  $q = db()->prepare("UPDATE dev_tasks SET status='queued', answer=? WHERE id=? AND status='question'"); $q->execute([$text, $id]);
+  if (!$q->rowCount()) fail('Это поручение сейчас ни о чём не спрашивает');
+  log_add($phone, 'ответ разработчику', ['id' => $id]);
+}
 function dev_decide(int $id, bool $ok, string $phone): void {
   dev_schema(db());
   $q = db()->prepare("UPDATE dev_tasks SET status=? WHERE id=? AND status='needs_ok'"); $q->execute([$ok ? 'approved' : 'rejected', $id]);
@@ -96,6 +108,8 @@ function dev_finish(int $id, array $a): void {
     ->execute([(string)($a['status'] ?? 'done'), now(), (int)round((float)($a['cost'] ?? 0) * 1000000), mb_substr((string)($a['result'] ?? ''), 0, 6000),
                mb_substr((string)($a['checks'] ?? ''), 0, 3000), (string)($a['branch'] ?? ''), (string)($a['commit'] ?? ''), (int)($a['release_n'] ?? 0),
                !empty($a['merged']) ? 1 : 0, mb_substr((string)($a['error'] ?? ''), 0, 1000), $id]);
+  if (array_key_exists('session', $a))   // 0.4.4 · сеанс Claude Code и вопрос руководителю (ответ после продолжения обнуляется)
+    db()->prepare("UPDATE dev_tasks SET session_id=?, question=?, answer='' WHERE id=?")->execute([(string)$a['session'], mb_substr((string)($a['question'] ?? ''), 0, 4000), $id]);
 }
 
 /* 0.4.0 · шлюз магазина: Фил (и Космос в магазине) поручает разработку от имени руководителя.
@@ -105,6 +119,7 @@ function gw_dev(array $in): void {
   $op = (string)($in['op'] ?? '');
   $info = function () { return ['spent' => round(dev_spent_today_u() / 1000000, 2), 'limit' => (float)setting('dev_limit', '30')]; };
   if ($op === 'list') jout(['ok' => true, 'tasks' => dev_list(10)] + $info());
+  if ($op === 'answer') { dev_answer((int)($in['id'] ?? 0), (string)($in['text'] ?? ''), 'магазин: ' . mb_substr((string)($in['who'] ?? ''), 0, 60)); jout(['ok' => true]); }
   if ($op === 'decide') { dev_decide((int)($in['id'] ?? 0), !empty($in['ok']), 'магазин: ' . mb_substr((string)($in['who'] ?? ''), 0, 60)); jout(['ok' => true]); }
   if ($op === 'add') {
     $eng = (string)($in['engine'] ?? 'claude');
