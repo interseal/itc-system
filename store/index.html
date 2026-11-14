@@ -8435,27 +8435,27 @@ function custPayment(){
    Управлении → Приложения; список приходит с сервера (my_profile → apps). */
 var ITC_APPS={
   /* №862 · Экосистема — только сотрудникам ИТК; что внутри доступно, решает сервер по роли сотрудника */
-  eco:{name:"Экосистема",sub:"Расчёты и справочники",open:function(){if(window.ecoOpen)window.ecoOpen();},icon:"/apps/eco/icon-192.png"},
-  metro:{name:"Мой Гуанчжоу",sub:"Метро, рынки, события",open:function(){if(window.metroOpen)window.metroOpen(S.token||"");},icon:"/apps/metro/icon-192.png"},
+  eco:{name:"Экосистема",sub:"Расчёты и справочники",open:function(){if(window.ecoOpen)window.ecoOpen();},icon:"/apps/eco/icon-192.png?v=z1"},
+  metro:{name:"Мой Гуанчжоу",sub:"Метро, рынки, события",open:function(){if(window.metroOpen)window.metroOpen(S.token||"");},icon:"/apps/metro/icon-192.png?v=z1"},
   /* №866 · ИТК Переводчик — своё окно (в приложении ИТК Глобал 1.7 адрес /apps/… открывается отдельным приложением) */
-  perevod:{name:"ИТК Переводчик",sub:"Текст, голос, фото",open:function(){location.href="/apps/perevod/?from=itc&t="+Date.now();},icon:"/apps/perevod/icon-192.png"},
+  perevod:{name:"ИТК Переводчик",sub:"Текст, голос, фото",open:function(){location.href="/apps/perevod/?from=itc&t="+Date.now();},icon:"/apps/perevod/icon-192.png?v=z1"},
   /* №868 · ИТК Навигатор — Amap, поиск по-русски, русский голос */
-  nav:{name:"ИТК Навигатор",sub:"Маршрут с русским голосом",open:function(){location.href="/apps/nav/?from=itc&t="+Date.now();},icon:"/apps/nav/icon-192.png?v=3"},
+  nav:{name:"ИТК Навигатор",sub:"Маршрут с русским голосом",open:function(){location.href="/apps/nav/?from=itc&t="+Date.now();},icon:"/apps/nav/icon-192.png?v=z1"},
   /* №869 · Воронки сделок — канбан как в Битрикс24 (сервер /api/flow.php), пропуск сотрудника передаём в адресе */
   /* №872 · Фил — голосовой помощник: команды по сделкам голосом, сразу выполняет, 10 секунд на «Отменить» */
-  fil:{name:"Фил",sub:"Голосовой помощник по сделкам",open:function(){location.href="/apps/fil/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/fil/icon-192.png?v=2"},
+  fil:{name:"Фил",sub:"Голосовой помощник по сделкам",open:function(){location.href="/apps/fil/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/fil/icon-192.png?v=z1"},
   /* №533 · «Космос» — помощник как Фил, но думает Claude (сервер в Сингапуре) */
-  kosmos:{name:"Космос",sub:"Помощник ИТК на Claude",open:function(){location.href="/apps/kosmos/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/kosmos/icon-192.png?v=1"},
+  kosmos:{name:"Космос",sub:"Помощник ИТК на Claude",open:function(){location.href="/apps/kosmos/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/kosmos/icon-192.png?v=z1"},
   /* №894 · «Рисовалка ИТК» — картинки голосом или текстом (ИИ Alibaba) */
-  draw:{name:"Рисовалка ИТК",sub:"Картинки голосом или текстом",open:function(){location.href="/apps/draw/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/draw/icon-192.png"},
-  crm:{name:"CRM ИТК",sub:"Сделки, клиенты, счета и отчёты",open:function(){location.href="/apps/crm/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/crm/icon-192.png"},
+  draw:{name:"Рисовалка ИТК",sub:"Картинки голосом или текстом",open:function(){location.href="/apps/draw/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/draw/icon-192.png?v=z1"},
+  crm:{name:"CRM ИТК",sub:"Сделки, клиенты, счета и отчёты",open:function(){location.href="/apps/crm/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/crm/icon-192.png?v=z1"},
   /* №870 · Склад в Китае — приёмка, наклейки (печать через приложение ИТК), грузы без наклеек, чат с офисом */
-  sklad:{name:"Склад в Китае",sub:"Приёмка, наклейки, грузы, чат",open:function(){location.href="/sklad/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/sklad/icon-192.png"},
+  sklad:{name:"Склад в Китае",sub:"Приёмка, наклейки, грузы, чат",open:function(){location.href="/sklad/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/sklad/icon-192.png?v=z1"},
   /* №1036 · «Отели ИТК» — бронь гостиниц с оплатой через магазин, кабинет гостиницы */
-  hotels:{name:"Отели ИТК",sub:"Гостиницы для поездок, кабинет гостиницы",open:function(){var tok=S.token||"";try{if(!tok){var _a=JSON.parse(localStorage.getItem("itc_auth")||"null");tok=(_a&&_a.token)||"";}}catch(e){}location.href="/apps/hotels/?from=itc"+(tok?"&u="+encodeURIComponent(tok):"");},icon:"/apps/hotels/icon-192.png?v=1"},
+  hotels:{name:"Отели ИТК",sub:"Гостиницы для поездок, кабинет гостиницы",open:function(){var tok=S.token||"";try{if(!tok){var _a=JSON.parse(localStorage.getItem("itc_auth")||"null");tok=(_a&&_a.token)||"";}}catch(e){}location.href="/apps/hotels/?from=itc"+(tok?"&u="+encodeURIComponent(tok):"");},icon:"/apps/hotels/icon-192.png?v=z1"},
   /* №1042 · ИТК Трейдинг — криптовалюта (Binance), только руководителю */
-  trade:{name:"Alex Trade",sub:"Криптовалюта: график, сделки, боты",open:function(){location.href="/apps/trade/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/trade/icon-192.png?v=3"},
-  esim:{name:"eSIM ИТК",sub:"Интернет в поездках",open:function(){var tok=S.token||"";try{if(!tok){var _a=JSON.parse(localStorage.getItem("itc_auth")||"null");tok=(_a&&_a.token)||"";}}catch(e){}location.href="/esim/?from=itc&t="+Date.now()+(tok?"&u="+encodeURIComponent(tok):"");},icon:"/esim/icon-192.png?v=3"}
+  trade:{name:"Alex Trade",sub:"Криптовалюта: график, сделки, боты",open:function(){location.href="/apps/trade/"+(window.ecoAuthQuery?ecoAuthQuery():"");},icon:"/apps/trade/icon-192.png?v=z1"},
+  esim:{name:"eSIM ИТК",sub:"Интернет в поездках",open:function(){var tok=S.token||"";try{if(!tok){var _a=JSON.parse(localStorage.getItem("itc_auth")||"null");tok=(_a&&_a.token)||"";}}catch(e){}location.href="/esim/?from=itc&t="+Date.now()+(tok?"&u="+encodeURIComponent(tok):"");},icon:"/esim/icon-192.png?v=z1"}
 };
 /* №862 · список «Моих приложений»: выданные боссом + Экосистема для сотрудника ИТК */
 function myApps(){var a=((S.auth&&S.auth.apps)||[]).slice();if(S.auth&&S.auth.role==="itc"&&a.indexOf("eco")<0)a.unshift("eco");if(S.auth&&S.auth.role==="itc"&&a.indexOf("perevod")<0)a.push("perevod");if(S.auth&&S.auth.role==="itc"&&a.indexOf("nav")<0)a.push("nav");if(S.auth&&S.auth.role==="itc"&&a.indexOf("crm")<0)a.push("crm");if(S.auth&&S.auth.role==="itc"&&S.auth.staffRole!=="warehouse"&&a.indexOf("fil")<0)a.push("fil");if(S.auth&&S.auth.role==="itc"&&S.auth.staffRole!=="warehouse"&&a.indexOf("kosmos")<0)a.push("kosmos");/* №533 */if(S.auth&&S.auth.role==="itc"&&a.indexOf("esim")<0)a.push("esim");if(S.auth&&S.auth.role==="itc"&&S.auth.staffRole!=="warehouse"&&a.indexOf("hotels")<0)a.push("hotels");if(S.auth&&S.auth.role==="itc"&&S.auth.staffRole!=="warehouse"&&a.indexOf("draw")<0)a.push("draw");if(S.auth&&S.auth.role==="itc"&&S.auth.staffRole==="boss"&&a.indexOf("trade")<0)a.push("trade");if(S.auth&&S.auth.role==="itc"&&S.auth.staffRole==="boss"&&a.indexOf("metro")<0)a.push("metro");/* №1046 · руководителю — все приложения */if(S.auth&&S.auth.role==="itc"&&a.indexOf("sklad")<0){if(S.auth.staffRole==="warehouse")a.unshift("sklad");else a.push("sklad");}return a;}
