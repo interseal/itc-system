@@ -472,7 +472,10 @@ function rdDraw(){
   });
   // №567 · всегда одна кнопка «Установить»: ставится только то обновление, которое собрано прямо после установленного
   // (needs = установленный номер). Всё остальное — устаревшее или ещё не дошедшее — не показываем вовсе.
-  var ok = list.filter(function(y){ return !y.needs || y.needs === cur; }).sort(function(a, b){ return a.n - b.n; });
+  // №596 · не «ровно после установленного», а «всё нужное уже стоит» (needs ≤ установленного): 14.11 стояло №590,
+  // а №591 было собрано после №567 — кнопки не было, хотя ставить можно (сервер тоже принимает needs ≤ установленного).
+  // Из подходящих — самое новое; ставить его безопасно: оно собрано позже установленного.
+  var ok = list.filter(function(y){ return !y.needs || y.needs <= cur; }).sort(function(a, b){ return a.n - b.n; });
   var hidden = list.length - ok.length; list = ok.length ? [ok[ok.length - 1]] : [];
   if (list.length) {
     var x = list[0], can = true;
