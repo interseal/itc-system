@@ -93,6 +93,87 @@ if ($action === 'tr_ip') {
   [$c, $j, $raw] = tr_http('GET', 'https://api.ipify.org?format=json');
   tr_out(['ok' => true, 'ip' => $j['ip'] ?? trim((string)$raw)]);
 }
+/* ---------- №582 · другие биржи, которые принимают российский паспорт (ноябрь 2026): ключи на спот и фьючерсы ----------
+   Торговля из приложения пока идёт через Binance; ключи остальных бирж хранятся зашифрованными и проверяются
+   (чтение счёта и что право «Вывод» выключено), чтобы потом подключить торговлю на них без повторного ввода. */
+const TR_EXCH = ['binance' => 'Binance', 'bybit' => 'Bybit', 'okx' => 'OKX', 'bingx' => 'BingX', 'phemex' => 'Phemex', 'pionex' => 'Pionex', 'toobit' => 'Toobit'];
+function tr_ex_http($method, $url, $hdr = []) {   // мягкий запрос: нет связи — null, а не ошибка
+  $ch = curl_init($url); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_CUSTOMREQUEST => $method, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_TIMEOUT => 20, CURLOPT_HTTPHEADER => $hdr]);
+  $b = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+  return $b === false ? null : [$code, json_decode((string)$b, true), (string)$b]; }
+/* [true|false|null, сообщение]: true — ключ принят и вывод выключен; false — биржа отказала (ошибка ключа/прав); null — проверить не удалось */
+function tr_ex_check($ex, $kind, $key, $sec, $pass) {
+  $ms = (string)round(microtime(true) * 1000); $h = fn($m) => hash_hmac('sha256', $m, $sec);
+  if ($ex === 'bybit') {
+    $q = 'accountType=UNIFIED'; $r = tr_ex_http('GET', "https://api.bybit.com/v5/account/wallet-balance?$q", ['X-BAPI-API-KEY: ' . $key, 'X-BAPI-TIMESTAMP: ' . $ms, 'X-BAPI-RECV-WINDOW: 10000', 'X-BAPI-SIGN: ' . $h($ms . $key . '10000' . $q)]);
+    if (!$r || !is_array($r[1])) return [null, 'Bybit не ответил'];
+    if ((int)($r[1]['retCode'] ?? -1) !== 0) return [false, 'Bybit: ' . ($r[1]['retMsg'] ?? 'ключ не принят')];
+    $ms = (string)round(microtime(true) * 1000); $r = tr_ex_http('GET', 'https://api.bybit.com/v5/user/query-api', ['X-BAPI-API-KEY: ' . $key, 'X-BAPI-TIMESTAMP: ' . $ms, 'X-BAPI-RECV-WINDOW: 10000', 'X-BAPI-SIGN: ' . $h($ms . $key . '10000')]);
+    if ($r && is_array($r[1]) && in_array('Withdraw', (array)($r[1]['result']['permissions']['Wallet'] ?? []), true)) return [false, 'у ключа включено право «Вывод» — выключите его на Bybit'];
+    return [true, ''];
+  }
+  if ($ex === 'okx') {
+    $ts = gmdate('Y-m-d\TH:i:s') . '.' . substr($ms, -3) . 'Z'; $sg = fn($p) => base64_encode(hash_hmac('sha256', $ts . 'GET' . $p, $sec, true));
+    $hd = fn($p) => ['OK-ACCESS-KEY: ' . $key, 'OK-ACCESS-SIGN: ' . $sg($p), 'OK-ACCESS-TIMESTAMP: ' . $ts, 'OK-ACCESS-PASSPHRASE: ' . $pass];
+    $r = tr_ex_http('GET', 'https://www.okx.com/api/v5/account/config', $hd('/api/v5/account/config'));
+    if (!$r || !is_array($r[1])) return [null, 'OKX не ответил'];
+    if ((string)($r[1]['code'] ?? '') !== '0') return [false, 'OKX: ' . ($r[1]['msg'] ?? 'ключ не принят') . ' (проверьте и пароль ключа)'];
+    if (strpos((string)($r[1]['data'][0]['perm'] ?? ''), 'withdraw') !== false) return [false, 'у ключа включено право «Вывод» — выключите его на OKX'];
+    return [true, ''];
+  }
+  if ($ex === 'bingx') {
+    $q = 'timestamp=' . $ms; $path = $kind === 'spot' ? '/openApi/spot/v1/account/balance' : '/openApi/swap/v2/user/balance';
+    $r = tr_ex_http('GET', 'https://open-api.bingx.com' . $path . '?' . $q . '&signature=' . $h($q), ['X-BX-APIKEY: ' . $key]);
+    if (!$r || !is_array($r[1])) return [null, 'BingX не ответил'];
+    return (int)($r[1]['code'] ?? -1) === 0 ? [true, ''] : [false, 'BingX: ' . ($r[1]['msg'] ?? 'ключ не принят')];
+  }
+  if ($ex === 'phemex') {
+    $exp = (string)(time() + 60); [$path, $q] = $kind === 'spot' ? ['/spot/wallets', ''] : ['/g-accounts/accountPositions', 'currency=USDT'];
+    $r = tr_ex_http('GET', 'https://api.phemex.com' . $path . ($q !== '' ? '?' . $q : ''), ['x-phemex-access-token: ' . $key, 'x-phemex-request-expiry: ' . $exp, 'x-phemex-request-signature: ' . $h($path . $q . $exp)]);
+    if (!$r || !is_array($r[1])) return [null, 'Phemex не ответил'];
+    return (int)($r[1]['code'] ?? -1) === 0 ? [true, ''] : [false, 'Phemex: ' . ($r[1]['msg'] ?? 'ключ не принят')];
+  }
+  if ($ex === 'pionex') {
+    $pq = '/api/v1/account/balances?timestamp=' . $ms; $r = tr_ex_http('GET', 'https://api.pionex.com' . $pq, ['PIONEX-KEY: ' . $key, 'PIONEX-SIGNATURE: ' . $h('GET' . $pq)]);
+    if (!$r || !is_array($r[1])) return [null, 'Pionex не ответил'];
+    return !empty($r[1]['result']) ? [true, ''] : [false, 'Pionex: ' . ($r[1]['message'] ?? 'ключ не принят')];
+  }
+  if ($ex === 'toobit') {
+    $q = 'timestamp=' . $ms; $path = $kind === 'spot' ? '/api/v1/account' : '/api/v1/futures/balance';
+    $r = tr_ex_http('GET', 'https://api.toobit.com' . $path . '?' . $q . '&signature=' . $h($q), ['X-BB-APIKEY: ' . $key]);
+    if (!$r || !is_array($r[1])) return [null, 'Toobit не ответил'];
+    return isset($r[1]['code']) && (int)$r[1]['code'] !== 0 && (int)$r[1]['code'] !== 200 ? [false, 'Toobit: ' . ($r[1]['msg'] ?? 'ключ не принят')] : [true, ''];
+  }
+  return [null, ''];
+}
+/* №582 · какие монеты (к USDT) есть на бирже — спот или фьючерсы; публичные списки бирж, запоминаем на 6 часов */
+function tr_ex_coins($ex, $mkt) {
+  $f = sys_get_temp_dir() . '/itc_excoins_' . $ex . '_' . $mkt . '.json';
+  if (is_file($f) && filemtime($f) > time() - 21600) { $j = json_decode((string)file_get_contents($f), true); if (is_array($j) && $j) return $j; }
+  $o = []; $fut = $mkt === 'fut'; $g = function ($u) { $r = tr_ex_http('GET', $u); return $r && is_array($r[1]) ? $r[1] : null; };
+  if ($ex === 'bybit') { $cur = ''; for ($i = 0; $i < 5; $i++) { $j = $g('https://api.bybit.com/v5/market/instruments-info?category=' . ($fut ? 'linear' : 'spot') . '&limit=1000' . ($cur !== '' ? '&cursor=' . rawurlencode($cur) : '')); if (!$j) break;
+      foreach ((array)($j['result']['list'] ?? []) as $x) if (($x['quoteCoin'] ?? '') === 'USDT' && ($x['status'] ?? 'Trading') === 'Trading') $o[] = (string)$x['baseCoin']; $cur = (string)($j['result']['nextPageCursor'] ?? ''); if ($cur === '') break; } }
+  elseif ($ex === 'okx') { $j = $g('https://www.okx.com/api/v5/public/instruments?instType=' . ($fut ? 'SWAP' : 'SPOT'));
+    foreach ((array)($j['data'] ?? []) as $x) { $id = (string)($x['instId'] ?? ''); if (preg_match($fut ? '~^([A-Z0-9]+)-USDT-SWAP$~' : '~^([A-Z0-9]+)-USDT$~', $id, $m) && ($x['state'] ?? 'live') === 'live') $o[] = $m[1]; } }
+  elseif ($ex === 'bingx') { $j = $g($fut ? 'https://open-api.bingx.com/openApi/swap/v2/quote/contracts' : 'https://open-api.bingx.com/openApi/spot/v1/common/symbols');
+    $L = $fut ? (array)($j['data'] ?? []) : (array)($j['data']['symbols'] ?? []); foreach ($L as $x) if (preg_match('~^([A-Z0-9]+)-USDT$~', (string)($x['symbol'] ?? ''), $m)) $o[] = $m[1]; }
+  elseif ($ex === 'phemex') { $j = $g('https://api.phemex.com/public/products');
+    foreach ((array)($j['data']['products'] ?? []) as $x) { $t = (string)($x['type'] ?? '');
+      if (!$fut && $t === 'Spot' && ($x['quoteCurrency'] ?? '') === 'USDT') $o[] = (string)$x['baseCurrency'];
+      if ($fut && $t === 'PerpetualV2' && preg_match('~^([A-Z0-9]+)USDT$~', (string)($x['symbol'] ?? ''), $m)) $o[] = $m[1]; }
+    foreach ((array)($j['data']['perpProductsV2'] ?? []) as $x) if ($fut && preg_match('~^([A-Z0-9]+)USDT$~', (string)($x['symbol'] ?? ''), $m)) $o[] = $m[1]; }
+  elseif ($ex === 'pionex') { $j = $g('https://api.pionex.com/api/v1/common/symbols' . ($fut ? '?type=PERP' : ''));
+    foreach ((array)($j['data']['symbols'] ?? []) as $x) { $t = strtoupper((string)($x['type'] ?? 'SPOT')); if (($x['quoteCurrency'] ?? '') === 'USDT' && ($fut ? $t === 'PERP' : $t === 'SPOT')) $o[] = (string)$x['baseCurrency']; } }
+  elseif ($ex === 'toobit') { $j = $g('https://api.toobit.com/api/v1/exchangeInfo');
+    foreach ((array)($j[$fut ? 'contracts' : 'symbols'] ?? []) as $x) { $b = (string)($x['baseAsset'] ?? $x['underlying'] ?? ''); $q = (string)($x['quoteAsset'] ?? $x['marginToken'] ?? 'USDT'); if ($b !== '' && $q === 'USDT') $o[] = $b; } }
+  $o = array_values(array_unique(array_map(function ($x) { return strtoupper(preg_replace('~[^A-Za-z0-9]~', '', $x)); }, $o)));
+  if ($o) @file_put_contents($f, json_encode($o)); return $o;
+}
+if ($action === 'tr_ex_coins') {
+  $ex = (string)tr_in('ex'); if (!isset(TR_EXCH[$ex]) || $ex === 'binance') tr_fail('Неизвестная биржа');
+  $L = tr_ex_coins($ex, tr_in('mkt') === 'spot' ? 'spot' : 'fut');
+  tr_out(['ok' => true, 'ex' => $ex, 'coins' => $L, 'err' => $L ? '' : 'биржа не отдала список монет — показываю все']);
+}
 /* ---------- ключи ---------- */
 if ($action === 'tr_keys') {
   tr_ensure(); $q = db()->prepare('SELECT id,exchange,kind,name,api_key,created_at,last_ok FROM itc_trade_keys WHERE phone=? ORDER BY created_at'); $q->execute([$ME]);
@@ -100,7 +181,22 @@ if ($action === 'tr_keys') {
   tr_out(['ok' => true, 'keys' => $out]);
 }
 if ($action === 'tr_key_add') {
-  tr_ensure(); $ex = (string)tr_in('exchange', 'binance'); if ($ex !== 'binance') tr_fail('Пока подключается только Binance — остальные биржи добавим следующим шагом');
+  tr_ensure(); $ex = (string)tr_in('exchange', 'binance'); if (!isset(TR_EXCH[$ex])) tr_fail('Такой биржи нет в списке');
+  if ($ex !== 'binance') {   // №582
+    try { db()->exec("ALTER TABLE itc_trade_keys ADD COLUMN pass_enc TEXT NULL"); } catch (Throwable $e) {}
+    try { db()->exec("ALTER TABLE itc_trade_keys ADD COLUMN state VARCHAR(20) NOT NULL DEFAULT ''"); } catch (Throwable $e) {}
+    $kind = tr_in('kind') === 'spot' ? 'spot' : 'fut'; $key = trim((string)tr_in('key')); $sec = trim((string)tr_in('secret')); $pass = trim((string)tr_in('pass'));
+    $name = mb_substr(trim((string)tr_in('name')), 0, 80) ?: (TR_EXCH[$ex] . ' ' . ($kind === 'spot' ? 'спот' : 'фьючерсы'));
+    if (!preg_match('~^[A-Za-z0-9_\-]{10,200}$~', $key) || !preg_match('~^[A-Za-z0-9_\-=+/]{10,300}$~', $sec)) tr_fail('Ключ или секретный ключ вставлены не полностью');
+    if ($ex === 'okx' && $pass === '') tr_fail('Для OKX нужен ещё пароль ключа (Passphrase) — его задают при создании ключа');
+    [$ok, $msg] = tr_ex_check($ex, $kind, $key, $sec, $pass);
+    if ($ok === false) tr_fail($msg);
+    $id = 'k' . bin2hex(random_bytes(6));
+    db()->prepare('INSERT INTO itc_trade_keys (id,phone,exchange,kind,name,api_key,secret_enc,pass_enc,state,last_ok) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      ->execute([$id, $ME, $ex, $kind, $name, $key, tr_enc($sec), $pass !== '' ? tr_enc($pass) : null, $ok ? 'ok' : 'unchecked', $ok ? date('Y-m-d H:i:s') : null]);
+    unset($sec, $pass);
+    tr_out(['ok' => true, 'id' => $id, 'name' => $name, 'kind' => $kind, 'exchange' => $ex, 'checked' => $ok === true, 'note' => $ok === true ? 'ключ проверен: счёт читается, вывод выключен' : 'биржа сейчас не ответила — ключ сохранён, проверим позже']);
+  }
   $kind = tr_in('kind') === 'spot' ? 'spot' : 'fut'; $key = trim((string)tr_in('key')); $sec = trim((string)tr_in('secret')); $name = mb_substr(trim((string)tr_in('name')), 0, 80) ?: ('Binance ' . ($kind === 'spot' ? 'спот' : 'фьючерсы'));
   if (!preg_match('~^[A-Za-z0-9]{20,128}$~', $key) || !preg_match('~^[A-Za-z0-9]{20,128}$~', $sec)) tr_fail('Ключ или секретный ключ вставлены не полностью');
   $k = ['kind' => $kind, 'api_key' => $key, 'secret_enc' => tr_enc($sec)]; unset($sec);
