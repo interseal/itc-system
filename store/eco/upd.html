@@ -58,6 +58,7 @@ input[type=password]{width:100%;padding:10px;border:1px solid var(--line);border
   <h1>Обновления</h1>
 </div>
 <div class="wrap">
+  <a class="btn g" href="/eco/skills.html" style="width:100%;margin-bottom:14px;text-decoration:none">Навыки «Фила», «Космоса» и Claude</a>
 
   <div class="card" id="cState"><div class="mut">Загрузка…</div></div>
 
@@ -143,6 +144,7 @@ var T = (function(){
   try { var a = JSON.parse(localStorage.getItem('itc_auth')||'null'); if (a && a.token) return a.token; } catch(e){}
   return '';
 })();
+try { if (T) sessionStorage.setItem('eco_t', T); } catch(e){}   // №544 · пропуск — и для страницы «Навыки»
 var ST = null, PEND = null;
 var IC = {
   ok:'<svg viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',

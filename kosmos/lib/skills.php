@@ -33,7 +33,8 @@ function skill_key(string $t): string { return mb_strtolower((string)preg_replac
 function skill_row(array $r): array {
   return ['id' => (int)$r['id'], 'title' => (string)$r['title'], 'trig' => (string)$r['trig'], 'steps' => (string)$r['steps'], 'trace' => (string)$r['trace'],
           'author' => (string)$r['author'], 'who' => (string)$r['who'], 'manual' => (int)$r['manual'], 'uses' => (int)$r['uses'],
-          'used_at' => (string)$r['used_at'], 'created_at' => (string)$r['created_at'], 'updated_at' => (string)$r['updated_at']];
+          'used_at' => (string)$r['used_at'], 'created_at' => (string)$r['created_at'], 'updated_at' => (string)$r['updated_at'],
+          'paused' => (int)($r['paused'] ?? 0), 'claude' => strpos((string)($r['src'] ?? ''), 'claude:') === 0 ? 1 : 0];   // 0.3.6
 }
 
 function skill_all(): array {
@@ -46,6 +47,7 @@ function skill_pick(string $text, int $n = 4): array {
   if (!$q) return [];
   $sc = [];
   foreach (skill_all() as $r) {
+    if (!empty($r['paused'])) continue;   // 0.3.6 · приостановленный навык помощникам не предлагаем
     $s = 0;
     foreach (skill_stems($r['title']) as $k => $_) if (isset($q[$k])) $s += 2;
     foreach (skill_stems($r['trig']) as $k => $_) if (isset($q[$k])) $s += 1;
@@ -69,8 +71,8 @@ function skill_save(array $a, string $author, string $who, int $id = 0, bool $au
   }
   if ($id > 0) {
     if ($auto && $man) return ['ok' => true, 'skip' => true, 'id' => $id, 'title' => $t, 'new' => false];
-    $d->prepare('UPDATE skills SET title=?, trig=?, steps=?, trace=CASE WHEN ?<>\'\' THEN ? ELSE trace END, who=?, manual=?, updated_at=? WHERE id=?')
-      ->execute([$t, $w, $s, $tr, $tr, $who, $auto ? $man : 1, now(), $id]);
+    $d->prepare('UPDATE skills SET title=?, trig=?, steps=?, trace=CASE WHEN ?<>\'\' THEN ? ELSE trace END, who=?, manual=?, updated_at=?, boss=CASE WHEN src<>\'\' AND ?=0 THEN 1 ELSE boss END WHERE id=?')
+      ->execute([$t, $w, $s, $tr, $tr, $who, $auto ? $man : 1, now(), $auto ? 1 : 0, $id]);
     return ['ok' => true, 'id' => $id, 'new' => false, 'title' => $t];
   }
   $d->prepare('INSERT INTO skills (title, trig, steps, trace, author, who, manual, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)')
@@ -104,7 +106,8 @@ function skill_sync_claude(string $dir): array {
     $a = skill_parse_md($raw);
     if (!$a || mb_strlen($a['steps']) > 1500) { $n['bad'][] = basename($f); continue; }
     $seen[] = $src;
-    $q = $d->prepare('SELECT id, src_hash, deleted FROM skills WHERE src=? ORDER BY deleted, id DESC LIMIT 1'); $q->execute([$src]); $r = $q->fetch();
+    $q = $d->prepare('SELECT id, src_hash, deleted, boss FROM skills WHERE src=? ORDER BY deleted, id DESC LIMIT 1'); $q->execute([$src]); $r = $q->fetch();
+    if ($r && (int)$r['boss']) continue;   // 0.3.6 · руководитель правил, приостановил или удалил — его решение важнее файла
     if ($r && $r['src_hash'] === $h && !(int)$r['deleted']) continue;
     if ($r) {
       $d->prepare("UPDATE skills SET title=?, trig=?, steps=?, author='Claude', who='Claude', manual=1, deleted=0, src_hash=?, updated_at=? WHERE id=?")
@@ -116,7 +119,7 @@ function skill_sync_claude(string $dir): array {
       $n['new']++;
     }
   }
-  $q = $d->query("SELECT id, src FROM skills WHERE deleted=0 AND src LIKE 'claude:%'");
+  $q = $d->query("SELECT id, src FROM skills WHERE deleted=0 AND boss=0 AND src LIKE 'claude:%'");
   foreach ($q->fetchAll() as $r) if (!in_array($r['src'], $seen, true)) { $d->prepare('UPDATE skills SET deleted=1 WHERE id=?')->execute([$r['id']]); $n['del']++; }
   if ($n['new'] || $n['upd'] || $n['del']) log_add('', 'навыки Claude из GitHub', $n);
   return $n;
@@ -127,7 +130,12 @@ function skill_used(int $id): void {
 }
 
 function skill_del(int $id): bool {
-  $q = db()->prepare('UPDATE skills SET deleted=1, updated_at=? WHERE id=? AND deleted=0'); $q->execute([now(), $id]);
+  $q = db()->prepare("UPDATE skills SET deleted=1, updated_at=?, boss=CASE WHEN src<>'' THEN 1 ELSE boss END WHERE id=? AND deleted=0"); $q->execute([now(), $id]);
+  return $q->rowCount() > 0;
+}
+/* 0.3.6 · приостановить / включить навык (руководитель): помощники его не видят, но он не удаляется */
+function skill_pause(int $id, bool $on): bool {
+  $q = db()->prepare("UPDATE skills SET paused=?, updated_at=?, boss=CASE WHEN src<>'' THEN 1 ELSE boss END WHERE id=? AND deleted=0"); $q->execute([$on ? 1 : 0, now(), $id]);
   return $q->rowCount() > 0;
 }
 
@@ -161,6 +169,7 @@ function gw_skills(array $in): void {
     jout($r, empty($r['ok']) ? 400 : 200);
   }
   if ($op === 'del') { $ok = skill_del((int)($in['id'] ?? 0)); if ($ok) log_add(str($in['who'] ?? '', 190), 'навык удалён', ['id' => (int)($in['id'] ?? 0)]); jout(['ok' => true, 'deleted' => $ok]); }
+  if ($op === 'pause') { $ok = skill_pause((int)($in['id'] ?? 0), !empty($in['paused'])); if ($ok) log_add(str($in['who'] ?? '', 190), !empty($in['paused']) ? 'навык приостановлен' : 'навык снова включён', ['id' => (int)($in['id'] ?? 0)]); jout(['ok' => $ok, 'error' => $ok ? '' : 'Навык не найден'], $ok ? 200 : 404); }
   if ($op === 'used') { skill_used((int)($in['id'] ?? 0)); jout(['ok' => true]); }
   if ($op === 'import') { $n = skill_import((array)($in['items'] ?? [])); log_add('', 'навыки перенесены из магазина', ['added' => $n]); jout(['ok' => true, 'added' => $n]); }
   fail('Неизвестное действие с навыками', 404);

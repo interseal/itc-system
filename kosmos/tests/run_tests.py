@@ -415,6 +415,21 @@ try:
     open(f'{G}/docs/skills/claude-dengi.md', 'a').write('7) Новая строка навыка.\n'); os.remove(f'{G}/docs/skills/kosmos-server.md')
     r, rows = run_sk(); d = {x[4]: x for x in rows}
     check('файл изменился — навык обновлён; файл убрали — навык удалён', 'Новая строка' in d['claude:claude-dengi'][5] and d['claude:claude-dengi'][3] == 0 and d['claude:kosmos-server'][3] == 1, rows)
+    print('15. Руководитель: приостановить, поправить, удалить навык (0.3.6)')
+    db = sqlite3.connect(f'{TMP}/kosmos.sqlite'); sid = db.execute("SELECT id FROM skills WHERE src='claude:claude-dengi'").fetchone()[0]; db.close()
+    K = 'ab' * 32
+    c, j = gw({'a': 'skills', 'op': 'pause', 'id': sid, 'paused': True, 'who': 'Алексей'}, key=K)
+    c2, j2 = gw({'a': 'skills', 'op': 'pick', 'q': 'сколько денег осталось на счёте Claude, баланс'}, key=K)
+    c3, j3 = gw({'a': 'skills', 'op': 'list'}, key=K); it = next(x for x in j3['items'] if x['id'] == sid)
+    check('приостановленный навык не предлагается, но в списке есть с отметкой', j.get('ok') and not any(x['id'] == sid for x in j2['items']) and it['paused'] == 1 and it['claude'] == 1, (j, j2, it))
+    open(f'{G}/docs/skills/claude-dengi.md', 'a').write('8) Ещё строка.\n'); r, rows = run_sk(); d = {x[4]: x for x in rows}
+    check('файл Claude изменился, но руководитель навык трогал — его решение остаётся', '8) Ещё' not in d['claude:claude-dengi'][5] and d['claude:claude-dengi'][3] == 0, d['claude:claude-dengi'])
+    gw({'a': 'skills', 'op': 'pause', 'id': sid, 'paused': False, 'who': 'Алексей'}, key=K)
+    c, j = gw({'a': 'skills', 'op': 'save', 'id': sid, 'skill': {'title': 'Деньги Claude (мой вариант)', 'trig': 'баланс', 'steps': 'Смотреть Billing и страницу Обновления.'}, 'author': 'Алексей', 'who': 'Алексей'}, key=K)
+    gw({'a': 'skills', 'op': 'del', 'id': sid, 'who': 'Алексей'}, key=K)
+    os.remove(f'{G}/docs/skills/claude-dengi.md'); open(f'{G}/docs/skills/claude-dengi.md', 'w').write('# Деньги Claude\nКогда: баланс\n---\nновый текст от Claude, длинный достаточно\n')
+    r, rows = run_sk(); d = {x[4]: x for x in rows}
+    check('удалённый руководителем навык Claude не воскресает', d['claude:claude-dengi'][3] == 1 and 'мой вариант' in d['claude:claude-dengi'][0], d['claude:claude-dengi'])
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

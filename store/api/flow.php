@@ -1956,23 +1956,29 @@ function nvk_copy_ensure() {
     steps TEXT NULL, trace VARCHAR(600) NOT NULL DEFAULT '', author VARCHAR(60) NOT NULL DEFAULT '', who VARCHAR(190) NOT NULL DEFAULT '', manual TINYINT NOT NULL DEFAULT 0,
     uses INT NOT NULL DEFAULT 0, used_at VARCHAR(19) NOT NULL DEFAULT '', created_at VARCHAR(19) NOT NULL DEFAULT '', updated_at VARCHAR(19) NOT NULL DEFAULT '',
     synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  // №544 · приостановленные руководителем навыки и навыки Claude — и в копии
+  try {
+    $have = array_column(db()->query('SHOW COLUMNS FROM itc_skill_copy')->fetchAll(), 'Field');
+    if (!in_array('paused', $have, true)) db()->exec('ALTER TABLE itc_skill_copy ADD COLUMN paused TINYINT NOT NULL DEFAULT 0, ADD COLUMN claude TINYINT NOT NULL DEFAULT 0');
+  } catch (Throwable $e) { error_log('nvk_copy_ensure: ' . $e->getMessage()); }
 }
 /* копия = то, что сейчас на сервере: новые и изменённые записать, удалённые на сервере — убрать */
 function nvk_copy_put($items) {
   try {
     nvk_copy_ensure(); $d = db(); $ids = [];
-    $st = $d->prepare('REPLACE INTO itc_skill_copy (sid,title,trig,steps,trace,author,who,manual,uses,used_at,created_at,updated_at,synced_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW())');
+    $st = $d->prepare('REPLACE INTO itc_skill_copy (sid,title,trig,steps,trace,author,who,manual,uses,used_at,created_at,updated_at,paused,claude,synced_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())');
     foreach ((array)$items as $x) {
       if (!is_array($x) || (int)($x['id'] ?? 0) < 1) continue; $ids[] = (int)$x['id'];
       $st->execute([(int)$x['id'], (string)($x['title'] ?? ''), (string)($x['trig'] ?? ''), (string)($x['steps'] ?? ''), (string)($x['trace'] ?? ''), (string)($x['author'] ?? ''),
-                    (string)($x['who'] ?? ''), (int)($x['manual'] ?? 0), (int)($x['uses'] ?? 0), (string)($x['used_at'] ?? ''), (string)($x['created_at'] ?? ''), (string)($x['updated_at'] ?? '')]);
+                    (string)($x['who'] ?? ''), (int)($x['manual'] ?? 0), (int)($x['uses'] ?? 0), (string)($x['used_at'] ?? ''), (string)($x['created_at'] ?? ''), (string)($x['updated_at'] ?? ''),
+                    (int)($x['paused'] ?? 0), (int)($x['claude'] ?? 0)]);
     }
     $d->exec('DELETE FROM itc_skill_copy' . ($ids ? ' WHERE sid NOT IN (' . implode(',', $ids) . ')' : ''));
     sp_put('nvk_copy_at', (string)time(), 'копия навыков');
   } catch (Throwable $e) { error_log('nvk_copy_put: ' . $e->getMessage()); }
 }
 function nvk_copy_all() {
-  try { nvk_copy_ensure(); return array_map(function ($r) { $r['id'] = (int)$r['sid']; $r['uses'] = (int)$r['uses']; $r['manual'] = (int)$r['manual']; unset($r['sid'], $r['synced_at']); return $r; },
+  try { nvk_copy_ensure(); return array_map(function ($r) { $r['id'] = (int)$r['sid']; $r['uses'] = (int)$r['uses']; $r['manual'] = (int)$r['manual']; $r['paused'] = (int)($r['paused'] ?? 0); $r['claude'] = (int)($r['claude'] ?? 0); unset($r['sid'], $r['synced_at']); return $r; },
           db()->query('SELECT * FROM itc_skill_copy ORDER BY uses DESC, sid DESC')->fetchAll()); }
   catch (Throwable $e) { return []; }
 }
@@ -1991,6 +1997,7 @@ function nvk_copy_pick($text, $n = 4) {
   $q = nvk_stems(mb_substr((string)$text, 0, 600)); if (!$q) return [];
   $sc = [];
   foreach (nvk_copy_all() as $r) {
+    if (!empty($r['paused'])) continue;   // №544 · приостановлен руководителем
     $s = 0; foreach (nvk_stems($r['title']) as $k => $_) if (isset($q[$k])) $s += 2;
     foreach (nvk_stems($r['trig']) as $k => $_) if (isset($q[$k])) $s += 1;
     if ($s >= 2) { $r['score'] = $s; $sc[] = $r; }
@@ -3743,6 +3750,13 @@ try {
   case 'nvk_del': {
     if (!$me['boss']) fl_fail('Навыки правит только руководитель', 403);
     $r = nvk_del((int)fl_in('id'), $me['name']); if (empty($r['ok'])) fl_fail($r['error'], 502);
+    fl_out(['ok' => true, 'items' => nvk_all()]);
+  }
+  case 'nvk_pause': {   // №544 · приостановить / включить навык (страница Экосистемы «Навыки»)
+    if (!$me['boss']) fl_fail('Навыки правит только руководитель', 403);
+    [$c, $j] = nvk_gw('pause', ['id' => (int)fl_in('id'), 'paused' => (bool)fl_in('paused'), 'who' => $me['name']]);
+    if ($c !== 200 || empty($j['ok'])) fl_fail(nvk_err($c, $j), 502);
+    nvk_sync(true);
     fl_out(['ok' => true, 'items' => nvk_all()]);
   }
   case 'fil_cfg': {

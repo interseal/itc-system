@@ -73,9 +73,9 @@ function db_schema(PDO $d): void {
     uses INTEGER NOT NULL DEFAULT 0, used_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)");
   // 0.3.5 · навыки Claude (помощника-разработчика) из GitHub: src — откуда навык (claude:<файл>), src_hash — отпечаток файла
   $cols = array_column($d->query('PRAGMA table_info(skills)')->fetchAll(PDO::FETCH_ASSOC), 'name');
-  foreach (['src', 'src_hash'] as $c) {
+  foreach (['src', 'src_hash', 'paused', 'boss'] as $c) {   // 0.3.6 · paused — приостановлен руководителем, boss — навык Claude правил/удалял руководитель
     if (in_array($c, $cols, true)) continue;
-    try { $d->exec("ALTER TABLE skills ADD COLUMN $c TEXT NOT NULL DEFAULT ''"); }
+    try { $d->exec("ALTER TABLE skills ADD COLUMN $c " . (in_array($c, ['paused', 'boss'], true) ? 'INTEGER NOT NULL DEFAULT 0' : "TEXT NOT NULL DEFAULT ''")); }
     catch (PDOException $e) { if (stripos($e->getMessage(), 'duplicate column') === false) throw $e; }
   }
   // 0.3.3 · стоимость ответов в usage.cost_u (lib/price.php) — для остатка денег на счёте Claude

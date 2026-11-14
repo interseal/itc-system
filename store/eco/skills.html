@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Навыки · Экосистема ИТК</title>
+<style>
+:root{--navy:#0a1a5c;--navy2:#13287e;--green:#1a8f0e;--green2:#0b5c02;--red:#b3261e;--bg:#f2f4f8;--card:#fff;--line:#dfe3ec;--mut:#5b6476;--txt:#141a2b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.top{background:var(--navy);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5}
+.top a{color:#fff;display:flex;align-items:center;text-decoration:none}
+.top h1{font-size:18px;margin:0;font-weight:600}
+.wrap{max-width:760px;margin:0 auto;padding:16px}
+.card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(10,26,92,.08)}
+.card h2{font-size:16px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.ok{color:var(--green2)} .bad{color:var(--red)} .mut{color:var(--mut);font-size:13.5px}
+svg{width:20px;height:20px;flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:6px;padding:12px 18px;font:600 15px/1 inherit;cursor:pointer;color:#fff;background:var(--navy);box-shadow:inset 0 -4px 0 #050d33;width:100%;margin-top:8px}
+.btn.g{background:var(--green);box-shadow:inset 0 -4px 0 var(--green2)}
+.btn.w{background:#fff;color:var(--navy);border:1px solid var(--line);box-shadow:inset 0 -4px 0 var(--navy)}
+.btn.r{background:#fff;color:var(--red);border:1px solid #f0c9c6;box-shadow:inset 0 -4px 0 var(--red)}
+.btn:disabled{opacity:.5;cursor:default}
+.bar{height:10px;background:#e7eaf2;border-radius:6px;overflow:hidden;margin:10px 0 4px}
+.bar i{display:block;height:100%;width:0;background:var(--green);transition:width .2s}
+.step{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
+.note{background:#fff7e0;border-left:4px solid #e0a800;padding:10px 12px;border-radius:6px;margin:8px 0}
+.err{background:#fdecea;border-left:4px solid var(--red);padding:10px 12px;border-radius:6px;margin:8px 0}
+.hist{border-top:1px solid var(--line);padding:8px 0;font-size:14px}
+.hist:first-child{border-top:0}
+input[type=text]{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.cat{border-top:1px solid var(--line);padding:10px 0}
+.cat:first-child{border-top:0}
+.hide{display:none}
+.ya h3{font-size:15px;margin:14px 0 6px;display:flex;align-items:center;gap:6px}
+.ya .site{font-weight:600;margin:10px 0 4px}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:6px 0}
+.kv div{background:#f5f7fb;border-radius:8px;padding:8px 10px}
+.kv b{display:block;font-size:20px;color:var(--navy)}
+.kv span{font-size:12.5px;color:var(--mut)}
+table.t{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0}
+table.t th,table.t td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:right}
+table.t th:first-child,table.t td:first-child{text-align:left}
+table.t th{color:var(--mut);font-weight:500;font-size:12.5px}
+.lnk{background:none;border:0;color:var(--navy);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+.kv b.bad{color:#c62828}
+.mbox{border-top:1px solid #e6eaf2;margin-top:10px;padding-top:8px}
+input[type=password]{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit;margin-top:6px}
+
+/* №544 · навыки */
+.sk{border-top:1px solid var(--line);padding:12px 0}
+.sk:first-child{border-top:0}
+.sk-h{display:flex;align-items:flex-start;gap:8px;cursor:pointer}
+.sk-h b{flex:1;font-size:15.5px}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;background:#eef1f8;color:var(--navy);margin:2px 4px 0 0;white-space:nowrap}
+.tag.p{background:#fff1d6;color:#8a5a00}.tag.c{background:#e6f4ea;color:var(--green2)}
+.sk-b{margin-top:8px;font-size:14.5px}
+.sk-b pre{white-space:pre-wrap;font:inherit;background:#f5f7fb;border-radius:8px;padding:10px;margin:6px 0}
+.sk.off .sk-h b{color:var(--mut)}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.acts .btn{padding:9px 14px;font-size:14px}
+textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit;min-height:120px}
+label.l{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+.filt{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 0}
+.filt button{border:1px solid var(--line);background:#fff;border-radius:16px;padding:6px 12px;font:inherit;font-size:13.5px;cursor:pointer;color:var(--navy)}
+.filt button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+</style>
+<style id="itc-font">/* Шрифт Roboto — как на сайте itcpartner.ru (01.11.2026) */@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-cyrillic-300-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:300;font-display:swap;src:url(/fonts/roboto-latin-300-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:'Roboto';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/roboto-cyrillic-400-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/roboto-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:'Roboto';font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/roboto-cyrillic-500-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/roboto-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}@font-face{font-family:'Roboto';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/roboto-cyrillic-700-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}@font-face{font-family:'Roboto';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/roboto-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}html body,html body *:not(svg):not(path):not(code):not(pre):not(kbd):not(samp){font-family:'Roboto',Arial,sans-serif!important}</style>
+<link rel="stylesheet" href="/apps/fon.css?v=2">
+</head>
+<body>
+<div class="top">
+  <a href="/eco/upd.html" aria-label="Назад"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></a>
+  <h1>Навыки «Фила», «Космоса» и Claude</h1>
+</div>
+<div class="wrap">
+  <div class="card">
+    <div class="mut">Навыки — проверенные способы решать задачи. «Космос» и «Фил» берут подходящий навык, когда вопрос на него похож. Здесь их можно найти, поправить, приостановить, удалить или добавить свой. Хранятся на сервере «Космоса» в Сингапуре, копия — в магазине.</div>
+    <input type="text" id="q" placeholder="Найти навык: слово из названия или текста" oninput="draw()" style="margin-top:10px">
+    <div class="filt" id="filt"></div>
+    <button class="btn g" style="margin-top:12px;width:100%" onclick="edit(0)">+ Новый навык</button>
+    <div id="form"></div>
+  </div>
+  <div class="card"><div id="list"><div class="mut">Загрузка…</div></div></div>
+</div>
+<script>
+var T = (function(){
+  var q = new URLSearchParams(location.search).get('t'); if (q) return q;
+  try { var s = sessionStorage.getItem('eco_t'); if (s) return s; } catch(e){}
+  try { var a = JSON.parse(localStorage.getItem('itc_auth')||'null'); if (a && a.token) return a.token; } catch(e){}
+  return '';
+})();
+function esc(x){ return String(x == null ? '' : x).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function api(action, data){
+  return fetch('/api/flow.php?action=' + action + '&t=' + encodeURIComponent(T), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({t:T}, data || {}))})
+    .then(function(r){ return r.json().catch(function(){ return {ok:false, error:'Сервер ответил не так (код ' + r.status + ')'}; }); })
+    .catch(function(){ return {ok:false, error:'Нет связи с магазином'}; });
+}
+var S = {items: [], open: {}, f: 'all', del: 0, warn: ''};
+var F = [['all','Все'],['on','Работают'],['paused','Приостановлены'],['claude','От Claude'],['kosmos','От «Космоса»'],['boss','Мои']];
+function kind(x){ return x.claude ? 'claude' : (x.author === 'Космос' ? 'kosmos' : (x.author === 'Фил' ? 'fil' : 'boss')); }
+function load(){
+  if (!T) { document.getElementById('list').innerHTML = '<div class="err">Войдите в Экосистему как руководитель, затем откройте эту страницу снова.</div>'; return; }
+  api('nvk_list').then(function(d){
+    if (!d.ok) { document.getElementById('list').innerHTML = '<div class="err">' + esc(d.error || 'Нет доступа') + '</div>'; return; }
+    S.items = d.items || []; S.warn = d.warn || ''; draw();
+  });
+}
+function match(x, q){ return !q || (x.title + ' ' + x.trig + ' ' + x.steps + ' ' + x.author).toLowerCase().indexOf(q) >= 0; }
+function draw(){
+  var q = document.getElementById('q').value.trim().toLowerCase();
+  document.getElementById('filt').innerHTML = F.map(function(f){
+    var n = S.items.filter(function(x){ return f[0] === 'all' || (f[0] === 'on' && !x.paused) || (f[0] === 'paused' && x.paused) || kind(x) === f[0]; }).length;
+    return '<button class="' + (S.f === f[0] ? 'on' : '') + '" onclick="S.f=\'' + f[0] + '\';draw()">' + f[1] + ' · ' + n + '</button>'; }).join('');
+  var rows = S.items.filter(function(x){ return match(x, q) && (S.f === 'all' || (S.f === 'on' && !x.paused) || (S.f === 'paused' && x.paused) || kind(x) === S.f); });
+  var h = S.warn ? '<div class="note">' + esc(S.warn) + '</div>' : '';
+  h += rows.length ? rows.map(row).join('') : '<div class="mut">' + (S.items.length ? 'Ничего не нашлось.' : 'Навыков пока нет.') + '</div>';
+  document.getElementById('list').innerHTML = h;
+}
+function row(x){
+  var o = S.open[x.id];
+  var h = '<div class="sk' + (x.paused ? ' off' : '') + '" id="sk' + x.id + '"><div class="sk-h" onclick="tog(' + x.id + ')"><b>' + esc(x.title) + '</b><span class="mut">' + (o ? '▲' : '▼') + '</span></div>'
+    + '<div>' + (x.paused ? '<span class="tag p">приостановлен</span>' : '') + '<span class="tag' + (x.claude ? ' c' : '') + '">' + (x.claude ? 'от Claude' : 'записал ' + esc(x.author || '—')) + '</span>'
+    + (x.uses ? '<span class="tag">применяли ' + x.uses + ' раз</span>' : '') + '</div>';
+  if (o) {
+    h += '<div class="sk-b"><div class="mut">Когда применять</div><div>' + esc(x.trig || '—') + '</div><div class="mut" style="margin-top:6px">Как делать</div><pre>' + esc(x.steps) + '</pre>'
+      + (x.trace ? '<div class="mut">Инструменты по порядку: ' + esc(x.trace) + '</div>' : '')
+      + (x.claude ? '<div class="mut">Навык Claude. Если поправите, приостановите или удалите его — ваше решение останется, Claude его не перезапишет.</div>' : '')
+      + '<div class="acts"><button class="btn w" onclick="edit(' + x.id + ')">Изменить / дополнить</button>'
+      + '<button class="btn w" onclick="pause(' + x.id + ',' + (x.paused ? 0 : 1) + ')">' + (x.paused ? 'Включить снова' : 'Приостановить') + '</button>'
+      + '<button class="btn r" onclick="del(' + x.id + ')">' + (S.del === x.id ? 'Точно удалить?' : 'Удалить') + '</button></div><div id="m' + x.id + '"></div></div>';
+  }
+  return h + '</div>';
+}
+function tog(id){ S.open[id] = !S.open[id]; S.del = 0; draw(); }
+function find(id){ for (var i = 0; i < S.items.length; i++) if (S.items[i].id === id) return S.items[i]; return null; }
+function msg(id, t){ var m = document.getElementById(id ? 'm' + id : 'fm'); if (m) m.innerHTML = '<div class="err">' + esc(t) + '</div>'; }
+function after(d, id){ if (!d.ok) { msg(id, d.error || 'Не получилось'); return false; } S.items = d.items || S.items; S.del = 0; draw(); return true; }
+function pause(id, on){ api('nvk_pause', {id:id, paused:on}).then(function(d){ after(d, id); }); }
+function del(id){
+  if (S.del !== id) { S.del = id; draw(); return; }
+  api('nvk_del', {id:id}).then(function(d){ if (after(d, id)) delete S.open[id]; });
+}
+function edit(id){
+  var x = id ? find(id) : {title:'', trig:'', steps:''};
+  document.getElementById('form').innerHTML = '<div style="margin-top:12px"><b>' + (id ? 'Изменить навык' : 'Новый навык') + '</b>'
+    + '<label class="l">Название</label><input type="text" id="fT" value="' + esc(x.title) + '">'
+    + '<label class="l">Когда применять (по каким словам вопроса)</label><input type="text" id="fW" value="' + esc(x.trig) + '">'
+    + '<label class="l">Как делать — шаги (до 1500 знаков)</label><textarea id="fS" maxlength="1500">' + esc(x.steps) + '</textarea>'
+    + '<div class="acts"><button class="btn g" onclick="save(' + id + ')">Сохранить</button><button class="btn w" onclick="document.getElementById(\'form\').innerHTML=\'\'">Отмена</button></div><div id="fm"></div></div>';
+  window.scrollTo(0, 0); document.getElementById('fT').focus();
+}
+function save(id){
+  var t = document.getElementById('fT').value.trim(), w = document.getElementById('fW').value.trim(), s = document.getElementById('fS').value.trim();
+  if (t.length < 4 || s.length < 15) { msg(0, 'Нужны название и шаги (хотя бы одна строка)'); return; }
+  api('nvk_save', {id:id, title:t, when:w, steps:s}).then(function(d){
+    if (!d.ok) { msg(0, d.error || 'Не сохранилось'); return; }
+    document.getElementById('form').innerHTML = ''; S.items = d.items || S.items; S.open[d.id] = true; draw();
+    var e = document.getElementById('sk' + d.id); if (e) e.scrollIntoView({block:'center'});
+  });
+}
+load();
+</script>
+</body>
+</html>
