@@ -16,7 +16,7 @@
 Без них сборка не идёт: неподписанное приложение не обновится у людей.
 Печатает JSON: {"ok": true, "apps": [{"app", "apk", "json", "size", "cert"}], "cert": "…"}.
 """
-import argparse, base64, hashlib, json, os, re, shutil, subprocess, sys, tempfile, urllib.request, zipfile
+import time, argparse, base64, hashlib, json, os, re, shutil, subprocess, sys, tempfile, urllib.request, zipfile
 
 SDK = os.environ.get('ITC_ANDROID_SDK', '/opt/android-sdk')
 GRADLE_VER = '8.2'
@@ -46,12 +46,27 @@ def java_ok():
     m = re.search(r'version "(\d+)', out); return bool(m) and int(m.group(1)) >= 17
 
 
+def apt_install(pkgs):
+    """№567 · apt бережно: ждём, пока освободится (другая установка, автообновления Ubuntu), и сначала чиним
+    прерванную установку («dpkg was interrupted…» — так упала первая сборка №562–563 14.11.2026)."""
+    env = dict(os.environ, DEBIAN_FRONTEND='noninteractive')
+    lock = ['-o', 'DPkg::Lock::Timeout=900']
+    last = ''
+    for attempt in range(3):
+        subprocess.run(['dpkg', '--configure', '-a'], capture_output=True, text=True, env=env, timeout=1800)
+        subprocess.run(['apt-get'] + lock + ['-f', 'install', '-y', '-q'], capture_output=True, text=True, env=env, timeout=1800)
+        subprocess.run(['apt-get'] + lock + ['update', '-q'], capture_output=True, text=True, env=env, timeout=900)
+        r = subprocess.run(['apt-get'] + lock + ['install', '-y', '-q'] + pkgs, capture_output=True, text=True, env=env, timeout=1800)
+        if r.returncode == 0: return
+        last = (r.stderr or r.stdout)[-600:]; log('apt не получилось, ещё раз через минуту:', last[-200:]); time.sleep(60)
+    raise SystemExit(f'не получилось поставить {" ".join(pkgs)} — {last}')
+
+
 def setup():
     """Java 17, Android SDK, Gradle — один раз, потом только проверка."""
     if not java_ok():
         log('ставлю Java 17')
-        sh(['apt-get', 'update', '-q'], env=dict(os.environ, DEBIAN_FRONTEND='noninteractive'))
-        sh(['apt-get', 'install', '-y', '-q', 'openjdk-17-jdk-headless', 'unzip'], env=dict(os.environ, DEBIAN_FRONTEND='noninteractive'))
+        apt_install(['openjdk-17-jdk-headless', 'unzip'])
     sdkm = f'{SDK}/cmdline-tools/latest/bin/sdkmanager'
     if not os.path.exists(sdkm):
         os.makedirs(f'{SDK}/cmdline-tools', exist_ok=True)
