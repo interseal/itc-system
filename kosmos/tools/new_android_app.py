@@ -9,7 +9,8 @@
       --icon значок_512.png --color "#112C93"
 
 --key    латиница, строчные (станет store.itcpartner.<key>)
---icon   квадратная картинка (лучше 512×512, PNG); без неё — значок ИТК
+--icon   картинка (фото человека или знак); без неё — белый шар ИТК
+--kind   shar (шар ИТК на цвете) | foto (фото в белой рамке, как «Фил») | logo (знак размером с шар) — см. android/znachki/README.md
 --color  цвет фона значка
 Потом — releases/N.json с "android": {"apps": ["<key>"], "code": …, "name": "…"} — сервер соберёт и подпишет.
 В RuStore новое приложение добавляет руководитель (console.rustore.ru → «Добавить приложение», файл APK из обновления).
@@ -22,6 +23,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--project', default=os.path.join(ROOT, 'android', 'ITCApp'))
 ap.add_argument('--key', required=True); ap.add_argument('--title', required=True); ap.add_argument('--url', required=True)
 ap.add_argument('--icon', default=''); ap.add_argument('--color', default='#FFFFFF')
+ap.add_argument('--kind', choices=['shar', 'foto', 'logo'], default='')   # вид значка по эталону
 a = ap.parse_args()
 
 key = a.key.strip()
@@ -59,18 +61,9 @@ os.makedirs(os.path.join(res, 'mipmap-anydpi-v26'), exist_ok=True)
 xml = ('<?xml version="1.0" encoding="utf-8"?>\n<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
        '    <background android:drawable="@color/ic_flv_bg"/>\n    <foreground android:drawable="@drawable/ic_flv_fg"/>\n</adaptive-icon>\n')
 for n in ['ic_launcher.xml', 'ic_launcher_round.xml']: open(os.path.join(res, 'mipmap-anydpi-v26', n), 'w').write(xml)
-src = a.icon or os.path.join(a.project, 'play_store_icon_512.png')
-from PIL import Image, ImageDraw
-im = Image.open(src).convert('RGBA'); side = min(im.size)
-im = im.crop(((im.width - side) // 2, (im.height - side) // 2, (im.width + side) // 2, (im.height + side) // 2))
-os.makedirs(os.path.join(res, 'drawable-nodpi'), exist_ok=True)
-fg = Image.new('RGBA', (432, 432), (0, 0, 0, 0)); fg.paste(im.resize((288, 288), Image.LANCZOS), (72, 72))   # безопасная зона адаптивного значка
-fg.save(os.path.join(res, 'drawable-nodpi', 'ic_flv_fg.png'))
-bg = tuple(int(a.color[k:k + 2], 16) for k in (1, 3, 5)) + (255,)
-for d, px in DENS.items():
-    os.makedirs(os.path.join(res, f'mipmap-{d}'), exist_ok=True)
-    sq = Image.new('RGBA', (px, px), bg); ic = im.resize((int(px * .8), int(px * .8)), Image.LANCZOS); sq.alpha_composite(ic, (int(px * .1), int(px * .1)))
-    sq.save(os.path.join(res, f'mipmap-{d}', 'ic_launcher.png'))
-    mask = Image.new('L', (px, px), 0); ImageDraw.Draw(mask).ellipse((0, 0, px - 1, px - 1), fill=255)
-    rd = Image.new('RGBA', (px, px), (0, 0, 0, 0)); rd.paste(sq, (0, 0), mask); rd.save(os.path.join(res, f'mipmap-{d}', 'ic_launcher_round.png'))
+# значок — только по эталону (android/znachki/README.md)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import icon_kit
+kind = a.kind or ('logo' if a.icon else 'shar')
+fg = icon_kit.fg_shar() if kind == 'shar' else icon_kit.fg_foto(a.icon) if kind == 'foto' else icon_kit.fg_logo(a.icon)
+icon_kit.write(res, fg, a.color)
 print(f'готово: приложение {key} («{a.title}»), store.itcpartner.{key}. Дальше — releases/N.json с "android": {{"apps": ["{key}"], …}}')
