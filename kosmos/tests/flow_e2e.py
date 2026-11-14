@@ -554,7 +554,7 @@ try:
     c, j = kf('fc_cmd', 'mgr-t', {'text': 'Проверка WeChat письмо: попроси вес и объём', 'conv': 'new'}); ag.tick()
     check('письмо поставщику ушло через компьютер сотрудника', fw.sent == [('SolarOne Ningbo', '请发一下重量和体积')] and q1("SELECT status FROM itc_pc_job WHERE op='send'") == 'done', (fw.sent, j.get('say')))
     c, j = kf('fc_cmd', data={'text': 'Проверка WeChat: прочитай', 'conv': 'new'})
-    check('у руководителя свой компьютер не подключён — Фил честно говорит, как подключить', 'не подключён' in j.get('say', ''), j.get('say'))
+    check('у руководителя свой компьютер не подключён — Фил честно говорит, как поставить', 'не установлен' in j.get('say', ''), j.get('say'))
     r = urllib.request.Request(f'{STORE}/api/flow.php?action=pc_poll', data=b'{}', headers={'X-PC-Token': 'x' * 64, 'Content-Type': 'application/json'}, method='POST')
     try: urllib.request.urlopen(r, timeout=10); cc = 200
     except urllib.error.HTTPError as e: cc = e.code
@@ -562,6 +562,18 @@ try:
     c, j = kf('pc_list', 'mgr-t', {}, flow='flow'); did = j['devs'][0]['id'] if j.get('devs') else ''
     kf('pc_revoke', 'mgr-t', {'id': did}, flow='flow'); ag.tick()
     check('отключил компьютер — ключ больше не работает, программа просит подключить заново', not ag.paired(), ag.st)
+    print('22. Компьютер подключается сам — личная ссылка установки (№560)')
+    c, j = kf('pc_inst', 'mgr-t', {}, flow='flow')
+    body = urllib.request.urlopen(f"{STORE}{j['url']}", timeout=10).read().decode('utf-8')
+    k = _re.search(r'set FIL_K=([a-f0-9]{48})', body)
+    check('личная установка: файл с ключом сотрудника', c == 200 and k and 'install.ps1' in body, body[:200])
+    shutil.rmtree(f'{TMP}/filpc', ignore_errors=True); os.makedirs(f'{TMP}/filpc'); json.dump({'install_key': k.group(1)}, open(f'{TMP}/filpc/state.json', 'w'))
+    ag2 = _pc.Agent(FakeWX(), store=_pc.Store(STORE), sleep=lambda s: None)
+    check('после установки компьютер подключился сам, без кода и без Фила', ag2.pair(wait=5) and ag2.paired() and 'install_key' not in _pc.load(), _pc.load())
+    try: urllib.request.urlopen(f"{STORE}{j['url']}", timeout=10); cc = 200
+    except urllib.error.HTTPError as e: cc = e.code
+    check('ссылка одноразовая — второй раз не работает', cc == 404, cc)
+    c, j = kf('pc_list', 'mgr-t', {}, flow='flow'); check('компьютер в списке сотрудника', len(j.get('devs', [])) == 1, j)
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

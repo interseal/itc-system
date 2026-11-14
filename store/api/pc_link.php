@@ -42,13 +42,30 @@ function pc_me($dev) {   // сотрудник, чей это компьютер
 
 /* ---- вызовы программы (до входа сотрудника) ---- */
 function pc_pre($action) {
-  if (strpos($action, 'pc_') !== 0 || in_array($action, ['pc_pair_ok', 'pc_list', 'pc_revoke'], true)) return;
+  if (strpos($action, 'pc_') !== 0 || in_array($action, ['pc_pair_ok', 'pc_list', 'pc_revoke', 'pc_inst'], true)) return;
+  if ($action === 'pc_installer') {   // №560 · установка с личным ключом сотрудника: компьютер подключится сам, без кода
+    pc_ensure(); $k = preg_replace('~[^a-f0-9]~', '', (string)($_GET['k'] ?? ''));
+    $q = db()->prepare("SELECT id FROM itc_pc_dev WHERE psec=? AND tok='' AND code_exp > NOW() AND revoked=0"); $q->execute([hash('sha256', $k)]);
+    if (strlen($k) !== 48 || !$q->fetchColumn()) { http_response_code(404); header('Content-Type: text/plain; charset=utf-8'); exit('Ссылка устарела — откройте страницу установки ещё раз'); }
+    header('Content-Type: application/octet-stream'); header("Content-Disposition: attachment; filename=\"ustanovit-fila.cmd\"; filename*=UTF-8''" . rawurlencode('Установить Фила.cmd'));
+    echo "@echo off\r\nchcp 65001 >nul\r\necho Устанавливаю Фила на компьютер...\r\nset FIL_K=$k\r\n"
+      . "powershell -NoProfile -ExecutionPolicy Bypass -Command \"[Net.ServicePointManager]::SecurityProtocol='Tls12'; \$p=Join-Path \$env:TEMP 'fil_install.ps1'; Invoke-WebRequest -UseBasicParsing 'https://itcpartner.store/app/pc/install.ps1' -OutFile \$p; & \$p\"\r\necho.\r\npause\r\n";
+    exit;
+  }
   fl_ensure(); wc_ensure(); pc_ensure(); $in = pc_in();
   if ($action === 'pc_pair_start') {
     $id = fl_id('pc'); $code = (string)random_int(100000, 999999); $sec = bin2hex(random_bytes(16));
     db()->prepare('INSERT INTO itc_pc_dev (id,name,code,psec,code_exp,wx_ver,app_ver) VALUES (?,?,?,?,DATE_ADD(NOW(), INTERVAL 15 MINUTE),?,?)')
       ->execute([$id, mb_substr((string)($in['name'] ?? 'компьютер'), 0, 190), $code, hash('sha256', $sec), mb_substr((string)($in['wx_ver'] ?? ''), 0, 40), mb_substr((string)($in['app_ver'] ?? ''), 0, 20)]);
     pc_out(['ok' => true, 'pair' => $id, 'secret' => $sec, 'code' => $code, 'say' => 'Скажите Филу: «подключи компьютер ' . $code . '» — или введите код в настройках Фила. Код действует 15 минут.']);
+  }
+  if ($action === 'pc_pair_auto') {   // №560 · компьютер, поставленный по личной ссылке, подключается сам
+    $q = db()->prepare("SELECT * FROM itc_pc_dev WHERE psec=? AND tok='' AND code_exp > NOW() AND revoked=0 AND phone<>''"); $q->execute([hash('sha256', (string)($in['key'] ?? ''))]); $d = $q->fetch();
+    if (!$d) pc_out(['ok' => false, 'error' => 'ключ установки устарел — подключите кодом'], 404);
+    $tok = bin2hex(random_bytes(32));
+    db()->prepare("UPDATE itc_pc_dev SET tok=?, psec='', name=?, wx_ver=?, app_ver=?, last_seen=NOW() WHERE id=?")
+      ->execute([hash('sha256', $tok), mb_substr((string)($in['name'] ?? 'компьютер'), 0, 190), mb_substr((string)($in['wx_ver'] ?? ''), 0, 40), mb_substr((string)($in['app_ver'] ?? ''), 0, 20), $d['id']]);
+    pc_out(['ok' => true, 'token' => $tok, 'who' => fl_staff_name($d['phone']) ?: $d['phone']]);
   }
   if ($action === 'pc_pair_check') {
     $q = db()->prepare('SELECT * FROM itc_pc_dev WHERE id=? AND psec=?'); $q->execute([(string)($in['pair'] ?? ''), hash('sha256', (string)($in['secret'] ?? ''))]); $d = $q->fetch();
@@ -148,6 +165,11 @@ function pc_save_file($me, $name, $bin, $chat, $at) {
 function pc_staff($me, $action) {
   pc_ensure();
   if ($action === 'pc_pair_ok') fl_out(pc_pair_ok($me, (string)fl_in('code')));
+  if ($action === 'pc_inst') {   // №560 · личная ссылка на установку (7 дней, одна установка)
+    $k = bin2hex(random_bytes(24)); $id = fl_id('pc');
+    db()->prepare('INSERT INTO itc_pc_dev (id,phone,name,psec,code_exp) VALUES (?,?,?,?,DATE_ADD(NOW(), INTERVAL 7 DAY))')->execute([$id, $me['phone'], 'ставится…', hash('sha256', $k)]);
+    fl_out(['ok' => true, 'url' => '/api/flow.php?action=pc_installer&k=' . $k, 'who' => $me['name']]);
+  }
   if ($action === 'pc_list') fl_out(['ok' => true, 'devs' => pc_devs($me), 'jobs' => pc_jobs($me, 15)]);
   if ($action === 'pc_revoke') { db()->prepare('UPDATE itc_pc_dev SET revoked=1 WHERE id=? AND (phone=? OR ?=1)')->execute([(string)fl_in('id'), $me['phone'], !empty($me['boss']) ? 1 : 0]); fl_out(['ok' => true]); }
 }
@@ -168,7 +190,7 @@ function pc_jobs($me, $n) {
 }
 function pc_job_add($me, $op, $args) {
   pc_ensure(); $devs = array_values(array_filter(pc_devs($me), function ($d) { return $d['online']; })) ?: pc_devs($me);
-  if (!$devs) return 'К WeChat нет доступа: компьютер не подключён. Установите «Фила» на компьютер (itcpartner.store/app/pc/) и скажите мне код с экрана: «подключи компьютер 123456».';
+  if (!$devs) return 'К WeChat нет доступа: на компьютере не установлен «Фил». Откройте на этом компьютере itcpartner.store/app/pc/ (войдя в Экосистему) и запустите установку — компьютер подключится сам.';
   db()->prepare('INSERT INTO itc_pc_job (dev_id,phone,op,args) VALUES (?,?,?,?)')->execute([$devs[0]['id'], $me['phone'], $op, json_encode($args, JSON_UNESCAPED_UNICODE)]);
   $id = (int)db()->lastInsertId();
   return ['принято' => 'поручение компьютеру №' . $id, 'компьютер' => $devs[0]['name'] . ($devs[0]['online'] ? ' (на связи)' : ' (сейчас не на связи — выполнит, когда включится)'),

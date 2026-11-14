@@ -3272,7 +3272,7 @@ try {
   }
   pc_pre($action);   // №559 · вызовы программы «Фил на компьютере» (по ключу устройства)
   $me = fl_me(); fl_ensure(); wc_ensure(); if (mt_rand(1, 20) === 1) wc_tick();
-  if (in_array($action, ['pc_pair_ok', 'pc_list', 'pc_revoke'], true)) pc_staff($me, $action);
+  if (in_array($action, ['pc_pair_ok', 'pc_list', 'pc_revoke', 'pc_inst'], true)) pc_staff($me, $action);
   $GLOBALS['ME_TZ'] = pl_tz((string)fl_in('tz', '')); if (mt_rand(1, 4) === 1) pl_tick();   // №43
   if (strncmp((string)$action, 'pr_', 3) === 0 && function_exists('pr_action')) pr_action($me, (string)$action);   // №492
   switch ($action) {

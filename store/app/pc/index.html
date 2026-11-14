@@ -12,12 +12,25 @@ ol{padding-left:20px}li{margin:6px 0}.m{color:#6c7177;font-size:14px}
 <div class="m">Для рабочих компьютеров ИТК с Windows 10/11</div>
 <div class="c">
 <p>Ставит на рабочий стол ярлыки <b>«Фил»</b> и <b>«Космос»</b> и помощника, который даёт Филу «руки» в вашем рабочем WeChat: прочитать переписку, забрать каталоги и прайсы в базу, написать поставщику (только после вашего «да»).</p>
-<p><a class="b" href="ustanovit-fila.cmd" download="Установить Фила.cmd">Скачать установку</a></p>
+<p id="who" class="m"></p><p><a class="b" id="dl" href="ustanovit-fila.cmd" download="Установить Фила.cmd">Скачать установку</a></p>
 <ol>
 <li>Скачайте файл и откройте его. Если Windows спросит «Запустить?» — нажмите <b>«Подробнее» → «Выполнить в любом случае»</b>.</li>
 <li>Подождите 3–10 минут — программа всё поставит сама (права администратора не нужны).</li>
-<li>В углу экрана появится окошко с <b>кодом из 6 цифр</b>. Скажите Филу: <b>«подключи компьютер»</b> и назовите код.</li>
+<li>Компьютер подключится к Филу сам. (Если страница открыта без входа в Экосистему — в окошке будет код из 6 цифр: скажите Филу «подключи компьютер» и назовите код.)</li>
 <li>WeChat держите открытым и с выполненным входом. Дальше просто говорите Филу: «прочитай сегодняшнюю переписку», «скачай каталоги», «что прислали поставщики».</li>
 </ol>
-<p class="m">Пока Фил работает в WeChat, не трогайте мышь — он сам ждёт, когда вы отойдёте от компьютера, и предупреждает в окошке. Отключить компьютер: скажите Филу «отключи компьютер».</p>
-</div></div></body></html>
+<p class="m">Пока Фил работает в WeChat, не трогайте мышь — он сам ждёт, когда вы отойдёте от компьютера, и предупреждает в окошке. Отключить компьютер: скажите Филу «отключи компьютер». Открывайте эту страницу на том компьютере, куда ставите, — войдя в Экосистему под своим именем.</p>
+</div></div>
+<script>
+(function(){
+  var T = ''; try { var a = JSON.parse(localStorage.getItem('itc_auth') || 'null'); if (a && a.token) T = a.token; } catch (e) {}
+  try { T = new URLSearchParams(location.search).get('t') || sessionStorage.getItem('eco_t') || T; } catch (e) {}
+  if (!T) { document.getElementById('who').textContent = 'Вы не вошли в Экосистему — установка будет общей, подключение кодом.'; return; }
+  fetch('/api/flow.php?action=pc_inst&t=' + encodeURIComponent(T), {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+    .then(function(r){ return r.json(); }).then(function(d){
+      if (!d.ok) return;
+      var a = document.getElementById('dl'); a.href = d.url; a.removeAttribute('download');
+      document.getElementById('who').textContent = 'Установка для: ' + d.who + ' — компьютер подключится сам, без кода.';
+    }).catch(function(){});
+})();
+</script></body></html>

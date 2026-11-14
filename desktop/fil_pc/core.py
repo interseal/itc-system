@@ -2,7 +2,7 @@
 Руки в WeChat — wx_engine.py (на Windows). Здесь только логика, её проверяют tests/test_core.py на любом компьютере."""
 import base64, hashlib, json, os, random, socket, time, urllib.request, urllib.error
 
-APP_VER = '1.0.0'
+APP_VER = '1.1.0'
 STORE = os.environ.get('FIL_PC_STORE', 'https://itcpartner.store')
 HOME = os.environ.get('FIL_PC_HOME') or os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'ITC', 'FilPC')
 os.makedirs(HOME, exist_ok=True)
@@ -59,6 +59,13 @@ class Agent:
 
     def pair(self, wait=900, step=4):
         inf = self.engine.info()
+        k = self.st.get('install_key')   # №560 · поставлен по личной ссылке сотрудника — подключаемся сами, без кода
+        if k:
+            r = self.store.call('pc_pair_auto', {'key': k, 'name': f'{socket.gethostname()} · {os.environ.get("USERNAME", "")}', 'wx_ver': inf.get('wx_ver', ''), 'app_ver': APP_VER})
+            if r.get('token'):
+                self.st.pop('install_key', None); self.st['token'] = r['token']; self.st['who'] = r.get('who', ''); save(self.st); self.store.token = r['token']
+                self.say('Компьютер подключён: ' + r.get('who', '')); return True
+            if not r.get('_net'): self.st.pop('install_key', None); save(self.st)   # ключ устарел — дальше обычным кодом
         r = self.store.call('pc_pair_start', {'name': f'{socket.gethostname()} · {os.environ.get("USERNAME", "")}', 'wx_ver': inf.get('wx_ver', ''), 'app_ver': APP_VER})
         if not r.get('ok'): self.say('Не удалось связаться с магазином: ' + str(r.get('error'))); return False
         self.say(f"Код подключения: {r['code']}\n" + r.get('say', ''))

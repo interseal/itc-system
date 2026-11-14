@@ -1,0 +1,5 @@
+{"n": 560, "title": "«Фил на компьютере» подключается сам — без кодов",
+ "what": ["Откройте itcpartner.store/app/pc/ на рабочем компьютере (войдя в Экосистему под сотрудником) и запустите установку — компьютер сам подключится к этому сотруднику. Говорить Филу код не нужно.",
+          "Ссылка личная и одноразовая (действует 7 дней). Если страница открыта без входа — установка общая, тогда подключение по коду, как раньше."],
+ "files": ["store/api/flow.php", "store/api/kosmos_flow.php", "store/api/pc_link.php", "store/app/pc/index.html", "store/app/pc/install.ps1", "store/app/pc/fil_pc.zip", "store/app/pc/version.json"],
+ "kosmos": false}

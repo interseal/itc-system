@@ -63,10 +63,17 @@ foreach ($a in @(@('Фил', 'fil'), @('Космос', 'kosmos'))) {
 $startup = [Environment]::GetFolderPath('Startup')
 Make-Link (Join-Path $startup 'Фил на компьютере.lnk') $PyW "`"$(Join-Path $App 'fil_pc.pyw')`"" (Join-Path $App 'fil.ico')
 
+# личный ключ установки (ссылка со страницы под входом сотрудника) — компьютер подключится к нему сам, без кода
+if ($env:FIL_K -match '^[a-f0-9]{48}$') {
+  $stf = Join-Path $Dir 'state.json'; $st = @{}
+  if (Test-Path $stf) { try { (Get-Content $stf -Raw -Encoding UTF8 | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $st[$_.Name] = $_.Value } } catch { } }
+  $st['install_key'] = $env:FIL_K; $st.Remove('token')
+  [IO.File]::WriteAllText($stf, ($st | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding $false))
+}
 # запуск
 Get-Process pythonw -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $PyW } | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Process -FilePath $PyW -ArgumentList "`"$(Join-Path $App 'fil_pc.pyw')`""
 if ($browser) { Start-Process -FilePath $browser -ArgumentList "--app=$Store/apps/fil/" }
 Write-Host ''
-Write-Host 'Готово! На рабочем столе — «Фил» и «Космос». В углу экрана — окошко «Фил на компьютере» с кодом из 6 цифр:' -ForegroundColor Green
-Write-Host 'скажите Филу: «подключи компьютер» и назовите код. WeChat держите открытым и с выполненным входом.' -ForegroundColor Green
+if ($env:FIL_K) { Write-Host 'Готово! На рабочем столе — «Фил» и «Космос». Компьютер подключится к Филу сам. WeChat держите открытым и с выполненным входом.' -ForegroundColor Green }
+else { Write-Host 'Готово! На рабочем столе — «Фил» и «Космос». В окошке «Фил на компьютере» — код из 6 цифр: скажите Филу «подключи компьютер» и назовите код.' -ForegroundColor Green }
