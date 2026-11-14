@@ -1,0 +1,36 @@
+{
+ "n": 561,
+ "title": "Новые значки приложений — все в одном стиле",
+ "what": [
+  "На странице приложений все значки теперь одинаковые по размеру и стилю: шары одного размера, без белых полей, «Фил» и «Космос» в одинаковой рамке, стрелка «Навигатора» крупнее, «Склад в Китае» — коричневый шар.",
+  "Сами Android-приложения с новыми значками сервер соберёт следующими обновлениями (после установки этого)."
+ ],
+ "files": [
+  "store/index.html",
+  "store/apps/eco/icon-192.png",
+  "store/apps/eco/icon-512.png",
+  "store/apps/metro/icon-192.png",
+  "store/apps/metro/icon-512.png",
+  "store/apps/perevod/icon-192.png",
+  "store/apps/perevod/icon-512.png",
+  "store/apps/nav/icon-192.png",
+  "store/apps/nav/icon-512.png",
+  "store/apps/fil/icon-192.png",
+  "store/apps/fil/icon-512.png",
+  "store/apps/kosmos/icon-192.png",
+  "store/apps/kosmos/icon-512.png",
+  "store/apps/draw/icon-192.png",
+  "store/apps/draw/icon-512.png",
+  "store/apps/crm/icon-192.png",
+  "store/apps/crm/icon-512.png",
+  "store/apps/sklad/icon-192.png",
+  "store/apps/sklad/icon-512.png",
+  "store/apps/hotels/icon-192.png",
+  "store/apps/hotels/icon-512.png",
+  "store/apps/trade/icon-192.png",
+  "store/apps/trade/icon-512.png",
+  "store/esim/icon-192.png",
+  "store/esim/icon-512.png"
+ ],
+ "kosmos": false
+}
