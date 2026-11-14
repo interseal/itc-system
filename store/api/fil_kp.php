@@ -55,7 +55,9 @@ function kp_images($urls) {
   }
   return $out;
 }
-function kp_logo() {
+function kp_acc() { return function_exists('br_get') ? br_get()['accent'] : '8fe03a'; }   // №556 · акцентный цвет фирменного стиля
+function kp_logo($coId = '') {
+  if (function_exists('br_logo')) { $l = br_logo($coId); if ($l !== '') return $l; }   // №556 · фирменный стиль — одна база
   $own = __DIR__ . '/kp_fonts/itc-logo.jpg'; if (is_file($own)) return (string)file_get_contents($own);
   foreach ([dirname(__DIR__) . '/eco/itc-logo.png', (function_exists('bk_site_root') ? bk_site_root() : '') . '/img/logo.png'] as $f)
     if ($f !== '' && is_file($f)) { $j = kp_jpeg((string)file_get_contents($f), 600); if ($j !== '') return $j; }
@@ -71,7 +73,7 @@ function kp_company($want) {
   };
   usort($all, function ($a, $b) use ($score) { return $score($b) - $score($a); });
   $c = $all[0] ?? [];
-  return ['short' => trim(preg_replace('~\s*·.*$~u', '', (string)($c['short'] ?? 'ООО «ИТК»'))), 'name' => (string)($c['name'] ?? 'ООО «Интернациональная Торговая Компания»'), 'inn' => (string)($c['inn'] ?? ''),
+  return ['id' => (string)($c['id'] ?? ''), 'name2' => (string)($c['name2'] ?? ''), 'short' => trim(preg_replace('~\s*·.*$~u', '', (string)($c['short'] ?? 'ООО «ИТК»'))), 'name' => (string)($c['name'] ?? 'ООО «Интернациональная Торговая Компания»'), 'inn' => (string)($c['inn'] ?? ''),
     'addr' => (string)($c['addr'] ?? ''), 'phone' => (string)($c['phone'] ?? ''), 'email' => (string)($c['email'] ?? ''), 'site' => (string)($c['site'] ?? 'itcpartner.ru')];
 }
 function kp_find_sup($q) {
@@ -115,10 +117,11 @@ function kp_collect($sup, $kind) {
 function kp_pdf($d, $co, $kind, $client, $title) {
   $F = __DIR__ . '/kp_fonts/'; $p = new KpPdf($F . 'Roboto-Regular.ttf', $F . 'Roboto-Bold.ttf');
   $navy = '0a1a66'; $green = '2e9e0e'; $gray = '6b7590'; $text = '1f2533';
+  if (function_exists('br_get')) { $B = br_get(); $navy = $B['primary']; $green = $B['accent']; $gray = $B['gray']; $text = $B['text']; }   // №556
   $urls = [$d['hero']];
   foreach ($d['groups'] as $g) { $urls[] = $g['cover']; foreach ($g['items'] as $i => $it) if ($kind === 'full' || $i < 3) $urls[] = $it['photo']; }
   foreach (array_slice($d['awards'], 0, 4) as $a) $urls[] = $a['photo'] ?? '';
-  $IM = kp_images($urls); $logo = kp_logo();
+  $IM = kp_images($urls); $logo = kp_logo($co['id'] ?? '');
   $L = 15; $R = 195; $W = $R - $L; $y = 0; $pg = 0;
   $foot = function () use ($p, $co, $gray, &$pg) {
     $p->line(15, 282, 195, 282, 'd9deea', 0.3); $p->font('R', 7.5); $p->color($gray);
@@ -131,14 +134,14 @@ function kp_pdf($d, $co, $kind, $client, $title) {
     if ($logo !== '') $p->image($logo, 15, 8, 32, 13);
     $p->font('B', 14); $p->color($navy); $p->text(52, 15.5, 'Коммерческое предложение');
     $p->font('R', 8.5); $p->color($gray); $p->text(52, 20.5, $co['short'] . ' · ' . date('d.m.Y'));
-    $p->line(15, 25, 195, 25, '8fe03a', 0.6); $y = 34;
+    $p->line(15, 25, 195, 25, kp_acc(), 0.6); $y = 34;
   };
   $need = function ($h) use (&$y, $newPage) { if ($y + $h > 276) $newPage(); };
   $para = function ($s, $size = 10, $col = '1f2533', $lh = null, $font = 'R', $x = 15, $w = 180) use ($p, &$y, $need) {
     $s = trim((string)$s); if ($s === '') return; $p->font($font, $size); $p->color($col); $lh = $lh ?: $size * 0.47;
     foreach ($p->wrap($s, $w) as $l) { $need($lh); $p->text($x, $y, $l); $y += $lh; }
   };
-  $h2 = function ($s, $min = 40) use ($p, &$y, $need, $navy) { $need($min); $y += 3; $p->font('B', 13); $p->color($navy); $p->text(15, $y, $s); $y += 3; $p->line(15, $y, 35, $y, '8fe03a', 0.9); $y += 6; };
+  $h2 = function ($s, $min = 40) use ($p, &$y, $need, $navy) { $need($min); $y += 3; $p->font('B', 13); $p->color($navy); $p->text(15, $y, $s); $y += 3; $p->line(15, $y, 35, $y, kp_acc(), 0.9); $y += 6; };
 
   $newPage();
   $p->font('B', 18); $p->color($navy);
@@ -155,7 +158,7 @@ function kp_pdf($d, $co, $kind, $client, $title) {
     if ($d['stats']) { $y += 4; $need(24); $n = min(4, count($d['stats'])); $bw = (180 - ($n - 1) * 4) / $n;
       foreach (array_slice($d['stats'], 0, $n) as $i => $s) { $x = 15 + $i * ($bw + 4); $p->rect($x, $y, $bw, 20, 'f1f4fb'); $p->font('B', 15); $p->color($navy); $p->text($x + 4, $y + 9, (string)$s['n']); $p->font('R', 8); $p->color($gray); $ll = $p->wrap((string)$s['t'], $bw - 8); $p->text($x + 4, $y + 14.5, $ll[0] ?? ''); if (isset($ll[1])) $p->text($x + 4, $y + 18, $ll[1]); }
       $y += 25; }
-    if ($d['facts']) { $h2('О производстве'); foreach ($d['facts'] as $f) { $need(6); $p->rect(15, $y - 2.2, 1.6, 1.6, '8fe03a'); $para($f, 10, $text, 5, 'R', 19, 176); $y += 0.8; } }
+    if ($d['facts']) { $h2('О производстве'); foreach ($d['facts'] as $f) { $need(6); $p->rect(15, $y - 2.2, 1.6, 1.6, kp_acc()); $para($f, 10, $text, 5, 'R', 19, 176); $y += 0.8; } }
     if ($d['groups']) { $h2('Продукция', 80);
       foreach (array_slice($d['groups'], 0, 12) as $g) {
         $ph = []; foreach ($g['items'] as $it) if ($it['photo'] !== '' && isset($IM[$it['photo']])) { $ph[] = $IM[$it['photo']]; if (count($ph) >= 3) break; }
@@ -169,7 +172,7 @@ function kp_pdf($d, $co, $kind, $client, $title) {
         $y += 4;
       } }
     if ($d['awards']) { $h2('Награды и сертификаты'); $cap = array_values(array_filter(array_map(function ($a) { return (string)($a['cap'] ?? ''); }, $d['awards'])));
-      foreach (array_slice($cap, 0, 10) as $c) { $need(6); $p->rect(15, $y - 2.2, 1.6, 1.6, '8fe03a'); $para($c, 9.5, $text, 4.8, 'R', 19, 176); } }
+      foreach (array_slice($cap, 0, 10) as $c) { $need(6); $p->rect(15, $y - 2.2, 1.6, 1.6, kp_acc()); $para($c, 9.5, $text, 4.8, 'R', 19, 176); } }
     $h2('Как мы работаем');
     foreach (['Вы присылаете задачу: модели, количество, требования.', 'Подбираем товар и согласуем с заводом цены и сроки, присылаем расчёт.', 'Договор и оплата в рублях в России, заводу платим мы.', 'Завод изготавливает партию, мы принимаем и проверяем товар на нашем складе в Китае, присылаем фото.', 'Доставляем в Россию с документами до вашего города.'] as $i => $s) {
       $need(8); $p->font('B', 10); $p->color($green); $p->text(15, $y, ($i + 1) . '.'); $para($s, 10, $text, 5, 'R', 21, 174); $y += 1; }
@@ -219,8 +222,8 @@ function kp_xlsx($d, $co, $kind, $client, $title) {
   }
   $sheet .= '</sheetData></worksheet>';
   $styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-    . '<fonts count="3"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF0A1A66"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts>'
-    . '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0A1A66"/></patternFill></fill></fills>'
+    . '<fonts count="3"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF' . strtoupper(function_exists('br_get') ? br_get()['primary'] : '0A1A66') . '"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts>'
+    . '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF' . strtoupper(function_exists('br_get') ? br_get()['primary'] : '0A1A66') . '"/></patternFill></fill></fills>'
     . '<borders count="2"><border/><border><left style="thin"><color rgb="FFD9DEEA"/></left><right style="thin"><color rgb="FFD9DEEA"/></right><top style="thin"><color rgb="FFD9DEEA"/></top><bottom style="thin"><color rgb="FFD9DEEA"/></bottom></border></borders>'
     . '<cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="4"><xf/><xf fontId="1" applyFont="1"/><xf fontId="2" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1"><alignment vertical="center" wrapText="1"/></xf><xf borderId="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs></styleSheet>';
   $tmp = tempnam(sys_get_temp_dir(), 'kpx'); $z = new ZipArchive(); $z->open($tmp, ZipArchive::OVERWRITE);

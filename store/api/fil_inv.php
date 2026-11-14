@@ -77,8 +77,9 @@ function inv_date_words($ymd) {
 function inv_pdf($co, $cl, $no, $dt, $items, $vat, $note) {
   $F = __DIR__ . '/kp_fonts/'; $p = new KpPdf($F . 'Roboto-Regular.ttf', $F . 'Roboto-Bold.ttf');
   $ink = '1f2533'; $gray = '6b7590'; $navy = '0a1a66'; $bd = '1f2533';
+  if (function_exists('br_get')) { $B = br_get(); $navy = $B['primary']; $gray = $B['gray']; }   // №556 · фирменный стиль
   $p->page(); $L = 15; $R = 195; $y = 14;
-  $logo = function_exists('kp_logo') ? kp_logo() : '';
+  $logo = function_exists('kp_logo') ? kp_logo((string)($co['id'] ?? '')) : '';
   if ($logo !== '') $p->image($logo, $L, 9, 28, 11);
   $p->font('R', 8); $p->color($gray);
   $hd = array_values(array_filter([$co['name'], $co['addr'], trim(($co['phone'] ?? '') . '  ' . ($co['email'] ?? ''))]));

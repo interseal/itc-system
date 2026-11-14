@@ -62,6 +62,17 @@ def plan(req, key):
         ans = json.dumps({'do': 'answer', 'say': f'Здравствуйте! Я {who}. На Claude: {"да" if claude else "нет"}. Ключ …{key[-4:]}. Вопрос: {text[-40:]}'}, ensure_ascii=False)
         # №538: навыки — решил в 2 шага и записал способ; повторно — делает по навыку из правил
         # №550: комплексное КП из нескольких поставщиков и разработчик (только руководителю)
+        if 'Проверка запроса' in text:   # №556 · коммерческий запрос в фирменном стиле
+            if 'РЕЗУЛЬТАТ make_request' not in text:
+                return [{'type': 'text', 'text': json.dumps({'tool': 'make_request', 'args': {'sup': 'SolarOne', 'lang': 'en', 'items': [{'name': 'Solar panel 550W', 'spec': 'mono, 144 cells', 'qty': '1x40HQ'}, {'name': 'Inverter 10 kW', 'qty': '20 pcs'}]}}, ensure_ascii=False)}], 'end_turn'
+            return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': 'Запрос: ' + text.split('РЕЗУЛЬТАТ make_request', 1)[1][:500]}, ensure_ascii=False)}], 'end_turn'
+        if 'Проверка стиля' in text:
+            if 'ИЗМЕНИТЬ ФИРМЕННЫЙ СТИЛЬ' not in sysx:
+                return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': 'Менять фирменный стиль может только руководитель.'}, ensure_ascii=False)}], 'end_turn'
+            if 'РЕЗУЛЬТАТ brand_set' not in text:
+                m = re.search(r'id файла ([A-Za-z0-9_]+)', text)
+                return [{'type': 'text', 'text': json.dumps({'tool': 'brand_set', 'args': {'primary': '#aa0000', 'slogan': 'Проверка слогана', 'logo_file': m.group(1) if m else ''}}, ensure_ascii=False)}], 'end_turn'
+            return [{'type': 'text', 'text': json.dumps({'do': 'answer', 'say': 'Стиль: ' + text.split('РЕЗУЛЬТАТ brand_set', 1)[1][:400]}, ensure_ascii=False)}], 'end_turn'
         if 'Проверка истории записи' in text:   # №555 · скриншот → в историю поставщика
             if 'РЕЗУЛЬТАТ sup_note' not in text:
                 m = re.search(r'id файла ([A-Za-z0-9_]+)', text)

@@ -473,6 +473,35 @@ try:
     c, j = kf('sh_hide', 'mgr-t', {'rid': rid}, flow='flow'); check('скрыть запись менеджер не может', c == 403, c)
     c, j = kf('sh_hide', data={'rid': rid}, flow='flow'); c, j = kf('sh_view', data={'id': 's1'}, flow='flow')
     check('руководитель скрыл ошибочную запись — в ленте её нет', not any('35 дней' in x['text'] for x in j['items']))
+    print('18. Фирменный стиль: одна база для всех документов (№556)')
+    os.makedirs(f'{ST}/api/kp_fonts', exist_ok=True)
+    for a_, b_ in [('DejaVuSans.ttf', 'Roboto-Regular.ttf'), ('DejaVuSans-Bold.ttf', 'Roboto-Bold.ttf')]:
+        if not os.path.exists(f'{ST}/api/kp_fonts/{b_}'): shutil.copy(f'/usr/share/fonts/truetype/dejavu/{a_}', f'{ST}/api/kp_fonts/{b_}')
+    q1("DELETE FROM itc_secret WHERE k='brand'"); shutil.rmtree(f'{ST}/uploads/brand', ignore_errors=True)
+    _Im.new('RGB', (600, 220), (13, 42, 107)).save(f'{ST}/uploads/brand_site.png'); os.makedirs(f'{ST}/uploads/brand', exist_ok=True); shutil.copy(f'{ST}/uploads/brand_site.png', f'{ST}/uploads/brand/site-logo.png')
+    def last_pdf(skip=''):
+        kid = q1(f"SELECT id FROM itc_fil_kp WHERE kind='rq' AND id<>'{skip}' ORDER BY created_at DESC LIMIT 1"); f = glob.glob(f'{ST}/uploads/**/{kid}.pdf', recursive=True)
+        import zlib as _z, re as _r2
+        raw = open(f[0], 'rb').read() if f else b''; out = raw
+        for m in _r2.finditer(rb'stream\n(.*?)\nendstream', raw, _r2.S):
+            try: out += _z.decompress(m.group(1))
+            except Exception: pass
+        return out, kid
+    q1("DELETE FROM itc_fil_kp WHERE kind='rq'")
+    c, j = kf('fc_cmd', 'mgr-t', {'text': 'Проверка запроса: запроси цены у SolarOne', 'conv': 'new'})
+    pdf, kid = last_pdf()
+    check('менеджер: запрос цены — PDF в фирменных цветах сайта, с логотипом', c == 200 and b'0.051 0.165 0.420 rg' in pdf and b'/Subtype /Image' in pdf and q1(f"SELECT kind FROM itc_fil_kp WHERE id='{kid}'") == 'rq', (j.get('say', '')[:300], len(pdf)))
+    check('запрос записан в историю поставщика', 'Отправлен коммерческий запрос' in q1("SELECT GROUP_CONCAT(text) FROM itc_sup_log WHERE sup_id='s1'"))
+    c, j = kf('fc_cmd', 'mgr-t', {'text': 'Проверка стиля: поменяй цвет', 'conv': 'new'})
+    check('менеджер стиль поменять не может', 'только руководитель' in j.get('say', ''), j.get('say'))
+    _Im.new('RGB', (500, 200), (170, 0, 0)).save(f'{TMP}/logo.png')
+    c, j = kf('fc_file', data={'name': 'наш логотип.png', 'mime': 'image/png', 'text': 'логотип ИТК', 'data': base64.b64encode(open(f'{TMP}/logo.png', 'rb').read()).decode()})
+    c, j = kf('fc_cmd', data={'text': 'Проверка стиля: вот новый логотип и цвет', 'conv': 'new', 'files': [j.get('id')]})
+    check('руководитель поменял логотип, цвет, слоган — одной командой', 'фирменный стиль обновлён' in j.get('say', '') and 'логотип' in j.get('say', ''), j.get('say'))
+    q1("DELETE FROM itc_fil_kp WHERE kind='rq' AND id<>'" + kid + "'")
+    c, j = kf('fc_cmd', 'mgr-t', {'text': 'Проверка запроса: ещё раз', 'conv': 'new'}); pdf2, _ = last_pdf(kid)
+    check('у всех менеджеров сразу новый стиль (цвет руководителя)', b'0.667 0.000 0.000 rg' in pdf2 and b'0.051 0.165 0.420 rg' not in pdf2, len(pdf2))
+    q1("DELETE FROM itc_secret WHERE k='brand'")
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')
