@@ -78,9 +78,48 @@ function skill_save(array $a, string $author, string $who, int $id = 0, bool $au
   $id = (int)$d->lastInsertId();
   $n = (int)$d->query('SELECT COUNT(*) FROM skills WHERE deleted=0')->fetchColumn();
   if ($n > SKILL_MAX)
-    $d->prepare("UPDATE skills SET deleted=1 WHERE id IN (SELECT id FROM skills WHERE deleted=0 AND id<>? ORDER BY uses ASC, COALESCE(NULLIF(used_at,''), created_at) ASC LIMIT ?)")
+    $d->prepare("UPDATE skills SET deleted=1 WHERE id IN (SELECT id FROM skills WHERE deleted=0 AND id<>? AND src='' ORDER BY uses ASC, COALESCE(NULLIF(used_at,''), created_at) ASC LIMIT ?)")
       ->execute([$id, $n - SKILL_MAX]);
   return ['ok' => true, 'id' => $id, 'new' => true, 'title' => $t];
+}
+
+/* 0.3.5 · навыки Claude — помощника, который строит систему ИТК. Он пишет их в GitHub (docs/skills/*.md),
+   агент сервера раз в 10 минут забирает GitHub и переносит сюда: «Космос» и «Фил» видят их как обычные навыки
+   (автор — Claude). Источник правды — файл: изменился файл — навык обновляется; файл убрали — навык удаляется. */
+function skill_parse_md(string $md): ?array {
+  $md = str_replace("\r", '', $md);
+  if (!preg_match('~^#\s+(.+)$~m', $md, $t)) return null;
+  $trig = preg_match('~^Когда:\s*(.+)$~mu', $md, $w) ? trim($w[1]) : '';
+  $p = strpos($md, "\n---\n");
+  $steps = $p !== false ? trim(substr($md, $p + 5)) : '';
+  if ($steps === '') return null;
+  return ['title' => trim($t[1]), 'trig' => $trig, 'steps' => $steps];
+}
+function skill_sync_claude(string $dir): array {
+  $d = db(); $seen = []; $n = ['new' => 0, 'upd' => 0, 'del' => 0, 'bad' => []];
+  foreach (glob(rtrim($dir, '/') . '/*.md') ?: [] as $f) {
+    $src = 'claude:' . basename($f, '.md');
+    if (basename($f) === 'README.md') continue;
+    $raw = (string)file_get_contents($f); $h = substr(hash('sha256', $raw), 0, 16);
+    $a = skill_parse_md($raw);
+    if (!$a || mb_strlen($a['steps']) > 1500) { $n['bad'][] = basename($f); continue; }
+    $seen[] = $src;
+    $q = $d->prepare('SELECT id, src_hash, deleted FROM skills WHERE src=? ORDER BY deleted, id DESC LIMIT 1'); $q->execute([$src]); $r = $q->fetch();
+    if ($r && $r['src_hash'] === $h && !(int)$r['deleted']) continue;
+    if ($r) {
+      $d->prepare("UPDATE skills SET title=?, trig=?, steps=?, author='Claude', who='Claude', manual=1, deleted=0, src_hash=?, updated_at=? WHERE id=?")
+        ->execute([skill_txt($a['title'], 120), skill_txt($a['trig'], 400), skill_txt($a['steps'], 1500), $h, now(), $r['id']]);
+      $n['upd']++;
+    } else {
+      $d->prepare("INSERT INTO skills (title, trig, steps, trace, author, who, manual, created_at, updated_at, src, src_hash) VALUES (?,?,?,'','Claude','Claude',1,?,?,?,?)")
+        ->execute([skill_txt($a['title'], 120), skill_txt($a['trig'], 400), skill_txt($a['steps'], 1500), now(), now(), $src, $h]);
+      $n['new']++;
+    }
+  }
+  $q = $d->query("SELECT id, src FROM skills WHERE deleted=0 AND src LIKE 'claude:%'");
+  foreach ($q->fetchAll() as $r) if (!in_array($r['src'], $seen, true)) { $d->prepare('UPDATE skills SET deleted=1 WHERE id=?')->execute([$r['id']]); $n['del']++; }
+  if ($n['new'] || $n['upd'] || $n['del']) log_add('', 'навыки Claude из GitHub', $n);
+  return $n;
 }
 
 function skill_used(int $id): void {

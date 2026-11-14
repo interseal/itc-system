@@ -36,8 +36,10 @@ $cmd = (string)($argv[1] ?? '');
 
 switch ($cmd) {
   case 'dbinfo':   echo json_encode(a_dbinfo()); exit;
+  case 'claudeskills': require_once __DIR__ . '/../lib/boot.php'; echo json_encode(skill_sync_claude((string)($argv[2] ?? ''))); exit;   // 0.3.5 · от www-data
   case 'bwinfo':   echo json_encode(a_bwinfo()); exit;   // 0.3.4 · от www-data: токен сейфа и ключи Claude (расшифровка — ключом базы)
   case 'bw':       a_lock(); exit(a_bw(true) ? 0 : 1);
+  case 'skills':   a_lock(); exit(a_claude_skills(true) ? 0 : 1);
   case 'dbbackup': exit(a_dbbackup((string)($argv[2] ?? '')) ? 0 : 1);
   case 'ip':       echo a_ip(), "\n"; exit;
   case 'update':   a_lock(); a_update(true); exit;
@@ -52,6 +54,7 @@ switch ($cmd) {
     a_backup(false);
     a_report();
     a_git(false);
+    a_claude_skills(false);
     a_bw(false);
     exit;
 }
@@ -504,5 +507,21 @@ function a_bw(bool $force): bool {
   $st['items'] = array_keys($want);
   if ($done) { $st['saved_at'] = date('Y-m-d H:i:s'); $st['last'] = $done; a_log('сейф: записано ' . implode(', ', $done)); }
   a_bw_save($st);
+  return true;
+}
+
+/* 0.3.5 · навыки Claude из рабочей копии GitHub (docs/skills/*.md) → навыки «Космоса» и «Фила». Только когда в GitHub что-то поменялось. */
+function a_claude_skills(bool $force): bool {
+  global $C;
+  $g = is_file(a_git_file()) ? (array)json_decode((string)file_get_contents(a_git_file()), true) : [];
+  $head = (string)($g['head']['hash'] ?? '');
+  $dir = rtrim((string)$C['git_dir'], '/') . '/docs/skills';
+  if (!is_dir($dir)) return true;
+  if (!$force && ($head === '' || (a_state()['skills_head'] ?? '') === $head)) return true;
+  $r = json_decode(a_as_db('claudeskills', $dir), true);
+  if (!is_array($r)) { a_log('навыки Claude: не удалось перенести'); return false; }
+  a_state_put(['skills_head' => $head]);
+  if ($r['new'] || $r['upd'] || $r['del']) a_log('навыки Claude: новых ' . $r['new'] . ', обновлено ' . $r['upd'] . ', убрано ' . $r['del']);
+  if ($r['bad']) a_log('навыки Claude: не разобраны (нет «# название» / «---» или шаги длиннее 1500 знаков): ' . implode(', ', $r['bad']));
   return true;
 }

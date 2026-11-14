@@ -394,6 +394,27 @@ try:
     call('bw_del', B); c, j = call('bw', B); check('токен можно убрать', j['set'] is False, j)
     html = open(f'{ROOT}/www/index.html', encoding='utf-8').read()
     check('вкладка «Сейф» в настройках, поле не password', 'data-t="bw"' in html and 'id="bwVal" type="text"' in html)
+
+    print('14. Навыки Claude из GitHub → навыки «Космоса» и «Фила» (0.3.5)')
+    import shutil as _sh
+    os.makedirs(f'{G}/docs/skills', exist_ok=True)
+    for f in ('claude-dengi.md', 'kosmos-server.md', 'README.md'): _sh.copy(f'{os.path.dirname(ROOT)}/docs/skills/{f}', f'{G}/docs/skills/{f}')
+    open(f'{G}/docs/skills/plokhoy.md', 'w').write('без заголовка и шагов')
+    def run_sk():
+        r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'skills'], env=aenv, capture_output=True, text=True, timeout=60)
+        db = sqlite3.connect(f'{TMP}/kosmos.sqlite'); rows = db.execute("SELECT title, author, manual, deleted, src, steps FROM skills WHERE src LIKE 'claude:%' ORDER BY src").fetchall(); db.close()
+        return r, rows
+    r, rows = run_sk()
+    live = [x for x in rows if not x[3]]
+    check('два навыка Claude перенесены: автор Claude, правленые (их не перепишет «Космос»)', len(live) == 2 and all(x[1] == 'Claude' and x[2] == 1 for x in live)
+          and {x[4] for x in live} == {'claude:claude-dengi', 'claude:kosmos-server'}, (rows, r.stdout[-300:], r.stderr[-300:]))
+    check('README и файл без шагов не стали навыками, в журнале причина', 'plokhoy.md' in r.stdout and not any('README' in x[4] for x in rows), r.stdout[-300:])
+    c, j = gw({'a': 'skills', 'op': 'pick', 'q': 'сколько денег осталось на счёте Claude, баланс'}, key='ab' * 32)
+    check('«Космос» и «Фил» находят навык Claude по вопросу (шлюз)', c == 200 and j['items'] and j['items'][0]['author'] == 'Claude' and 'Деньги Claude' in j['items'][0]['title'], j)
+    r, rows2 = run_sk(); check('повторно ничего не меняется', rows2 == rows and 'новых' not in r.stdout, r.stdout[-200:])
+    open(f'{G}/docs/skills/claude-dengi.md', 'a').write('7) Новая строка навыка.\n'); os.remove(f'{G}/docs/skills/kosmos-server.md')
+    r, rows = run_sk(); d = {x[4]: x for x in rows}
+    check('файл изменился — навык обновлён; файл убрали — навык удалён', 'Новая строка' in d['claude:claude-dengi'][5] and d['claude:claude-dengi'][3] == 0 and d['claude:kosmos-server'][3] == 1, rows)
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')
