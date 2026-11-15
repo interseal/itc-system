@@ -2,7 +2,7 @@
 """Проверка «Космоса» целиком у себя: пробный Claude + встроенный сервер PHP + служба задач.
 Запуск: python3 tests/run_tests.py   (из папки kosmos)
 """
-import json, os, shutil, subprocess, sys, time, urllib.request, urllib.error, sqlite3
+import base64, json, os, shutil, subprocess, sys, time, urllib.request, urllib.error, sqlite3
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = '/tmp/kosmos_test'
@@ -632,6 +632,19 @@ try:
     c, j = gw({'a': 'ask', 'system': 'Правила без метки', 'user': 'Привет', 'who': BOSS}, key='ab' * 32)
     rec = [json.loads(l) for l in open(f'{TMP}/mock.log')][-1]
     check('шлюз: правила без метки — одним блоком, как раньше', c == 200 and len(rec.get('sys_blocks', [])) == 1 and rec['sys_blocks'][0][1], (c, rec.get('sys_blocks')))
+    print('26. Загрузка фото быстрее (№627): снимок в Сингапур — один раз, дальше по отпечатку; текст фото — после ответа телефону')
+    import hashlib
+    d0 = imgs[0]['data'] if imgs else base64.b64encode(b'\xff\xd8\xff' + os.urandom(3000)).decode()
+    sha = hashlib.sha256(d0.encode()).hexdigest()
+    c, j = gw({'a': 'ask', 'user': 'Что на фото?', 'who': BOSS, 'images': [{'media_type': 'image/jpeg', 'data': d0, 'sha': sha}]}, key='ab' * 32)
+    check('шлюз: снимок целиком принят и запомнен, в ответе img_cache', c == 200 and j.get('img_cache') == 1, (c, j))
+    c, j = gw({'a': 'ask', 'user': 'А теперь?', 'who': BOSS, 'images': [{'media_type': 'image/jpeg', 'sha': sha}]}, key='ab' * 32)
+    rec = [json.loads(l) for l in open(f'{TMP}/mock.log')][-1]
+    check('шлюз: следующий шаг — только отпечаток, Claude всё равно видит снимок', c == 200 and len(rec.get('imgs', [])) == 1 and 'А теперь' in rec.get('txt1', ''), (c, rec))
+    c, j = gw({'a': 'ask', 'user': 'Чужой снимок', 'who': BOSS, 'images': [{'media_type': 'image/jpeg', 'sha': 'f' * 64}]}, key='ab' * 32)
+    check('шлюз: снимка нет — 409 need_images (магазин пришлёт целиком)', c == 409 and j.get('need_images') == ['f' * 64], (c, j))
+    r = subprocess.run(['php', f'{ROOT}/tests/ff_ocr_test.php'], capture_output=True, text=True, timeout=60)
+    check('магазин: отпечатки снимков, распознавание после ответа, одно соединение — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

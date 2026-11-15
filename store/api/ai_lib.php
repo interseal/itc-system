@@ -15,11 +15,16 @@ function itcai_dir() {
   return $d;
 }
 
+/* №627 · соединение с тем же сервером (DeepSeek, Яндекс) держим открытым на весь запрос: шаги Фила и распознавание
+   идут без нового рукопожатия TLS каждый раз. «Expect:» — без лишнего круга перед большим телом (фото). */
 function itcai_post($url, $body, $headers, $timeout) {
-  $ch = curl_init($url);
-  curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body,
-    CURLOPT_HTTPHEADER => $headers, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 5]);
-  $r = curl_exec($ch); $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+  static $hs = [];
+  $k = (string)parse_url($url, PHP_URL_HOST);
+  if (isset($hs[$k])) { $ch = $hs[$k]; curl_reset($ch); } else $ch = $hs[$k] = curl_init();
+  curl_setopt_array($ch, [CURLOPT_URL => $url, CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body,
+    CURLOPT_HTTPHEADER => array_merge($headers, ['Expect:']), CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 5]);
+  $r = curl_exec($ch); $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  if ($http === 0) { curl_close($ch); unset($hs[$k]); }   // оборвалось — в следующий раз новое соединение
   return [$http, $r === false ? '' : $r];
 }
 

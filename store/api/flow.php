@@ -2446,15 +2446,75 @@ function ff_convert($name, $bin) {
 }
 /* фото / скан → текст (Яндекс Vision OCR) */
 function ff_ocr($bin, $mime, &$err) {
-  $err = '';
+  $err = ''; $q = ff_ocr_req($bin, $mime, $err); if (!$q) return null;
+  [$http, $r] = itcai_post($q[0], $q[1], $q[2], 40);
+  return ff_ocr_parse($http, $r, $err);
+}
+/* №627 · запрос к Яндексу отдельно от разбора ответа — чтобы распознавать несколько снимков одновременно (ff_ocr_many) */
+function ff_ocr_req($bin, $mime, &$err) {
   $YK = fl_yk(); $YF = defined('YC_FOLDER_ID') ? YC_FOLDER_ID : ($GLOBALS['YC_FOLDER_ID'] ?? '');
   if (!$YK) { $err = 'не настроен ключ Яндекса для распознавания'; return null; }
   $mt = $mime === 'application/pdf' ? 'PDF' : ($mime === 'image/png' ? 'PNG' : 'JPEG');
   $body = json_encode(['mimeType' => $mt, 'languageCodes' => ['*'], 'model' => 'page', 'content' => base64_encode($bin)]);
-  [$http, $r] = itcai_post('https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText', $body, ['Content-Type: application/json', 'Authorization: Api-Key ' . $YK, 'x-folder-id: ' . $YF, 'x-data-logging-enabled: false'], 40);
-  $j = json_decode($r, true);
+  return ['https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText', $body, ['Content-Type: application/json', 'Authorization: Api-Key ' . $YK, 'x-folder-id: ' . $YF, 'x-data-logging-enabled: false', 'Expect:']];
+}
+function ff_ocr_parse($http, $r, &$err) {
+  $j = json_decode((string)$r, true);
   if ($http !== 200) { $err = 'Яндекс ответил ' . $http . (is_array($j) && !empty($j['message']) ? ': ' . $j['message'] : ''); return null; }
   return trim((string)($j['result']['textAnnotation']['fullText'] ?? ''));
+}
+/* №627 · ФОТО И СКАНЫ — РАСПОЗНАВАНИЕ ПОСЛЕ ОТВЕТА ТЕЛЕФОНУ. Раньше fc_file держал загрузку, пока Яндекс читал текст (2–5 с на фото,
+   у пачки — пока не прочитаются все). Теперь: файл сохранён → телефон сразу получает id (ocr=1), текст читается в том же процессе
+   уже после ответа. Перед вопросом ff_ocr_wait дожидается готового текста; если фоновое чтение не успело или сорвалось —
+   распознаёт оставшиеся сам, все одновременно. Готовый текст лежит в базе по id — в следующих репликах не пересчитывается. */
+const FF_OCR_WAIT = 25; const FF_OCR_STALE = 60;
+function ff_ocr_on() { try { ff_cols(); return ag_col('itc_fc_file', 'ocr'); } catch (Throwable $e) { return false; } }
+/* итоговый текст файла: фото без текста и «ничего не нашлось» — честная пометка (№557, №558) */
+function ff_text_final($kind, $text, $err, $name, $ext, $bytes) {
+  if ($kind === 'фото' && ($text === null || mb_strlen(trim((string)$text)) < 3))
+    $text = 'Фото «' . $name . '» — текста на нём нет (это снимок: человек, товар, логотип, место). Файл сохранён: его можно обработать (files), прикрепить к поставщику или поставить логотипом (brand_set).';
+  if ($text === null || mb_strlen(trim((string)$text)) < 3)
+    $text = 'Файл «' . $name . '» (' . ($ext ?: 'без расширения') . ', ' . ($bytes !== null ? round($bytes / 1024) . ' КБ' : '') . ') сохранён, но текста в нём не нашлось' . ($err !== '' ? ' (' . mb_substr($err, 0, 120) . ')' : '') . '. Его можно прикрепить к поставщику или обработать (files).';
+  return trim(mb_substr((string)$text, 0, 200000));
+}
+function ff_ocr_save($id, $kind, $text, $err, $name, $bytes) {
+  $t = ff_text_final($kind, $text, $err, $name, strtolower(pathinfo($name, PATHINFO_EXTENSION)), $bytes);
+  db()->prepare('UPDATE itc_fc_file SET text=?,chars=?,ocr=0 WHERE id=?')->execute([$t, mb_strlen($t), $id]);
+}
+/* распознать сохранённые файлы (строки itc_fc_file с ocr=1) — все запросы к Яндексу одновременно */
+function ff_ocr_many($rows) {
+  $mh = curl_multi_init(); $jobs = [];
+  foreach ($rows as $f) {
+    $fn = ff_dir() . '/' . basename((string)$f['path']); $bin = (string)$f['path'] !== '' && is_file($fn) ? (string)@file_get_contents($fn) : '';
+    $mime = (string)$f['kind'] === 'PDF-скан' ? 'application/pdf' : ((string)$f['mime'] === 'image/png' ? 'image/png' : 'image/jpeg');
+    $err = ''; $q = $bin !== '' ? ff_ocr_req($bin, $mime, $err) : null;
+    if (!$q) { ff_ocr_save($f['id'], (string)$f['kind'], null, $err ?: 'файл не найден', (string)$f['name'], strlen($bin)); continue; }
+    $ch = curl_init($q[0]); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_POSTFIELDS => $q[1], CURLOPT_HTTPHEADER => $q[2], CURLOPT_TIMEOUT => 40, CURLOPT_CONNECTTIMEOUT => 5]);
+    curl_multi_add_handle($mh, $ch); $jobs[] = [$ch, $f, $bin, $mime];
+  }
+  do { $st = curl_multi_exec($mh, $run); if ($run) curl_multi_select($mh, 1.0); } while ($run && $st === CURLM_OK);
+  foreach ($jobs as [$ch, $f, $bin, $mime]) {
+    $err = ''; $text = ff_ocr_parse((int)curl_getinfo($ch, CURLINFO_HTTP_CODE), (string)curl_multi_getcontent($ch), $err);
+    curl_multi_remove_handle($mh, $ch); curl_close($ch);
+    if ($mime === 'application/pdf' && ($text === null || mb_strlen(trim((string)$text)) < 3)) { $cv = ff_convert((string)$f['name'], $bin); if (!empty($cv['text'])) $text = (string)$cv['text']; }
+    ff_ocr_save($f['id'], (string)$f['kind'], $text, $err, (string)$f['name'], strlen($bin));
+  }
+  curl_multi_close($mh);
+}
+/* перед вопросом: дождаться текста приложенных файлов (не дольше FF_OCR_WAIT), несделанное — распознать самим */
+function ff_ocr_wait($me, $ids) {
+  try {
+    $ids = array_values(array_filter(array_map('strval', (array)$ids))); if (!$ids || !ff_ocr_on()) return;
+    $in = implode(',', array_fill(0, count($ids), '?')); $t0 = microtime(true);
+    for ($i = 0; $i < 400; $i++) {
+      $q = db()->prepare("SELECT id,name,kind,path,mime,TIMESTAMPDIFF(SECOND,created_at,NOW()) age FROM itc_fc_file WHERE phone=? AND ocr=1 AND id IN ($in)");
+      $q->execute(array_merge([$me['phone']], $ids)); $rows = $q->fetchAll(); if (!$rows) return;
+      $late = microtime(true) - $t0 > FF_OCR_WAIT;
+      $do = array_values(array_filter($rows, function ($f) use ($late) { return $late || (int)$f['age'] > FF_OCR_STALE; }));
+      if ($do) { ff_ocr_many($do); continue; }
+      usleep(250000);
+    }
+  } catch (Throwable $e) { error_log('ff_ocr_wait: ' . $e->getMessage()); }
 }
 /* Word .docx → текст */
 function ff_docx($bin) {
@@ -2495,6 +2555,7 @@ function ff_xlsx($bin) {
 /* прикреплённые файлы → кусок текста для Фила */
 function ff_attach_text($me, $ids) {
   ff_ensure(); $ids = array_slice(array_filter(array_map('strval', (array)$ids)), 0, defined('KS_MODEL0') ? FF_IMG_MAX : 6); if (!$ids) return '';   // №624: «Космос» — до 10 файлов, Фил — как было
+  ff_ocr_wait($me, $ids);   // №627 · текст фото читается после загрузки — к вопросу он обычно уже готов
   $in = implode(',', array_fill(0, count($ids), '?'));
   $q = db()->prepare("SELECT id,name,kind,text FROM itc_fc_file WHERE phone=? AND id IN ($in)"); $q->execute(array_merge([$me['phone']], $ids));
   $o = ''; $left = 14000;
@@ -2533,6 +2594,16 @@ function ff_img_small($bin, $m) {
     return $out !== '' && strlen($out) <= FF_IMG_RAW ? ['image/jpeg', $out] : $raw;
   } catch (Throwable $e) { return $raw; }
 }
+/* №627 · уменьшенный снимок храним рядом (fil_files/sm/<id>.jpg): в следующих репликах и шагах не пересжимаем заново */
+function ff_img_cached($id, $fn, $m) {
+  $raw = filesize($fn) <= FF_IMG_RAW ? @getimagesize($fn) : false;
+  if ($raw && max((int)$raw[0], (int)$raw[1]) <= FF_IMG_SIDE) return [$m, (string)@file_get_contents($fn)];   // уже небольшой — как есть
+  $d = ff_dir() . '/sm'; $cf = $d . '/' . preg_replace('~[^a-z0-9]~i', '', (string)$id) . '.jpg';
+  if (is_file($cf) && filemtime($cf) >= filemtime($fn)) return ['image/jpeg', (string)@file_get_contents($cf)];
+  $bin = (string)@file_get_contents($fn); $im = ff_img_small($bin, $m);
+  if ($im && $im[0] === 'image/jpeg' && $im[1] !== $bin) { if (!is_dir($d)) @mkdir($d, 0755, true); @file_put_contents($cf, $im[1], LOCK_EX); }
+  return $im;
+}
 function ff_attach_imgs($me, $ids) {
   try {   // №623 · любая ошибка — просто без снимков, как раньше
     $ids = array_values(array_unique(array_slice(array_filter(array_map('strval', (array)$ids)), 0, FF_IMG_MAX))); if (!$ids) return [];
@@ -2545,7 +2616,7 @@ function ff_attach_imgs($me, $ids) {
       $fn = ff_dir() . '/' . basename((string)$f['path']); if ((string)$f['path'] === '' || !is_file($fn)) continue;
       $ext = strtolower(pathinfo($fn, PATHINFO_EXTENSION)); $m = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif'][$ext] ?? '';
       if ($m === '' || filesize($fn) > 25 * 1048576) continue;
-      $im = ff_img_small((string)@file_get_contents($fn), $m); if (!$im || $tot + strlen($im[1]) > FF_IMG_TOT) continue;
+      $im = ff_img_cached($id, $fn, $m); if (!$im || $tot + strlen($im[1]) > FF_IMG_TOT) continue;
       $tot += strlen($im[1]); $o[] = ['m' => $im[0], 'd' => base64_encode($im[1]), 'n' => (string)$f['name']];
     }
     return $o;
@@ -3040,7 +3111,7 @@ function ff_dir() {
 }
 function ff_cols() {
   static $d = false; if ($d) return; $d = true; ff_ensure();
-  foreach (['path VARCHAR(300) NOT NULL DEFAULT \'\'', 'mime VARCHAR(120) NOT NULL DEFAULT \'\'', 'bytes INT NOT NULL DEFAULT 0'] as $c)
+  foreach (['path VARCHAR(300) NOT NULL DEFAULT \'\'', 'mime VARCHAR(120) NOT NULL DEFAULT \'\'', 'bytes INT NOT NULL DEFAULT 0', 'ocr TINYINT NOT NULL DEFAULT 0'] as $c)   // №627 · ocr=1 — текст ещё распознаётся
     if (!ag_col('itc_fc_file', strtok($c, ' '))) try { db()->exec('ALTER TABLE itc_fc_file ADD COLUMN ' . $c); } catch (Throwable $e) {}
 }
 function fs_sup_ok() { try { db()->query('SELECT 1 FROM itc_sup LIMIT 1'); db()->query('SELECT 1 FROM itc_sup_media LIMIT 1'); return true; } catch (Throwable $e) { return false; } }
@@ -3971,6 +4042,9 @@ try {
       // №558 · ЛЮБОЙ ФОРМАТ: быстрые — здесь, остальное (TIFF, HEIC, BMP, GIF, старые .doc/.xls, PowerPoint, RTF, ODT, звук…) — переводит сервер «Космоса»
       $fastImg = in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) || in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) && !in_array($ext, ['tif', 'tiff', 'heic', 'heif', 'bmp', 'gif'], true);
       if ($isVid) { $kind = 'видео'; $text = 'Видео «' . $name . '», ' . round(strlen($bin) / 1048576, 1) . ' МБ. Обработать — инструментом files (кадры, сжать, отрезок, сведения).'; }
+      elseif (($fastImg || $ext === 'pdf') && (string)fl_in('wait') === '' && ff_ocr_on()) {   // №627 · распознаём после ответа телефону (ниже)
+        $kind = $fastImg ? 'фото' : 'PDF-скан'; $ocrLater = $fastImg ? ($mime === 'image/png' || $ext === 'png' ? 'image/png' : 'image/jpeg') : 'application/pdf';
+        $text = ($fastImg ? 'Фото' : 'PDF') . ' «' . $name . '» — текст ещё распознаётся (несколько секунд).'; }
       elseif ($fastImg) { $kind = 'фото'; $text = ff_ocr($bin, $mime === 'image/png' || $ext === 'png' ? 'image/png' : 'image/jpeg', $err); }
       elseif ($ext === 'pdf') { $kind = 'PDF-скан'; $text = ff_ocr($bin, 'application/pdf', $err);
         if ($text === null || mb_strlen(trim((string)$text)) < 3) { $cv = ff_convert($name, $bin); if (!empty($cv['text'])) $text = (string)$cv['text']; } }
@@ -3987,13 +4061,8 @@ try {
         } else { $kind = 'файл'; $text = ''; $err = (string)($cv['error'] ?? ''); }
       }
     }
-    // №557 · фото без текста (портрет сотрудника, товар, логотип) — тоже принимаем: сохраняем снимок, Фил/«Космос» работают с ним как с файлом
-    if ($kind === 'фото' && ($text === null || mb_strlen(trim((string)$text)) < 3))
-      $text = 'Фото «' . $name . '» — текста на нём нет (это снимок: человек, товар, логотип, место). Файл сохранён: его можно обработать (files), прикрепить к поставщику или поставить логотипом (brand_set).';
-    // №558 · ничего не отклоняем: не прочитали — всё равно сохраняем и честно говорим
-    if ($text === null || mb_strlen(trim((string)$text)) < 3)
-      $text = 'Файл «' . $name . '» (' . ($ext ?: 'без расширения') . ', ' . (isset($bin) && $bin !== false ? round(strlen((string)$bin) / 1024) . ' КБ' : '') . ') сохранён, но текста в нём не нашлось' . ($err !== '' ? ' (' . mb_substr($err, 0, 120) . ')' : '') . '. Его можно прикрепить к поставщику или обработать (files).';
-    $text = trim(mb_substr((string)$text, 0, 200000));
+    // №557 · фото без текста — тоже принимаем; №558 · ничего не отклоняем: не прочитали — всё равно сохраняем и честно говорим (ff_text_final)
+    $text = ff_text_final($kind, $text, $err, $name, $ext, isset($bin) && $bin !== false ? strlen((string)$bin) : null);
     $id = fl_id('ff');
     db()->prepare('INSERT INTO itc_fc_file (id,phone,name,kind,text,chars) VALUES (?,?,?,?,?,?)')->execute([$id, $me['phone'], $name, $kind, $text, mb_strlen($text)]);
     /* №33 · оригинал файла храним — чтобы Фил мог приложить его к карточке поставщика */
@@ -4003,6 +4072,18 @@ try {
       try { ff_cols(); $sx = $sxx; if ($kind === 'фото' && $mime === 'image/jpeg') $sx = 'jpg';
         $fn = $id . '.' . $sx; if (@file_put_contents(ff_dir() . '/' . $fn, $bin) !== false)
           db()->prepare('UPDATE itc_fc_file SET path=?,mime=?,bytes=? WHERE id=?')->execute([$fn, $mime ?: 'application/octet-stream', strlen($bin), $id]); } catch (Throwable $e) {}
+    }
+    if (!empty($ocrLater)) {   // №627 · телефон получает id сразу, текст читаем уже после ответа
+      try { db()->prepare('UPDATE itc_fc_file SET ocr=1 WHERE id=?')->execute([$id]); } catch (Throwable $e) { $ocrLater = ''; }
+      if ($ocrLater !== '') {
+        fl_out_keep(['ok' => true, 'id' => $id, 'name' => $name, 'kind' => $kind, 'chars' => 0, 'preview' => '', 'ocr' => 1]); @set_time_limit(180);
+        try {
+          $err = ''; $t = ff_ocr($bin, $ocrLater, $err);
+          if ($ocrLater === 'application/pdf' && ($t === null || mb_strlen(trim((string)$t)) < 3)) { $cv = ff_convert($name, $bin); if (!empty($cv['text'])) $t = (string)$cv['text']; }
+          ff_ocr_save($id, $kind, $t, $err, $name, strlen($bin));
+        } catch (Throwable $e) { error_log('fc_file ocr: ' . $e->getMessage()); }
+        exit;
+      }
     }
     fl_out(['ok' => true, 'id' => $id, 'name' => $name, 'kind' => $kind, 'chars' => mb_strlen($text), 'preview' => mb_substr(preg_replace('~\s+~u', ' ', $text), 0, 160)]);
   }

@@ -12,6 +12,35 @@ const GW_DYN = "\n\n=== ПО ЭТОМУ ЗАПРОСУ ===";   // 0.5.2 (№626)
 /* где начинается меняющаяся часть правил (0 — метки нет или постоянная часть пустая) */
 function gw_sys_cut(string $sys): int { $p = strpos($sys, GW_DYN); return $p === false || trim(substr($sys, 0, $p)) === '' ? 0 : (int)$p; }
 const GW_IMG_MAX = 10; const GW_IMG_TOT = 26000000;   // 0.5.0 (№624)
+/* 0.5.3 (№627) · КЕШ СНИМКОВ. Раньше магазин слал все снимки (до 10 × ~0,7 МБ) из России в Сингапур на КАЖДОМ шаге ответа.
+   Теперь снимок, пришедший целиком, кладём сюда по отпечатку (sha256 его base64); дальше магазин шлёт только {"media_type","sha"}.
+   Снимка нет (стёрт, другой сервер) — ответ 409 need_images, магазин пришлёт эти снимки целиком. Храним сутки. */
+const GW_IMG_TTL = 86400;
+function gw_img_dir(): string { $d = dirname((string)cfg('db')) . '/imgcache'; if (!is_dir($d)) @mkdir($d, 0700, true); return $d; }
+function gw_img_sha($sha): string { return is_string($sha) && preg_match('~^[a-f0-9]{64}$~', $sha) ? $sha : ''; }
+/* base64 снимка: пришёл целиком — запомнить; пришёл отпечаток — взять из кеша ('' — нет) */
+function gw_img_data(array $im): string {
+  $d = (string)($im['data'] ?? ''); $dir = gw_img_dir();
+  if ($d !== '') {
+    if (strlen($d) <= 7000000 && preg_match('~^[A-Za-z0-9+/=]+$~', substr($d, 0, 200))) {
+      $f = $dir . '/' . hash('sha256', $d); if (!is_file($f)) @file_put_contents($f, $d, LOCK_EX); else @touch($f);
+      if (mt_rand(1, 50) === 1) foreach (glob($dir . '/*') ?: [] as $o) if (is_file($o) && filemtime($o) < time() - GW_IMG_TTL) @unlink($o);
+    }
+    return $d;
+  }
+  $sha = gw_img_sha($im['sha'] ?? null); if ($sha === '') return '';
+  $f = $dir . '/' . $sha; if (!is_file($f)) return '';
+  @touch($f); return (string)@file_get_contents($f);
+}
+/* каких снимков по отпечатку здесь нет */
+function gw_img_need(array $ims): array {
+  $o = [];
+  foreach (array_slice($ims, 0, GW_IMG_MAX) as $im) {
+    if (!is_array($im) || (string)($im['data'] ?? '') !== '') continue;
+    $sha = gw_img_sha($im['sha'] ?? null); if ($sha !== '' && !is_file(gw_img_dir() . '/' . $sha)) $o[] = $sha;
+  }
+  return $o;
+}
 
 function gw_handle(): void {
   $want = '';
@@ -65,6 +94,9 @@ function gw_who(array $w): array {
 }
 
 function gw_ask(array $in): void {
+  // 0.5.3 (№627) · снимок по отпечатку, которого здесь нет — просим целиком (до учёта обращения, чтобы повтор не считался дважды)
+  $need = gw_img_need((array)($in['images'] ?? []));
+  if ($need) jout(['ok' => false, 'error' => 'нужны снимки целиком', 'need_images' => $need, 'img_cache' => 1], 409);
   $u = gw_who((array)($in['who'] ?? []));
   $sys = (string)($in['system'] ?? '');
   $user = (string)($in['user'] ?? '');
@@ -77,7 +109,7 @@ function gw_ask(array $in): void {
   // все вместе — до 26 МБ в base64 (предел запроса Claude — 32 МБ; предел тела у nginx/PHP «Космоса» — 64 МБ)
   $content = $user; $imgs = []; $tot = 0;
   foreach (array_slice((array)($in['images'] ?? []), 0, GW_IMG_MAX) as $im) {
-    $mt = (string)($im['media_type'] ?? ''); $d = (string)($im['data'] ?? '');
+    $mt = (string)($im['media_type'] ?? ''); $d = gw_img_data((array)$im);
     if (!in_array($mt, ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], true) || $d === '' || strlen($d) > 7000000 || !preg_match('~^[A-Za-z0-9+/=]+$~', substr($d, 0, 200))) continue;
     if ($tot + strlen($d) > GW_IMG_TOT) break; $tot += strlen($d);
     $imgs[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mt, 'data' => $d]];
@@ -108,5 +140,5 @@ function gw_ask(array $in): void {
   $kn = '';
   if ($kid) { $q = db()->prepare('SELECT name FROM keys WHERE id=?'); $q->execute([$kid]); $kn = (string)$q->fetchColumn(); }
   jout(['ok' => true, 'text' => blocks_text((array)($res['content'] ?? [])), 'model' => (string)($res['model'] ?? $model),
-        'stop' => (string)($res['stop_reason'] ?? ''), 'key' => $kn, 'switched' => $switched]);
+        'stop' => (string)($res['stop_reason'] ?? ''), 'key' => $kn, 'switched' => $switched, 'img_cache' => 1]);
 }

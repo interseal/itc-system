@@ -71,23 +71,59 @@ function ks_cron_url() { return KS_STORE . '/api/kosmos_flow.php?action=ft_cron&
 function ks_cron_ok($k) { return is_string($k) && strlen($k) === 32 && hash_equals(ks_gw()['cron'], $k); }
 
 /* Запрос к шлюзу сервера «Космоса». Возвращает [код, ответ-массив]. 0 — нет связи. */
+/* №627 · одно соединение на весь ответ: шаги «Космоса» (до 60) идут по уже открытому соединению (keep-alive) —
+   без нового рукопожатия TLS до Сингапура (~0,4 с) на каждом шаге. «Expect:» — без лишнего круга «можно слать?» перед большим телом. */
 function ks_gw_call($data, $timeout = 150) {
-  $ch = curl_init(KS_SERVER . '/api.php?a=gw');
-  curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 8,
-    CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Kosmos-GW: ' . ks_gw()['gw']],
+  static $ch = null;
+  if ($ch) curl_reset($ch); else $ch = curl_init();
+  curl_setopt_array($ch, [CURLOPT_URL => KS_SERVER . '/api.php?a=gw', CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 8,
+    CURLOPT_TCP_KEEPALIVE => 1, CURLOPT_ENCODING => '',
+    CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Kosmos-GW: ' . ks_gw()['gw'], 'Expect:'],
     CURLOPT_POSTFIELDS => json_encode($data, JSON_UNESCAPED_UNICODE)]);
-  $r = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+  $r = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  if ($code === 0) { curl_close($ch); $ch = null; }   // оборвалось — в следующий раз новое соединение
   $j = is_string($r) ? json_decode($r, true) : null;
   return [$code, is_array($j) ? $j : []];
 }
 
+/* №627 · КЕШ СНИМКОВ НА ШЛЮЗЕ. Снимок уходит в Сингапур целиком один раз, дальше (следующие шаги, реплики, фоновые задачи) — только
+   отпечаток sha256. Что шлюз уже получил — помним в этом запросе и пометками ks_dir('imgsent') на 20 часов (шлюз хранит сутки).
+   Старый шлюз (без img_cache в ответе) пометок не получает — ему снимки идут целиком, как раньше. */
+function ks_gw_imgs($imgs, $full = false) {
+  $o = [];
+  foreach ($imgs as $x) {
+    $d = (string)($x['d'] ?? ''); $sha = hash('sha256', $d);
+    if (!$full && ks_gw_img_known($sha)) $o[] = ['media_type' => (string)$x['m'], 'sha' => $sha];
+    else $o[] = ['media_type' => (string)$x['m'], 'data' => $d, 'sha' => $sha];
+  }
+  return $o;
+}
+function ks_gw_img_known($sha) {
+  if (!empty($GLOBALS['KS_IMG_SENT'][$sha])) return true;
+  $f = ks_dir('imgsent') . '/' . $sha;
+  if (is_file($f) && filemtime($f) > time() - 72000) return $GLOBALS['KS_IMG_SENT'][$sha] = true;
+  return false;
+}
+function ks_gw_imgs_sent($req) {
+  $dir = ks_dir('imgsent');
+  foreach ($req as $x) if (!empty($x['data']) && preg_match('~^[a-f0-9]{64}$~', (string)($x['sha'] ?? ''))) { $GLOBALS['KS_IMG_SENT'][$x['sha']] = true; @touch($dir . '/' . $x['sha']); }
+  if (mt_rand(1, 40) === 1) foreach (glob($dir . '/*') ?: [] as $f) if (preg_match('~/[a-f0-9]{64}$~', $f) && filemtime($f) < time() - 72000) @unlink($f);
+}
+function ks_gw_imgs_forget($shas) {
+  foreach ($shas as $sha) if (preg_match('~^[a-f0-9]{64}$~', (string)$sha)) { unset($GLOBALS['KS_IMG_SENT'][$sha]); @unlink(ks_dir('imgsent') . '/' . $sha); }
+}
 /* Спросить Claude: [текст или null, ошибка, какая модель ответила]. $me — кто спрашивает (для доступа и лимитов «Космоса»). */
 function ks_gw_ask($sys, $user, $maxTok, $model, $me) {
   $who = ['phone' => (string)($me['phone'] ?? ''), 'name' => (string)($me['name'] ?? ''), 'role' => (string)($me['role'] ?? ''), 'boss' => !empty($me['boss'])];
   $GLOBALS['KS_STOP'] = '';
   $req = ['a' => 'ask', 'system' => (string)$sys, 'user' => (string)$user, 'max_tokens' => (int)$maxTok, 'model' => (string)$model, 'who' => $who];
-  if (!empty($GLOBALS['FC_IMGS'])) $req['images'] = array_map(function ($x) { return ['media_type' => $x['m'], 'data' => $x['d']]; }, (array)$GLOBALS['FC_IMGS']);   // №575 · фото — самому Claude
+  if (!empty($GLOBALS['FC_IMGS'])) $req['images'] = ks_gw_imgs((array)$GLOBALS['FC_IMGS']);   // №575 · фото — самому Claude (№627: уже отданные — по отпечатку)
   [$code, $j] = ks_gw_call($req, !empty($req['images']) ? 240 : 150);
+  if ($code === 409 && !empty($j['need_images']) && !empty($req['images'])) {   // №627 · шлюз снимка не нашёл — шлём целиком
+    ks_gw_imgs_forget((array)$j['need_images']); $req['images'] = ks_gw_imgs((array)$GLOBALS['FC_IMGS'], true);
+    [$code, $j] = ks_gw_call($req, 240);
+  }
+  if ($code === 200 && !empty($j['ok']) && !empty($req['images']) && !empty($j['img_cache'])) ks_gw_imgs_sent($req['images']);
   if ($code === 200 && !empty($j['ok']) && is_string($j['text'] ?? null)) {
     $GLOBALS['KS_STOP'] = (string)($j['stop'] ?? '');   // №535: max_tokens — ответ не уместился
     if (!empty($j['switched'])) $GLOBALS['KS_SWITCHED'] = (string)$j['switched'];

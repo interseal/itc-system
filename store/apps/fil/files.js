@@ -9,7 +9,8 @@
     return new Promise(function (ok, no) {
       var img = new Image(), u = URL.createObjectURL(file);
       img.onload = function () { var k = Math.min(1, 2000 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL('image/jpeg', 0.88).split(',')[1]); };
+        var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);   // №627 · прозрачное — на белом
+        g.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL('image/jpeg', 0.84).split(',')[1]); };
       img.onerror = function () { URL.revokeObjectURL(u); no(); }; img.src = u;
     });
   }
@@ -56,6 +57,10 @@
   F.read = function (files, api, onChange) {
     var list = [].slice.call(files || []).slice(0, 6), out = list.map(function (f) { return { name: f.name || 'Фото', busy: true }; });
     if (onChange) onChange(out);
-    return Promise.all(list.map(function (f, i) { return one(out[i], f, api).catch(function () { out[i].busy = false; out[i].err = 'не прочитался'; }).then(function () { if (onChange) onChange(out); }); })).then(function () { return out; });
+    var q = list.map(function (f, i) { return i; }), work = function () {   // №627 · не больше 3 загрузок одновременно
+      if (!q.length) return Promise.resolve(); var i = q.shift(), f = list[i];
+      return one(out[i], f, api).catch(function () { out[i].busy = false; out[i].err = 'не прочитался'; }).then(function () { if (onChange) onChange(out); }).then(work);
+    };
+    return Promise.all([work(), work(), work()]).then(function () { return out; });
   };
 })();
