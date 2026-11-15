@@ -1,6 +1,6 @@
 /* «eSIM ИТК» · sw.js v1 — приложение открывается сразу, свежая версия тихо догружается в фоне.
    Данные (/api/) — всегда через сеть. */
-var C = 'itc-esim-v13';   // №470
+
 var SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png?v=3', 'fav-64.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(C).then(function (c) { return Promise.all(SHELL.map(function (u) { return c.add(new Request(u, { cache: 'reload' })).catch(function () {}); })); }));

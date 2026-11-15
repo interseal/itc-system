@@ -4902,7 +4902,8 @@ try {
     $d = body();
     $c = strtoupper(preg_replace('/[^A-Za-z]/', '', (string)($d['c'] ?? '')));
     $c = strtoupper(preg_replace('/[^A-Za-z_]/', '', (string)($d['c'] ?? '')));
-    if ($c !== 'WORLD' && !preg_match('/^[A-Z]{2}(_R)?$/', $c)) fail('Нет такой страны');
+    if ($c !== 'WORLD' && !preg_match('/^[A-Z]{2}(_R)?$/', $c) && !preg_match('/^GB(1|2|3|5|10|20|50|D)$/', strtoupper(preg_replace('/[^A-Za-z0-9_]/', '', (string)($d['c'] ?? ''))))) fail('Нет такой страны');
+    if (preg_match('/^GB(1|2|3|5|10|20|50|D)$/', $gk = strtoupper(preg_replace('/[^A-Za-z0-9_]/', '', (string)($d['c'] ?? ''))))) jout(esim_gb_art($gk));   // №613 · картинки объёмов
     if (substr($c, -2) === '_R') jout(esim_region_art(substr($c, 0, 2)));
     $name = mb_substr(preg_replace('/[^\p{L}\p{N} \-\'\(\),\.]/u', '', (string)($d['name'] ?? $c)), 0, 60);
     $r = esim_art_make($c, $name);
@@ -21748,6 +21749,27 @@ function esim_region_art($c) {
   $names = array_map('esim_en', array_slice($nb, 0, 4));
   $subj = 'a travel panorama that blends the most famous landmarks of ' . esim_en($c) . ' together with the landmarks of ' . implode(', ', $names) . ', one seamless scenic composition, airplane or travel mood';
   return esim_art_make($c . '_R', $subj);
+}
+/* №613 · картинки объёмов трафика для eSIM (1, 2, 3, 5, 10, 20, 50 ГБ и «в день»): сюжет растёт вместе с объёмом,
+   цифру поверх кладёт само приложение (нейросеть цифры рисует криво). Файлы — /esim/art/GB5.jpg и т. п. */
+function esim_gb_art($k) {
+  $key = trim((string)itc_setting('dashscope_key', ''));
+  if ($key === '') return ['ok'=>false, 'error'=>'Не задан ключ рисовалки (DashScope)'];
+  $S = ['GB1'=>'a small glossy blue SIM card chip with a single soft glowing wifi wave above it',
+        'GB2'=>'a glossy blue SIM card chip with two glowing wifi waves above it',
+        'GB3'=>'a glossy blue SIM card chip with three glowing wifi waves and a small white cloud',
+        'GB5'=>'a glossy blue SIM card chip sitting on a fluffy white cloud with bright streams of glowing data',
+        'GB10'=>'a glossy blue SIM card chip riding a white paper airplane through clouds, streams of glowing data behind it',
+        'GB20'=>'a glossy blue SIM card chip on a small rocket taking off, bright glowing data trails',
+        'GB50'=>'a glossy blue SIM card chip as a powerful rocket flying into space among stars and planets, a galaxy of glowing data',
+        'GBD'=>'a glossy blue SIM card chip with a smiling sun and an infinity loop made of glowing data, daily internet concept'];
+  $prompt = 'Cute 3D render app icon illustration, ' . ($S[$k] ?? $S['GB1']) . ', centered composition, soft studio lighting, glossy materials, navy blue, turquoise and white palette, clean soft light-blue gradient background, high detail, friendly travel tech mood';
+  $r = ds_draw($prompt, '1024*1024', 'text, letters, numbers, digits, words, watermark, logo, brand, people, faces, hands, blurry, low quality, dark, cluttered', 'wanx2.1-t2i-plus');
+  if (!empty($r['err'])) return ['ok'=>false, 'error'=>$r['err']];
+  $f = esim_art_dir() . '/' . $k . '.jpg'; $im = @imagecreatefromstring($r['img']);
+  if ($im) { $o = imagecreatetruecolor(512, 512); imagecopyresampled($o, $im, 0, 0, 0, 0, 512, 512, imagesx($im), imagesy($im)); @imagejpeg($o, $f, 85); imagedestroy($o); imagedestroy($im); }
+  else @file_put_contents($f, $r['img']);
+  return ['ok'=>is_file($f), 'c'=>$k, 'v'=>(int)@filemtime($f)];
 }
 function esim_art_make($c, $name) {
   $key = trim((string)itc_setting('dashscope_key', ''));
