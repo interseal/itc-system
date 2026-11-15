@@ -1,14 +1,19 @@
 /* ИТК · голос Космоса (№15) — общий для приложения «Космос» и кнопки-микрофона в «Воронках сделок».
    Слушать: 1) в приложении ИТК — свой распознаватель телефона (мост window.AndroidSpeech, как в «ИТК Переводчике»):
                сам слышит конец фразы, показывает слова по ходу речи;
-            2) в браузере — запись с микрофона → Яндекс SpeechKit (sp_hear).
+            2) в браузере — распознавание браузера со словами по ходу речи (№629); нет его — запись → Яндекс SpeechKit (sp_hear).
    Говорить: Яндекс SpeechKit (выбранный голос Космоса); если ключа нет — голос телефона. */
 (function () {
   var V = window.FilVoice = {};
-  var api = null, native = null, rec = null, cb = {};
+  var api = null, native = null, rec = null, ws = null, cb = {}, STARTED = false, SES = 0;   // SES — номер слушания: запоздалые ответы прошлого не попадают в новое
   V.init = function (apiFn) { api = apiFn; };
   V.hasNative = function () { try { return !!(window.AndroidSpeech && AndroidSpeech.canListen && AndroidSpeech.canListen()); } catch (e) { return false; } };
-  V.listening = function () { return !!(native || rec); };
+  V.listening = function () { return !!(native || rec || ws); };
+  function cat(a, b) { a = String(a || '').trim(); b = String(b || '').trim(); return a && b ? a + ' ' + b : (a || b); }
+  function started(mode) { if (STARTED) return; STARTED = true; if (cb.start) cb.start(mode); }
+  /* №629 · живые слова: partial(весь текст, {fin: уже точно распознано, cur: фраза, которая ещё говорится}).
+     fin только растёт (дописывается в конец), cur меняется на ходу; итог final = fin + cur — без повторов. */
+  function live(fin, cur) { if (cb.partial) cb.partial(cat(fin, cur), { fin: String(fin || '').trim(), cur: String(cur || '').trim() }); }
 
   /* мост приложения зовёт window.itcSpeech*. На время нашего слушания ставим свои, потом возвращаем прежние
      (в «Сделках» те же имена нужны диктовке разъяснений для бухгалтера) */
@@ -17,11 +22,11 @@
     prev = { p: window.itcSpeechPartial, r: window.itcSpeechResult, e: window.itcSpeechError };
     /* №19 · слушаем, пока человек не закончит: телефон отдаёт фразу после короткой паузы — мы её копим
        и сразу слушаем дальше. Конец — повторное нажатие микрофона или долгая тишина (телефон сам скажет «ничего не услышал»). */
-    window.itcSpeechPartial = function (t) { if (!native) return; clearTimeout(QT); LASTP = String(t || '').trim(); if (cb.partial) cb.partial((BUF ? BUF + ' ' : '') + t); };   // №616 · помним недоговорённый кусок
+    window.itcSpeechPartial = function (t) { if (!native) return; clearTimeout(QT); LASTP = String(t || '').trim(); live(BUF, LASTP); };   // №616 · помним недоговорённый кусок · №629 · слова сразу в поле
     window.itcSpeechResult = function (t) {
-      if (!native) return; t = String(t || '').trim() || LASTP; LASTP = ''; if (t) BUF = (BUF ? BUF + ' ' : '') + t;
+      if (!native) return; t = String(t || '').trim() || LASTP; LASTP = ''; if (t) BUF = cat(BUF, t);
       if (STOP || Date.now() - T0 > (cb.keep ? 600000 : 120000)) { done(); return; }
-      if (cb.partial && BUF) cb.partial(BUF + ' …');
+      if (BUF) live(BUF, '');
       // №626 · быстрый конец фразы («Сделки», рисунки): 1,2 с после куска нет новых слов — отправляем, не ждём, пока телефон скажет «ничего не услышал» (~5 с)
       clearTimeout(QT); if (!cb.keep) QT = setTimeout(function () { if (native && !STOP && !LASTP && BUF) done(); }, 1200);
       setTimeout(function () { if (native && !STOP) { try { (cb.keep && typeof AndroidSpeech.listenLong === 'function' ? AndroidSpeech.listenLong('ru-RU') : AndroidSpeech.listen('ru-RU')); } catch (e) { done(); } } else if (native) done(); }, 0);   // №616 · без паузы: пока перезапускались — слова терялись
@@ -36,23 +41,84 @@
     };
   }
   var BUF = '', STOP = false, T0 = 0, LASTP = '', QT = 0;
-  function done() { clearTimeout(QT); if (LASTP) { BUF = (BUF ? BUF + ' ' : '') + LASTP; LASTP = ''; } var t = BUF.trim(); BUF = ''; native = null; unhook(); if (cb.final) cb.final(t); }
+  function done() { clearTimeout(QT); if (LASTP) { BUF = cat(BUF, LASTP); LASTP = ''; } var t = BUF.trim(); BUF = ''; native = null; unhook(); if (cb.final) cb.final(t); }
   function unhook() { if (!prev) return; window.itcSpeechPartial = prev.p; window.itcSpeechResult = prev.r; window.itcSpeechError = prev.e; prev = null; }
+
+  /* №629 · браузер (компьютер, Chrome/Edge/Safari): распознавание браузера показывает слова по ходу речи.
+     Не работает (нет связи с сервисом, запрещено) — один раз запоминаем и пишем звук для Яндекса, как раньше. */
+  var WS = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function wsOk() { if (!WS || cb.noWeb) return false; try { var b = +localStorage.getItem('itc_ws_bad') || 0; return !(b && Date.now() - b < 3 * 86400000); } catch (e) { return true; } }   // не работало — 3 дня сразу Яндекс, потом пробуем снова
+  function wsBad() { try { localStorage.setItem('itc_ws_bad', String(Date.now())); localStorage.setItem('itc_ws_empty', '0'); } catch (e) {} }
+  function wsStart() {
+    var my = { fin: '', cur: '', got: false, stop: false, bad: '', t0: Date.now(), r: null, tm: 0, fast: 0 };
+    var mobile = /Android|iPhone|iPad/i.test(navigator.userAgent || '');   // на телефонах непрерывный режим Chrome повторяет слова — там слушаем по фразам
+    function end() {
+      if (ws !== my) return; ws = null; clearTimeout(my.tm); clearTimeout(QT);
+      try { my.r && my.r.abort(); } catch (e) {}
+      var t = cat(my.fin, my.cur);
+      // распознавание браузера «есть», но молчит (бывает в других браузерах): три раза подряд долго слушал и ни слова — 3 дня Яндекс
+      try { var n = my.got ? 0 : (my.stop && Date.now() - my.t0 > 4000 ? (+localStorage.getItem('itc_ws_empty') || 0) + 1 : -1);
+        if (n >= 0) localStorage.setItem('itc_ws_empty', String(n)); if (n >= 3) wsBad(); } catch (x) {}
+      if (t || my.stop) { if (cb.final) cb.final(t); } else if (cb.error) cb.error('Не расслышал');
+    }
+    function one() {
+      var r = new WS(), base = my.fin, t1 = Date.now(); my.r = r;
+      r.lang = 'ru-RU'; r.interimResults = true; r.maxAlternatives = 1; r.continuous = !!cb.keep && !mobile;
+      r.onresult = function (e) {
+        if (ws !== my || my.r !== r) return;
+        my.got = true; clearTimeout(QT);
+        var f = '', c = '';
+        for (var i = 0; i < e.results.length; i++) { var x = String(e.results[i][0] && e.results[i][0].transcript || '').trim(); if (!x) continue; if (e.results[i].isFinal) f = cat(f, x); else c = cat(c, x); }
+        my.fin = cat(base, f); my.cur = c; live(my.fin, my.cur);
+        if (!cb.keep && !c) QT = setTimeout(function () { if (ws === my) end(); }, 1200);
+      };
+      r.onerror = function (e) {
+        if (ws !== my || my.r !== r) return;
+        var er = e && e.error || '';
+        if (!my.got && /network|not-allowed|service-not-allowed|language-not-supported|audio-capture/.test(er)) my.bad = er;
+      };
+      r.onend = function () {
+        if (ws !== my || my.r !== r) return;
+        if (my.bad && !my.got) {   // распознавание браузера недоступно — пишем звук для Яндекса
+          ws = null; clearTimeout(my.tm);
+          if (my.bad !== 'not-allowed' && my.bad !== 'audio-capture') wsBad();
+          STARTED = false; webRec(); return;   // слов ещё не было — страница заново начнёт (волна по настоящему звуку)
+        }
+        if (my.cur) { my.fin = cat(my.fin, my.cur); my.cur = ''; }
+        if (my.stop || !cb.keep || Date.now() - my.t0 > 1800000) { end(); return; }
+        my.fast = Date.now() - t1 < 400 ? my.fast + 1 : 0; if (my.fast > 5) { end(); return; }
+        try { one(); } catch (x) { end(); }   // №303 · keep: браузер сам закончил фразу — слушаем дальше до второго нажатия
+      };
+      r.start();
+    }
+    ws = my;
+    try { one(); } catch (e) { ws = null; return false; }
+    if (!cb.keep) my.tm = setTimeout(function () { V.stop(); }, 29000);
+    my.end = end;
+    started('speech');
+    return true;
+  }
 
   /* начать слушать. ВАЖНО: вызывать прямо из нажатия кнопки (иначе браузер не даст звук) */
   V.listen = function (o) {
     V.hush();                                   // №29: начали говорить сами — Космос замолкает
-    cb = o || {};
+    cb = o || {}; STARTED = false; SES++;
+    if (rec) rec.dead = true;
     if (V.hasNative()) {
       native = true; BUF = ''; LASTP = ''; STOP = false; T0 = Date.now(); hook();
-      try { (cb.keep && typeof AndroidSpeech.listenLong === 'function' ? AndroidSpeech.listenLong('ru-RU') : AndroidSpeech.listen('ru-RU')); if (cb.start) cb.start('native'); } catch (e) { native = null; unhook(); if (cb.error) cb.error('Распознавание недоступно'); }
+      try { (cb.keep && typeof AndroidSpeech.listenLong === 'function' ? AndroidSpeech.listenLong('ru-RU') : AndroidSpeech.listen('ru-RU')); started('native'); } catch (e) { native = null; unhook(); if (cb.error) cb.error('Распознавание недоступно'); }
       return;
     }
-    // запись в браузере: звуковой контекст создаём сразу в нажатии, иначе он «спит» и пишет тишину
+    if (wsOk() && wsStart()) return;
+    webRec();
+  };
+  /* запись в браузере → Яндекс (sp_hear): где нет распознавания браузера */
+  function webRec() {
+    // звуковой контекст создаём сразу в нажатии, иначе он «спит» и пишет тишину
     var Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { if (cb.error) cb.error('Это устройство не даёт доступ к микрофону — напишите команду'); return; }
     var ctx = new Ctx(); try { ctx.resume(); } catch (e) {}
-    rec = { ctx: ctx, bufs: [], stream: null, pr: null, src: null, t0: Date.now(), ct: Date.now(), parts: [], peak: 0 };
+    rec = { ses: SES, ctx: ctx, bufs: [], stream: null, pr: null, src: null, t0: Date.now(), ct: Date.now(), parts: [], txt: [], shown: '', sp: false, peak: 0 };
     navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } }).then(function (stream) {
       if (!rec) { stream.getTracks().forEach(function (x) { x.stop(); }); return; }
       rec.stream = stream; rec.src = ctx.createMediaStreamSource(stream); rec.pr = ctx.createScriptProcessor(4096, 1, 1);
@@ -64,19 +130,21 @@
         rec.bufs.push(new Float32Array(d));
         if (cb.level) cb.level(lvl);
         // сам замечаем конец фразы: была речь, потом 2 с тишины (было 3 с)
-        if (lvl > 0.02) { heard = true; quiet = 0; } else if (heard) { quiet += d.length / ctx.sampleRate; if (!cb.keep && quiet > 2) V.stop(); }
+        if (lvl > 0.02) { heard = true; quiet = 0; rec.sp = true; } else if (heard) { quiet += d.length / ctx.sampleRate; if (!cb.keep && quiet > 2) V.stop(); }
         if (!cb.keep && Date.now() - rec.t0 > 29000) V.stop();
-        else if (cb.keep && (Date.now() - rec.ct > 80000 || (Date.now() - rec.ct > 15000 && quiet > 0.4))) chunk(rec);   // №616 · длинная диктовка: кусок уходит на распознавание, запись идёт дальше · №626: на паузе после 15 с — при «стоп» остаётся распознать только короткий хвост
-        if (cb.keep && Date.now() - rec.t0 > 1800000) V.stop();
+        // №616 · длинная диктовка: кусок уходит на распознавание, запись идёт дальше. №629 · на паузе уже после 6 с (было 15 с) —
+        // распознанный кусок сразу появляется в поле. 
+        else if (cb.keep && (Date.now() - rec.ct > 80000 || (rec.sp && Date.now() - rec.ct > 6000 && quiet > 0.5))) chunk(rec);
+        if (cb.keep && rec && Date.now() - rec.t0 > 1800000) V.stop();
       };
       rec.src.connect(rec.pr); rec.pr.connect(ctx.destination);
       if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
-      if (cb.start) cb.start('web');
+      started('web');
     }).catch(function (e) {
       rec = null; try { ctx.close(); } catch (x) {}
       if (cb.error) cb.error(e && e.name === 'NotAllowedError' ? 'Разрешите доступ к микрофону: настройки телефона → Приложения → ITC GLOBAL → Разрешения → Микрофон' : (e && e.name === 'NotFoundError' ? 'Микрофон не найден на этом устройстве' : e && e.name === 'NotReadableError' ? 'Микрофон занят другим приложением — закройте его и нажмите ещё раз' : 'Микрофон недоступен'));
     });
-  };
+  }
 
   /* №616 · куски длинной записи: распознаём по порядку, текст склеиваем при остановке */
   function pcm64(bufs, rate) {
@@ -88,28 +156,42 @@
     for (var j = 0; j < u8.length; j += CH) bin += String.fromCharCode.apply(null, u8.subarray(j, j + CH));
     return btoa(bin);
   }
+  function hear(r, b64) {
+    var i = r.parts.length;
+    var p = api('sp_hear', { pcm: b64 }).then(function (x) { return x && x.ok ? String(x.text || '').trim() : ''; }).catch(function () { return ''; });
+    r.parts.push(p);
+    p.then(function (t) { r.txt[i] = t; chunkLive(r); });
+  }
+  /* №629 · распознанные куски — сразу в поле, строго по порядку (поздний ответ первого куска не путает текст) */
+  function chunkLive(r) {
+    if (r.dead || r.ses !== SES) return;
+    var a = []; for (var k = 0; k < r.parts.length; k++) { if (r.txt[k] === undefined) break; if (r.txt[k]) a.push(r.txt[k]); }
+    var f = a.join(' ').trim(); if (f && f !== r.shown) { r.shown = f; live(f, ''); }
+  }
   function chunk(r) {
-    var bufs = r.bufs; r.bufs = []; r.ct = Date.now(); var b64 = pcm64(bufs, r.ctx.sampleRate); if (!b64) return;
-    r.parts.push(api('sp_hear', { pcm: b64 }).then(function (x) { return x && x.ok ? String(x.text || '').trim() : ''; }).catch(function () { return ''; }));
+    var bufs = r.bufs; r.bufs = []; r.ct = Date.now(); r.sp = false; var b64 = pcm64(bufs, r.ctx.sampleRate); if (!b64) return;
+    hear(r, b64);
   }
   /* закончить: у телефона — «хватит слушать», в браузере — отправить запись на распознавание */
   V.stop = function () {
     // №626 · всё сказанное уже пришло — отправляем почти сразу (0,25 с); есть недослушанный кусок — ждём точный текст не дольше 0,7 с (было всегда до 1,5 с)
     if (native) { STOP = true; try { AndroidSpeech.stopListen(); } catch (e) {} setTimeout(function () { if (native) done(); }, LASTP ? 700 : 250); return; }
+    if (ws) { var w = ws; w.stop = true; try { w.r && w.r.stop(); } catch (e) {} clearTimeout(w.tm); w.tm = setTimeout(function () { if (w.end) w.end(); }, w.cur ? 900 : 400); return; }
     if (!rec) return;
     var r = rec; rec = null;
     try { r.pr && r.pr.disconnect(); r.src && r.src.disconnect(); } catch (e) {}
     if (r.stream) r.stream.getTracks().forEach(function (x) { x.stop(); });
     var rate = r.ctx.sampleRate; try { r.ctx.close(); } catch (e) {}
-    if (r.peak < 0.004) { if (cb.error) cb.error('Микрофон молчит — проверьте, что разрешён доступ к микрофону'); return; }
+    if (r.peak < 0.004) { r.dead = true; if (cb.error) cb.error('Микрофон молчит — проверьте, что разрешён доступ к микрофону'); return; }
     var n = 0; r.bufs.forEach(function (b) { n += b.length; });
     if (r.parts && r.parts.length) {   // №616 · были куски — дораспознаём хвост и склеиваем по порядку
       var tail = n >= rate * 0.4 ? pcm64(r.bufs, rate) : '';
-      if (tail) r.parts.push(api('sp_hear', { pcm: tail }).then(function (x) { return x && x.ok ? String(x.text || '').trim() : ''; }).catch(function () { return ''; }));
+      if (tail) hear(r, tail);
       if (cb.busy) cb.busy();
-      Promise.all(r.parts).then(function (L) { var t = L.filter(Boolean).join(' ').trim(); if (cb.final) cb.final(t); });
+      Promise.all(r.parts).then(function (L) { if (r.ses !== SES) return; r.dead = true; var t = L.filter(Boolean).join(' ').trim(); if (cb.final) cb.final(t); });
       return;
     }
+    r.dead = true;
     if (n < rate * 0.4) { if (cb.error) cb.error('Слишком коротко — скажите ещё раз'); return; }
     var all = new Float32Array(n), o = 0; r.bufs.forEach(function (b) { all.set(b, o); o += b.length; });
     var k = rate / 16000, m = Math.floor(n / k), pcm = new Int16Array(m);
@@ -117,12 +199,61 @@
     var u8 = new Uint8Array(pcm.buffer), bin = '', CH = 0x8000;
     for (var j = 0; j < u8.length; j += CH) bin += String.fromCharCode.apply(null, u8.subarray(j, j + CH));
     if (cb.busy) cb.busy();
+    var ses = SES;
     api('sp_hear', { pcm: btoa(bin) }).then(function (x) {
+      if (ses !== SES) return;   // уже слушаем новое — старый ответ не нужен
       if (!x || !x.ok) { if (cb.error) cb.error((x && x.error) || 'Не удалось распознать'); return; }
       if (cb.final) cb.final(String(x.text || '').trim());
-    }).catch(function () { if (cb.error) cb.error('Нет связи'); });
+    }).catch(function () { if (ses === SES && cb.error) cb.error('Нет связи'); });
   };
-  V.cancel = function () { if (native) { native = null; BUF = ''; unhook(); try { AndroidSpeech.stopListen(); } catch (e) {} } if (rec) { var r = rec; rec = null; try { r.stream && r.stream.getTracks().forEach(function (x) { x.stop(); }); r.ctx.close(); } catch (e) {} } };
+  V.cancel = function () {
+    if (native) { native = null; BUF = ''; LASTP = ''; unhook(); try { AndroidSpeech.stopListen(); } catch (e) {} }
+    if (ws) { var w = ws; ws = null; clearTimeout(w.tm); clearTimeout(QT); try { w.r && w.r.abort(); } catch (e) {} }
+    if (rec) { var r = rec; rec = null; r.dead = true; try { r.stream && r.stream.getTracks().forEach(function (x) { x.stop(); }); r.ctx.close(); } catch (e) {} }
+  };
+
+  /* №629 · живая расшифровка в поле ввода (Фил, Космос). Поле = набранное до диктовки + распознанное + говорится сейчас.
+     Человек поправил поле пальцем во время диктовки — его текст главнее: дальше дописываем только новые слова.
+     L.start() — в начале слушания, L.show(info) — на каждый partial, L.end(t) → {text: всё поле, heard: что сказано}, L.base() — поле без голоса. */
+  V.live = function (el, grow) {
+    var L = { pre: '', skip: 0, fin: '', cur: '', cs: '', shown: null, held: null };   // cs — часть текущей фразы, что видна в поле; held — сколько слов фразы человек уже поправил сам
+    function put(v) { el.value = v; L.shown = el.value; if (grow) grow(); }
+    function sync() {   // человек поправил текст сам — забираем поле как есть
+      if (L.shown === null || el.value === L.shown) return;
+      var v = String(el.value), c = L.cs;
+      if (c) { var k = v.lastIndexOf(c); if (k >= 0 && !v.slice(k + c.length).trim()) v = v.slice(0, k); else L.held = words(L.cur).length; }   // правили недоговорённую фразу — её слова уже в поле
+      L.pre = v.replace(/\s+$/, ''); L.skip = L.fin.length; L.cs = ''; L.shown = el.value;
+    }
+    function words(x) { return String(x || '').trim().split(/\s+/).filter(Boolean); }
+    function tail(fin, cur) {   // что из сказанного ещё не в L.pre
+      var f = fin.slice(L.skip).trim();
+      if (L.held !== null && fin.length > L.skip) {   // фраза, которую поправили, распознана до конца: её начало уже в поле (правкой человека), дописываем только новые слова
+        f = words(f).slice(L.held).join(' ');
+        L.pre = cat(L.pre, f); L.skip = fin.length; L.held = null; f = '';
+      }
+      if (L.held !== null) cur = words(cur).slice(L.held).join(' ');
+      L.cs = cur;
+      return cat(f, cur);
+    }
+    L.start = function () { L.pre = String(el.value || '').replace(/\s+$/, ''); L.skip = 0; L.fin = ''; L.cur = ''; L.cs = ''; L.held = null; L.shown = el.value; };
+    L.show = function (info) {
+      if (!info) return; sync();
+      var fin = String(info.fin || '').trim(), cur = String(info.cur || '').trim();
+      L.fin = fin; L.cur = cur;
+      var t = tail(fin, cur); put(cat(L.pre, t));   // tail() может дописать L.pre — сначала он
+    };
+    L.base = function () { sync(); return L.pre; };
+    L.end = function (t) {
+      sync(); t = String(t || '').trim();
+      var done = L.fin.slice(0, L.skip).trim(), rest = t;
+      if (L.skip && done && t.indexOf(done) === 0) rest = t.slice(done.length).trim();
+      if (L.held !== null) rest = words(rest).slice(L.held).join(' ');
+      var heard = L.skip ? cat(done, rest) : rest;
+      L.shown = null;
+      return { text: cat(L.pre, rest), heard: heard, rest: rest, pre: L.pre };
+    };
+    return L;
+  };
 
   /* сказать вслух */
   /* №626 · текст → куски для озвучки: первый — короткий (первое предложение), дальше — до 240 знаков (столько Яндекс берёт за раз) */

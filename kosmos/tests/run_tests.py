@@ -648,6 +648,20 @@ try:
     print('27. Ответы не обрываются (№628): история разговора целиком, результаты инструментов 8000, max_tokens — повтор, озвучка целиком')
     r = subprocess.run(['php', f'{ROOT}/tests/talk_cut_test.php'], capture_output=True, text=True, timeout=60)
     check('история 3 реплики целиком / 4000, Claude и DeepSeek без обрывков, озвучка 12000 — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
+    print('28. Голос — слова в поле по ходу речи (№629): Android, браузер, Яндекс по кускам, без дублей')
+    REPO = os.path.dirname(ROOT)
+    for app in ('fil', 'kosmos'):
+        r = subprocess.run(['node', f'{ROOT}/tests/voice_live_test.js', f'{REPO}/store/apps/{app}/voice.js'], capture_output=True, text=True, timeout=60)
+        check(f'{app}/voice.js: живые слова, правка пальцем, отправка без повторов — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
+        h = open(f'{REPO}/store/apps/{app}/index.html', encoding='utf-8').read()
+        check(f'{app}: поле ввода берёт живые слова (LV.show / LV.end), набранное не стирается', 'LV.show(info' in h and 'LV.end(t)' in h and "$('txt').value = PRE" not in h)
+    vers = set()
+    for app, path in (('fil', 'voice.js?v='), ('kosmos', 'voice.js?v='), ('crm', '/apps/fil/voice.js?v='), ('draw', '/apps/fil/voice.js?v=')):
+        h = open(f'{REPO}/store/apps/{app}/index.html', encoding='utf-8').read(); k = h.find(path)
+        vers.add(h[k + len(path):k + len(path) + 6].split('"')[0] if k >= 0 else '')
+    check('voice.js: одна версия ?v= в Фил, Космос, Сделки, Рисовалка', len(vers) == 1 and '' not in vers, vers)
+    sh = open(f'{REPO}/android/ITCApp/app/src/main/java/store/itcpartner/app/SpeechHelper.java', encoding='utf-8').read()
+    check('Android: частичные результаты включены и идут в itcSpeechPartial (с «неустоявшимся» концом фразы)', 'EXTRA_PARTIAL_RESULTS, true' in sh and 'itcSpeechPartial' in sh and 'UNSTABLE_TEXT' in sh)
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

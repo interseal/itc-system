@@ -1,6 +1,6 @@
 /* ИТК Воронки сделок · sw.js v1 — само приложение хранится в телефоне и открывается мгновенно;
    данные сделок (/api/flow.php) всегда идут в сеть. Страница всегда берётся свежая с сервера, без связи — из телефона. */
-var C = 'itc-crm-v60';   // №628 · voice.js: ответ озвучивается целиком
+var C = 'itc-crm-v61';   // №629 · voice.js: слова по ходу речи
 var SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'fav-64.png',
   '/fonts/roboto-cyrillic-400-normal.woff2', '/fonts/roboto-latin-400-normal.woff2',
   '/fonts/roboto-cyrillic-500-normal.woff2', '/fonts/roboto-latin-500-normal.woff2',

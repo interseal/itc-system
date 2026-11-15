@@ -1,6 +1,6 @@
 /* «Рисовалка ИТК» · sw.js v1 — приложение открывается сразу, свежая версия тихо догружается в фоне.
    Данные (/api/) — всегда через сеть. */
-var C = 'itc-draw-v6';   // №628 · voice.js
+var C = 'itc-draw-v7';   // №629 · voice.js
 var SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(C).then(function (c) { return Promise.all(SHELL.map(function (u) { return c.add(new Request(u, { cache: 'reload' })).catch(function () {}); })); }));

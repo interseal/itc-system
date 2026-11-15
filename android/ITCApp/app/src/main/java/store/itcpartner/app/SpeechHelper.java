@@ -24,7 +24,8 @@ import java.util.Locale;
    Внутри приложения браузерные «озвучить» и «слушать» не работают,
    поэтому даём странице свой мост window.AndroidSpeech:
      listen(lang)  — слушать речь на языке lang ('ru', 'zh', 'en'),
-                     ответы: itcSpeechPartial(текст), itcSpeechResult(текст), itcSpeechError(текст)
+                     ответы: itcSpeechPartial(текст) — по ходу речи (вся текущая фраза, заменяет прошлый),
+                     itcSpeechResult(текст) — фраза целиком, itcSpeechError(текст)
      stopListen()  — закончить слушать (что успели сказать — придёт в itcSpeechResult)
      say(text, lang), stopSay(), canSay(lang) — озвучка голосом телефона
    ============================================================ */
@@ -129,6 +130,9 @@ public class SpeechHelper {
                 @Override public void onPartialResults(Bundle b) {
                     if (sr != mine) return;
                     String t = first(b);
+                    // 2.2.7 · Google присылает конец фразы отдельно («неустоявшийся» текст) — показываем и его, слова видны сразу
+                    String u = unstable(b);
+                    if (u != null && !u.isEmpty()) t = (t == null || t.isEmpty()) ? u : t + " " + u;
                     if (t != null && !t.isEmpty()) { lastPartial = t; js("window.itcSpeechPartial && itcSpeechPartial(" + JSONObject.quote(t) + ")"); }
                 }
                 @Override public void onResults(Bundle b) {
@@ -168,6 +172,11 @@ public class SpeechHelper {
 
     private static String first(Bundle b) {
         try { ArrayList<String> r = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION); if (r != null && !r.isEmpty() && r.get(0) != null) return r.get(0).trim(); }
+        catch (Exception ignored) {}
+        return null;
+    }
+    private static String unstable(Bundle b) {
+        try { ArrayList<String> r = b.getStringArrayList("android.speech.extra.UNSTABLE_TEXT"); if (r != null && !r.isEmpty() && r.get(0) != null) return r.get(0).trim(); }
         catch (Exception ignored) {}
         return null;
     }
