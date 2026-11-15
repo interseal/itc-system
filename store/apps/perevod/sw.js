@@ -1,6 +1,6 @@
 /* ИТК Переводчик · sw.js v2 — само приложение хранится в телефоне и открывается мгновенно;
    перевод (api.php) и cfg.json всегда идут в сеть. Страница всегда берётся свежая с сервера, без связи — из телефона. */
-var C = 'itc-perevod-v22';
+var C = 'itc-perevod-v23';   // №618
 var SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'fav-64.png',
   '/fonts/roboto-cyrillic-400-normal.woff2', '/fonts/roboto-latin-400-normal.woff2',
   '/fonts/roboto-cyrillic-500-normal.woff2', '/fonts/roboto-latin-500-normal.woff2',

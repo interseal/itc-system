@@ -92,7 +92,12 @@ public class SpeechHelper {
         try { return SpeechRecognizer.isRecognitionAvailable(act); } catch (Exception e) { return false; }
     }
     @JavascriptInterface public void listen(final String lang) {
-        act.runOnUiThread(new Runnable() { @Override public void run() { startListen(lang); } });
+        act.runOnUiThread(new Runnable() { @Override public void run() { startListen(lang, false); } });
+    }
+    /* 2.2.6 · долгая диктовка (Фил, Космос): паузы до 4 с не обрывают фразу, первые 20 с без перезапуска.
+       Переводчик и поиск зовут listen() — там фраза должна заканчиваться быстро. */
+    @JavascriptInterface public void listenLong(final String lang) {
+        act.runOnUiThread(new Runnable() { @Override public void run() { startListen(lang, true); } });
     }
     @JavascriptInterface public void stopListen() {
         act.runOnUiThread(new Runnable() { @Override public void run() {
@@ -100,7 +105,7 @@ public class SpeechHelper {
         }});
     }
 
-    private void startListen(String lang) {
+    private void startListen(String lang, boolean longMode) {
         if (ActivityCompat.checkSelfPermission(act, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(act, new String[]{ Manifest.permission.RECORD_AUDIO }, REQ_MIC);
             js("window.itcSpeechError && itcSpeechError('Разрешите доступ к микрофону и нажмите ещё раз')");
@@ -110,7 +115,10 @@ public class SpeechHelper {
         release();
         lastPartial = "";
         try {
-            sr = SpeechRecognizer.createSpeechRecognizer(act);
+            // 2.2.6 · у каждого слушания — свой распознаватель: запоздалые ответы прошлого (после «стоп») больше
+            // не попадают в новое слушание и не выключают его (переводчик: вторую фразу «не слышал»)
+            final SpeechRecognizer mine = SpeechRecognizer.createSpeechRecognizer(act);
+            sr = mine;
             sr.setRecognitionListener(new RecognitionListener() {
                 @Override public void onReadyForSpeech(Bundle b) {}
                 @Override public void onBeginningOfSpeech() {}
@@ -119,15 +127,18 @@ public class SpeechHelper {
                 @Override public void onEndOfSpeech() {}
                 @Override public void onEvent(int i, Bundle b) {}
                 @Override public void onPartialResults(Bundle b) {
+                    if (sr != mine) return;
                     String t = first(b);
                     if (t != null && !t.isEmpty()) { lastPartial = t; js("window.itcSpeechPartial && itcSpeechPartial(" + JSONObject.quote(t) + ")"); }
                 }
                 @Override public void onResults(Bundle b) {
+                    if (sr != mine) { try { mine.destroy(); } catch (Exception ignored) {} return; }
                     String t = first(b); if (t == null || t.isEmpty()) t = lastPartial;
                     js("window.itcSpeechResult && itcSpeechResult(" + JSONObject.quote(t == null ? "" : t) + ")");
                     release();
                 }
                 @Override public void onError(int err) {
+                    if (sr != mine) { try { mine.destroy(); } catch (Exception ignored) {} return; }
                     String m = "";
                     if (err == SpeechRecognizer.ERROR_NO_MATCH || err == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) m = "Ничего не услышал";
                     else if (err == SpeechRecognizer.ERROR_NETWORK || err == SpeechRecognizer.ERROR_NETWORK_TIMEOUT) m = "Нет связи для распознавания речи";
@@ -144,10 +155,10 @@ public class SpeechHelper {
             i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
             i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
             i.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, act.getPackageName());
-            // 2.2.5 · длинная диктовка: паузы до 4 с не обрывают фразу (раньше 1 с — распознавание перезапускалось и слова терялись)
-            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L);
-            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L);
-            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 20000L);
+            long sil = longMode ? 4000L : 1000L;
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, sil);
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, sil);
+            if (longMode) i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 20000L);
             sr.startListening(i);
         } catch (Exception e) {
             release();

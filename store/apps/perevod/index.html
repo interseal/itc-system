@@ -450,9 +450,10 @@ function prefetch(t, f, to) {
 /* ---------- голос: распознаёт и озвучивает сам телефон ---------- */
 var REC = null, recBtn = null;
 var AS = window.AndroidSpeech || null;   // приложение ИТК Глобал 1.8+: свой голос телефона
+var LAST_STOP = 0;   // №618 · когда в последний раз останавливали распознавание телефона
 function micStop() {
   LSN = null;
-  if (AS && recBtn) { try { AS.stopListen(); } catch (e) {} }
+  if (AS && recBtn) { try { AS.stopListen(); } catch (e) {} LAST_STOP = Date.now(); }
   if (REC) { var r = REC; REC = null; try { r.onresult = r.onend = r.onerror = null; r.abort(); } catch (e) {} }
   if (recBtn) { recBtn.classList.remove('rec'); recBtn = null; }
   try { if (window.AndroidVoice && window.AndroidVoice.stop) window.AndroidVoice.stop(); } catch (e) {}
@@ -466,12 +467,15 @@ var HEAR = { ru: 'Говорите…', zh: '请说话…', en: 'Speak now…' }
 function listen(lang, btn, onPart, onDone) {
   if (recBtn === btn) {   // второе нажатие — закончить
     if (LSN) LSN.stop = true;
-    if (AS) { try { AS.stopListen(); } catch (e) {} return; }
+    if (AS) { try { AS.stopListen(); } catch (e) {} LAST_STOP = Date.now(); return; }
     if (REC) { try { REC.stop(); } catch (e) { micStop(); } } else micStop();
     return;
   }
+  /* №618 · нажали другую кнопку, пока первая ещё слушала: то, что уже распознано, не теряем — переводим */
+  if (LSN && LSN.flush) { try { LSN.flush(); } catch (e) {} }
   micStop(); stopSay();
   var L0 = LSN = { btn: btn, lang: lang, t0: Date.now(), stop: false }, got = '';
+  L0.flush = function () { if (got && LSN === L0) { var g = got; LSN = null; if (recBtn) { recBtn.classList.remove('rec'); recBtn = null; } try { if (AS) AS.stopListen(); } catch (e) {} LAST_STOP = Date.now(); onDone(g.trim()); } };
   function alive() { return LSN === L0 && !L0.stop && recBtn === btn; }
   function again() { return alive() && !got && Date.now() - L0.t0 < 40000; }
   function finish(t) { if (LSN !== L0) return; LSN = null; if (recBtn) { recBtn.classList.remove('rec'); recBtn = null; } onDone((t || got || '').trim()); }
@@ -479,6 +483,17 @@ function listen(lang, btn, onPart, onDone) {
   toast(HEAR[lang] || 'Говорите…', 1800);
 
   if (AS && AS.canListen && AS.canListen()) {
+    /* №618 · после «стоп» телефон ещё ~0,5–1 с досылает ответ прошлой фразы. Если сразу начать новую
+       (передали телефон собеседнику), этот запоздалый ответ выключал новое слушание — вторую фразу «не слышал»:
+       ни иероглифов, ни перевода. Ждём, пока прошлое распознавание закончится, и только потом слушаем. */
+    var wait = Math.max(0, 900 - (Date.now() - LAST_STOP));
+    if (wait > 0) {
+      window.itcSpeechPartial = window.itcSpeechResult = window.itcSpeechError = function () {};
+      setTimeout(function () { if (LSN === L0) asGo(); }, wait); return;
+    }
+    asGo(); return;
+  }
+  function asGo() {
     window.itcSpeechPartial = function (t) { if (LSN !== L0) return; got = t; if (onPart) onPart(t); };
     window.itcSpeechResult = function (t) {
       if (LSN !== L0) return;
@@ -491,7 +506,6 @@ function listen(lang, btn, onPart, onDone) {
       if (m && !got) toast(m, 3500); finish('');
     };
     try { AS.listen(lang); } catch (e) { finish(''); }
-    return;
   }
   var R = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!R) {

@@ -1,0 +1,21 @@
+{
+ "n": 618,
+ "title": "Переводчик: вторая фраза больше не теряется",
+ "what": [
+  "Переводчик: если сразу после своей фразы передать телефон собеседнику и он нажмёт свою кнопку, его фраза теперь записывается и переводится (раньше запоздалый ответ прошлой фразы выключал микрофон — ни иероглифов, ни перевода).",
+  "Если нажать кнопку собеседника, пока первая ещё слушает, уже сказанное не пропадает — переводится."
+ ],
+ "files": [
+  "store/apps/perevod/index.html",
+  "store/apps/perevod/sw.js",
+  "store/apps/fil/voice.js",
+  "store/apps/kosmos/voice.js",
+  "store/apps/fil/index.html",
+  "store/apps/kosmos/index.html",
+  "store/apps/crm/index.html",
+  "store/apps/draw/index.html",
+  "store/apps/fil/sw.js",
+  "store/apps/kosmos/sw.js"
+ ],
+ "kosmos": false
+}

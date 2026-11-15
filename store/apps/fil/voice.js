@@ -22,12 +22,12 @@
       if (!native) return; t = String(t || '').trim() || LASTP; LASTP = ''; if (t) BUF = (BUF ? BUF + ' ' : '') + t;
       if (STOP || Date.now() - T0 > (cb.keep ? 600000 : 120000)) { done(); return; }
       if (cb.partial && BUF) cb.partial(BUF + ' …');
-      setTimeout(function () { if (native && !STOP) { try { AndroidSpeech.listen('ru-RU'); } catch (e) { done(); } } else if (native) done(); }, 0);   // №616 · без паузы: пока перезапускались — слова терялись
+      setTimeout(function () { if (native && !STOP) { try { (cb.keep && typeof AndroidSpeech.listenLong === 'function' ? AndroidSpeech.listenLong('ru-RU') : AndroidSpeech.listen('ru-RU')); } catch (e) { done(); } } else if (native) done(); }, 0);   // №616 · без паузы: пока перезапускались — слова терялись
     };
     window.itcSpeechError = function (m) {
       if (!native) return;
       // №303 · режим «нажал — говоришь — нажал ещё раз»: тишина не заканчивает запись, слушаем дальше до второго нажатия
-      if (cb.keep && !STOP && Date.now() - T0 < 600000) { setTimeout(function () { if (native && !STOP) { try { AndroidSpeech.listen('ru-RU'); } catch (e) { if (BUF) done(); } } else if (native) done(); }, 0); return; }
+      if (cb.keep && !STOP && Date.now() - T0 < 600000) { setTimeout(function () { if (native && !STOP) { try { (cb.keep && typeof AndroidSpeech.listenLong === 'function' ? AndroidSpeech.listenLong('ru-RU') : AndroidSpeech.listen('ru-RU')); } catch (e) { if (BUF) done(); } } else if (native) done(); }, 0); return; }
       if (STOP && BUF) { done(); return; }
       if (BUF) { done(); return; }                       // была речь, потом тишина — фраза закончена
       native = null; unhook(); if (cb.error) cb.error(m || 'Не расслышал');
@@ -43,7 +43,7 @@
     cb = o || {};
     if (V.hasNative()) {
       native = true; BUF = ''; LASTP = ''; STOP = false; T0 = Date.now(); hook();
-      try { AndroidSpeech.listen('ru-RU'); if (cb.start) cb.start('native'); } catch (e) { native = null; unhook(); if (cb.error) cb.error('Распознавание недоступно'); }
+      try { (cb.keep && typeof AndroidSpeech.listenLong === 'function' ? AndroidSpeech.listenLong('ru-RU') : AndroidSpeech.listen('ru-RU')); if (cb.start) cb.start('native'); } catch (e) { native = null; unhook(); if (cb.error) cb.error('Распознавание недоступно'); }
       return;
     }
     // запись в браузере: звуковой контекст создаём сразу в нажатии, иначе он «спит» и пишет тишину
