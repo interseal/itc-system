@@ -874,12 +874,18 @@ function a_dev_to_main(string $br, string $title, string $u): array {
   for ($try = 0; $try < 3; $try++) {
     a_sh(a_git_env($rk) . "git -C $q fetch -q origin", $c0);
     if ($c0 !== 0) return ['error' => 'нет связи с GitHub — правки в ветке ' . $br] + $out;
+    /* 0.5.1 (№17) · правки уже в main (так было с №16: push прошёл, а статус «не попало») — это успех, а не ошибка */
+    a_sh("git -C $q merge-base --is-ancestor HEAD origin/main", $inm);
+    if ($inm !== 0) a_sh("git -C $q diff --quiet origin/main HEAD", $inm);
+    if ($inm === 0) { a_log("ветка $br: правки уже в main"); return ['merged' => 1, 'error' => 'правки уже были в main', 'commit' => substr(trim(a_sh("git -C $q rev-parse HEAD")), 0, 7)] + $out; }
     a_sh("git -C $q merge-base --is-ancestor origin/main HEAD", $anc);
     if ($anc !== 0) {   // в main за это время появились чужие коммиты
       a_sh("git -C $q -c user.name=Космос-разработчик -c user.email=kosmos@itcpartner.store rebase -q origin/main", $c1);
       if ($c1 !== 0) { a_sh("git -C $q rebase --abort");
         a_log("ветка $br: конфликт с main — остановлено, нужен руководитель");
         return ['status' => 'failed', 'error' => 'Конфликт: пока шло поручение, в main появились чужие правки в тех же местах. Ничего не слито и ничего чужого не затёрто; правки лежат в ветке ' . $br . '. Нужно решение руководителя (поручить заново поверх нового main или передать Claude).'] + $out; }
+      if (trim(a_sh("git -C $q rev-parse HEAD")) === trim(a_sh("git -C $q rev-parse origin/main"))) {   // 0.5.1 · после rebase ничего своего не осталось — всё уже в main
+        a_log("ветка $br: правки уже в main"); return ['merged' => 1, 'error' => 'правки уже были в main', 'commit' => substr(trim(a_sh("git -C $q rev-parse HEAD")), 0, 7)] + $out; }
       $changed = array_values(array_filter(explode("\n", trim(a_sh("git -C $q diff --name-only origin/main HEAD")))));
       a_sh('chown -R ' . escapeshellarg($u) . ': ' . $q); [$ok, $ch] = a_dev_checks($dev, $changed, $u); a_sh('chown -R root: ' . $q);
       $out['checks'] = 'перепроверка поверх нового main: ' . ($ch ? implode('; ', $ch) : 'синтаксис в порядке');

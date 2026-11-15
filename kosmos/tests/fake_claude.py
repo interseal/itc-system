@@ -6,7 +6,7 @@ model = a[a.index('--model') + 1]; budget = a[a.index('--max-budget-usd') + 1]
 open('/tmp/fake_claude_args.json', 'w').write(json.dumps({'model': model, 'budget': budget, 'user': os.getuid(), 'cwd': os.getcwd(), 'rules': '--append-system-prompt' in a,
     'key': bool(os.environ.get('ANTHROPIC_API_KEY')), 'base': os.environ.get('ANTHROPIC_BASE_URL', ''), 'keyval': os.environ.get('ANTHROPIC_API_KEY', '')[:3], 'resume': a[a.index('--resume') + 1] if '--resume' in a else '', 'prompt': task}))
 n = 9101 if 'DeepSeek' in task else 9100
-for k, v in (('PR-проба', 9103), ('чужой коммит', 9104), ('конфликт', 9105)):
+for k, v in (('PR-проба', 9103), ('чужой коммит', 9104), ('конфликт', 9105), ('уже в main', 9106)):
     if k in task: n = v
 open('/tmp/fake_claude_env.json', 'w').write(json.dumps(sorted(os.environ.keys())))   # №624: токен GitHub разработчику не передаётся
 def foreign(path, text):   # №624: пока идёт поручение, кто-то другой кладёт коммит в main
@@ -24,7 +24,8 @@ if 'Ответ руководителя' in task and '--resume' in a:
     print(json.dumps({'type': 'result', 'result': 'Босс, сделал кнопку по вашему ответу.', 'total_cost_usd': 0.7, 'is_error': False, 'session_id': 'sess-q1'})); sys.exit(0)
 if 'gradle' in task:   # правит настройки сборки Android и выпускает обновление
     os.makedirs('android/ITCApp/app', exist_ok=True); open('android/ITCApp/app/build.gradle', 'w').write('// правка')
-    open('releases/9102.json', 'w').write(json.dumps({'n': 9102, 'title': 'gradle', 'what': [], 'files': [], 'kosmos': False}))
+    rn = 9106 if n == 9106 else 9102; open('android/ITCApp/app/build.gradle', 'a').write(f' {rn}')
+    open(f'releases/{rn}.json', 'w').write(json.dumps({'n': rn, 'title': 'gradle', 'what': [], 'files': [], 'kosmos': False}))
 elif 'сломай' in task: open('store/bad.php', 'w').write('<?php echo ;')
 elif 'ключ' in task: open('store/leak.php', 'w').write("<?php $k = 'sk-ant-api03-" + 'x' * 40 + "';")
 elif 'конфликт' in task:

@@ -549,6 +549,17 @@ try:
     t, r = gh_task('конфликт: поправь a.php и выпусти обновление')
     check('конфликт с чужой правкой — стоп, ничего не слито, чужое не затёрто, Боссу понятная причина', t['status'] == 'failed' and t['merged'] == 0 and 'Конфликт' in t['error']
           and 'чужое' in gh_main('store/a.php') and not gh_main('releases/9105.json'), (t, gh_main('store/a.php'), r.stdout[-400:]))
+    print('19в. Одобренные правки уже лежат в main — это успех, а не «не попало» (0.5.1, поручение №17: так было с №16)')
+    c, j = call('dev_add', B, {'text': 'Поправь gradle (уже в main) и выпусти обновление', 'model': 'opus'}); tid6 = j['id']
+    subprocess.run(['php', f'{ROOT}/bin/agent.php', 'devrun'], env=genv, capture_output=True, text=True, timeout=120)
+    c, j = call('dev', B); t6 = next(x for x in j['tasks'] if x['id'] == tid6)
+    check('правка gradle ждёт «Одобрить»', t6['status'] == 'needs_ok' and t6['release_n'] == 9106, t6)
+    subprocess.run(f'git --git-dir={O} update-ref refs/heads/main refs/heads/kosmos/{tid6}', shell=True, check=True)   # push в main уже прошёл раньше
+    open(GH_LOG, 'w').close(); c, j = call('dev_decide', B, {'id': tid6, 'ok': True})
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'devrun'], env=genv, capture_output=True, text=True, timeout=120)
+    c, j = call('dev', B); t6 = next(x for x in j['tasks'] if x['id'] == tid6); calls = [json.loads(l) for l in open(GH_LOG) if l.strip()]
+    check('одобрено, правки уже в main — «слито», обновление №9106 на месте, лишнего Pull request нет', t6['status'] == 'done' and t6['merged'] == 1 and t6['release_n'] == 9106
+          and gh_main('releases/9106.json') and not any(x['m'] == 'POST' for x in calls), (t6, calls, r.stdout[-400:], r.stderr[-400:]))
     print('20. Файлы на сервере: PDF, фото, видео (0.4.4)')
     import io as _io, base64 as _b64
     try: from PIL import Image as _Im
