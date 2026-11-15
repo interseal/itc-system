@@ -5,3 +5,4 @@
 2) Инструмент files: op = pdf_images (фото товаров; from/to — страницы, min — мелкие пропустить), pdf_pages (страницы картинками, если скан), pdf_text, img (size, format, square, white, trim), video_frames (count), video_small (height), video_cut (from, len), info.
 3) Обрабатывает сервер «Космоса» (lib/media.php, шлюз a=media); результат — ссылки itcpartner.store/uploads/fil_out/… и all.zip.
 4) Нет вшитых картинок — значит каталог из сканов: pdf_pages.
+5) «Космос» (Claude) видит сам снимок из чата (№575, №623): ff_attach_imgs в flow.php — до 4 штук, до 1600 точек; в следующих репликах — снова (id из истории), в фоне — первые 4 шага. «Фил» (DeepSeek) видит только текст распознавания.
