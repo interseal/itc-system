@@ -62,6 +62,8 @@ if [ -f /etc/nginx/sites-available/kosmos ] && grep -q 'managed by Certbot' /etc
 else
   install -m 644 "$APP/install/nginx-kosmos.conf" /etc/nginx/sites-available/kosmos
 fi
+# 0.5.0 (№624): в файле сайта, который уже правил certbot, поднимаем предел тела запроса (было 2m — снимки к Claude и файлы не проходили)
+sed -i -E 's/client_max_body_size[[:space:]]+[0-9]+[kKmM]?;/client_max_body_size 64m;/' /etc/nginx/sites-available/kosmos 2>/dev/null || true
 ln -sf /etc/nginx/sites-available/kosmos /etc/nginx/sites-enabled/kosmos
 rm -f /etc/nginx/sites-enabled/default
 for u in kosmos-worker.service kosmos-agent.service kosmos-agent.timer; do install -m 644 "$APP/install/$u" "/etc/systemd/system/$u"; done

@@ -1,0 +1,9 @@
+# Лимиты «Космоса»/«Фила» и автослияние в main (№624, сервер 0.5.0)
+Когда: сколько шагов у Фила или Космоса, фоновая задача остановилась, «нет продвижения», сколько снимков видит Claude, предел файла, 413, Pull request, GITHUB_TOKEN, поручение не попало в main, конфликт с main
+---
+ШАГИ (store/api/flow.php → kosmos_flow.php генератором): AG_MAX_STEPS=60 (разговор), AG_BG_STEPS=400 и AG_BG_MIN=180 (фон). fc_cmd: set_time_limit 1800.
+ЗАЦИКЛИВАНИЕ (ag_run): тот же инструмент с теми же args AG_REPEAT=3 раза подряд — стоп; в фоне AG_STALL=12 шагов подряд с уже виденным результатом — стоп. Ответ с полем stall, ft_run — статус stop и уведомление с причиной. Проверка: kosmos/tests/ag_loop_test.php.
+СНИМКИ (только Claude): FF_IMG_MAX=10, FF_IMG_SIDE=2000, всего FF_IMG_TOT=18 МБ (base64 ≈24 МБ < 32 МБ предела Claude); разговор — все шаги, фон — первые 12. Шлюз gw.php: GW_IMG_MAX=10, GW_IMG_TOT=26 МБ, последний снимок с cache_control.
+ФАЙЛЫ: больше FF_INLINE_MAX=8 МБ — сервер забирает по ff_link (media.php принимает flow.php и kosmos_flow.php). По url из интернета — до FF_URL_MAX=100 МБ. Загрузка кусками — до 500 МБ.
+ПРЕДЕЛЫ СЕРВЕРА: nginx client_max_body_size 64m (install.sh правит и файл certbot), PHP-FPM post_max_size/upload 64M, memory 512M.
+АВТОСЛИЯНИЕ (agent.php a_dev_to_main): GITHUB_TOKEN из сейфа «Авто» (a_gh_token, только root, разработчику не передаётся). fetch → если main ушёл вперёд: rebase, a_dev_checks, push -f ветки; конфликт — status failed «Конфликт…», ничего не сливается. Затем Pull request и PUT merge squash с sha; 405/409 — ещё раз (до 3). Нет токена — push в main по-старому + «нужен GITHUB_TOKEN в сейфе». needs_ok (gradle, agent.php) — как раньше, после «Одобрить» тот же путь.

@@ -447,7 +447,7 @@ try:
     _sh.copy(f'{ROOT}/tests/fake_claude.py', '/tmp/fake_claude.py'); os.chmod('/tmp/fake_claude.py', 0o755)
     dc = f'{TMP}/agent_dev.php'
     open(dc, 'w').write(CONF.replace("];", f"  'git_repo' => '{O}', 'git_key' => '{TMP}/gitkey', 'dev_dir' => '{TMP}/itcdev', 'dev_key' => '{TMP}/devkey', 'claude_bin' => '/tmp/fake_claude.py', 'dev_user' => 'kosmosdev', 'db_user' => '', 'agent_state' => '{TMP}/agent_state.json',\n];"))
-    denv = dict(env, KOSMOS_CONFIG=dc)
+    denv = dict(env, KOSMOS_CONFIG=dc, KOSMOS_GH_TOKEN_TEST='')   # №624: здесь — «токена GitHub в сейфе нет» (по-старому)
     if os.geteuid() != 0:   # №622: сервер гоняет проверки от kosmosdev (runuser -u kosmosdev), а runuser работает только у root —
         # подставляем runuser, который просто запускает команду от текущего (тоже не root) пользователя; под root — настоящий
         os.makedirs(f'{TMP}/bin', exist_ok=True)
@@ -522,6 +522,33 @@ try:
     check('продолжил тот же сеанс с ответом руководителя и сделал', fa['resume'] == 'sess-q1' and 'Первую, «Обновить»' in fa['prompt'] and t['status'] == 'done' and t['commit'] and t['question'] == '', (fa, t))
     check('стоимость — за всё поручение', abs(t['cost'] - 1.2) < 0.01, t['cost'])
     c, j = call('dev_answer', B, {'id': tq, 'text': 'ещё'}); check('без вопроса ответ не принимается', c == 400, j)
+    print('19б. Автослияние: после зелёных проверок сервер сам создаёт Pull request и сливает в main (squash) (0.5.0, №624)')
+    c, j = call('dev', B); t0 = next((x for x in j['tasks'] if x['status'] == 'done' and x['merged'] == 1 and x['engine'] != 'deepseek'), {})
+    check('без GITHUB_TOKEN — по-старому, а в статусе «нужен GITHUB_TOKEN в сейфе»', 'нужен GITHUB_TOKEN в сейфе' in t0.get('error', ''), t0)
+    GH_TOK = 'ghtest_' + 'Q7' * 20; GH_LOG = f'{TMP}/gh.log'; open(GH_LOG, 'w').close()
+    gh = subprocess.Popen([sys.executable, f'{ROOT}/tests/fake_github.py', '8790', O, GH_LOG, GH_TOK]); procs.append(gh); time.sleep(0.8)
+    dc2 = f'{TMP}/agent_dev_gh.php'
+    open(dc2, 'w').write(open(dc).read().replace("];", "  'gh_api' => 'http://127.0.0.1:8790', 'gh_repo' => 'interseal/itc-system',\n];"))
+    genv = dict(denv, KOSMOS_CONFIG=dc2, KOSMOS_GH_TOKEN_TEST=GH_TOK)
+    def gh_task(text):
+        c, j = call('dev_add', B, {'text': text, 'model': 'opus'}); i = j['id']
+        r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'devrun'], env=genv, capture_output=True, text=True, timeout=300)
+        c, j = call('dev', B); return next(x for x in j['tasks'] if x['id'] == i), r
+    def gh_main(f): return subprocess.run(f'git --git-dir={O} show main:{f}', shell=True, capture_output=True, text=True).stdout
+    t, r = gh_task('PR-проба: сделай страницу и выпусти обновление')
+    calls = [json.loads(l) for l in open(GH_LOG)]
+    lg = subprocess.run(f'git --git-dir={O} log -1 --format=%s main', shell=True, capture_output=True, text=True).stdout
+    check('Pull request создан и слит squash, обновление №9103 в main', t['status'] == 'done' and t['merged'] == 1 and t['release_n'] == 9103 and gh_main('releases/9103.json')
+          and any(x['m'] == 'POST' for x in calls) and any(x['m'] == 'PUT' and x['body'].get('merge_method') == 'squash' for x in calls) and '(#' in lg, (t, calls, lg, r.stdout[-400:], r.stderr[-400:]))
+    check('токен GitHub — только у сервера: все запросы с токеном, в ответе, журнале и окружении разработчика его нет',
+          all(x['tok'] for x in calls) and GH_TOK not in json.dumps(t, ensure_ascii=False) and GH_TOK not in r.stdout + r.stderr
+          and not any('GH' in k or 'GITHUB' in k for k in json.load(open('/tmp/fake_claude_env.json'))), (r.stdout[-300:],))
+    t, r = gh_task('чужой коммит: сделай страницу и выпусти обновление')
+    check('в main появились чужие коммиты — rebase, перепроверка, потом слияние; чужое на месте', t['status'] == 'done' and t['merged'] == 1 and gh_main('docs/chuzhoe.txt') == 'чужое'
+          and gh_main('releases/9104.json') and 'перепроверка поверх нового main' in t['checks'], (t, r.stdout[-400:], r.stderr[-400:]))
+    t, r = gh_task('конфликт: поправь a.php и выпусти обновление')
+    check('конфликт с чужой правкой — стоп, ничего не слито, чужое не затёрто, Боссу понятная причина', t['status'] == 'failed' and t['merged'] == 0 and 'Конфликт' in t['error']
+          and 'чужое' in gh_main('store/a.php') and not gh_main('releases/9105.json'), (t, gh_main('store/a.php'), r.stdout[-400:]))
     print('20. Файлы на сервере: PDF, фото, видео (0.4.4)')
     import io as _io, base64 as _b64
     try: from PIL import Image as _Im
@@ -574,15 +601,18 @@ try:
     check('очистка ответа и разбор <invoke name=…> — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
     print('23. «Космос» видит сами снимки: скриншот без текста уходит Claude картинкой рядом с текстом (№623)')
     r = subprocess.run(['php', f'{ROOT}/tests/ff_img_test.php', f'{TMP}/images.json'], capture_output=True, text=True, timeout=60)
-    check('уменьшение, не больше 4, ошибки не роняют, id прошлых снимков — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
+    check('уменьшение, не больше 10, ошибки не роняют, id прошлых снимков — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
     imgs = json.load(open(f'{TMP}/images.json')) if os.path.exists(f'{TMP}/images.json') else []
     c, j = gw({'a': 'ask', 'user': 'Что я подсветил на скриншоте?\n\n=== ПРИЛОЖЕН ФАЙЛ «72904.jpg» (фото, id файла ff261115a1b2c3d4) ===\nФото без текста', 'who': BOSS,
-               'images': imgs * 5 + [{'media_type': 'image/bmp', 'data': 'AAAA'}]}, key='ab' * 32)
+               'images': imgs * 12 + [{'media_type': 'image/bmp', 'data': 'AAAA'}]}, key='ab' * 32)
     rec = [json.loads(l) for l in open(f'{TMP}/mock.log')][-1]
-    check('шлюз: снимки — блоками image (не больше 4), текст OCR рядом', c == 200 and len(rec.get('imgs', [])) == 4 and rec['imgs'][0] in ('image/png', 'image/jpeg') and 'Что я подсветил' in rec.get('txt1', ''), (c, rec))
+    check('шлюз: снимки — блоками image (№624: не больше 10, было 4), текст OCR рядом', c == 200 and len(rec.get('imgs', [])) == 10 and rec['imgs'][0] in ('image/png', 'image/jpeg') and 'Что я подсветил' in rec.get('txt1', ''), (c, rec))
     c, j = gw({'a': 'ask', 'user': 'Без картинки', 'who': BOSS, 'images': [{'media_type': 'image/png', 'data': '!!не base64!!'}]}, key='ab' * 32)
     rec = [json.loads(l) for l in open(f'{TMP}/mock.log')][-1]
     check('испорченный снимок пропущен — ответ как раньше, текстом', c == 200 and rec.get('imgs') == [], (c, rec))
+    print('24. Лимиты шагов (разговор 60, фон 400 и 3 часа) и защита от зацикливания (№624)')
+    r = subprocess.run(['php', f'{ROOT}/tests/ag_loop_test.php'], capture_output=True, text=True, timeout=60)
+    check('повтор одного вызова и работа без толку останавливаются с причиной, снимки на нужных шагах — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

@@ -36,6 +36,8 @@ $C = (is_file($cfgFile) ? (array)(require $cfgFile) : []) + [
   'upd_key_file' => '/etc/kosmos/upd_key.php', 'own_sign_key' => '/etc/kosmos/sign_own.pem', 'release_dir' => '/var/lib/kosmos-releases', 'python' => 'python3',
   // 0.4.1 · Android-приложения собирает сервер (android/ITCApp из GitHub), копия проекта для сборки — здесь
   'android_dir' => '/srv/itc-android', 'android_timeout' => 3600,
+  // 0.5.0 (№624) · автослияние: Pull request в main через GitHub API, токен GITHUB_TOKEN — из сейфа «Авто» (только у root, разработчику не виден)
+  'gh_api' => 'https://api.github.com', 'gh_repo' => 'interseal/itc-system',
 ];
 date_default_timezone_set((string)$C['tz']);
 $cmd = (string)($argv[1] ?? '');
@@ -816,13 +818,96 @@ function a_dev_merge_approved(): void {
   foreach ($list as $t) {
     $id = (int)$t['id']; $br = (string)$t['branch'];
     $r = ['status' => 'done', 'cost' => $t['cost'], 'result' => $t['result'], 'checks' => $t['checks'], 'branch' => $br, 'commit' => $t['commit'], 'release_n' => $t['release_n'], 'merged' => 0, 'error' => ''];
-    a_sh(a_git_env($rk) . "git -C $q fetch -q origin && git -C $q checkout -q -f -B " . escapeshellarg($br) . ' ' . escapeshellarg('origin/' . $br) . " && git -C $q rebase -q origin/main", $c1);
-    a_sh(a_git_env($wk) . "git -C $q push -q origin HEAD:main", $c2);
-    if ($c1 === 0 && $c2 === 0) { $r['merged'] = 1; $r['error'] = 'одобрено руководителем — отправлено в работу'; }
-    else { a_sh("git -C $q rebase --abort"); $r['status'] = 'failed'; $r['error'] = 'одобрено, но в главную не попало (код успел измениться) — поручите заново'; }
+    a_sh(a_git_env($rk) . "git -C $q fetch -q origin && git -C $q checkout -q -f -B " . escapeshellarg($br) . ' ' . escapeshellarg('origin/' . $br), $c1);
+    $m = $c1 === 0 ? a_dev_to_main($br, 'Поручение №' . $id . ' (одобрено руководителем)', (string)$C['dev_user']) : ['merged' => 0, 'error' => 'ветка ' . $br . ' не найдена в GitHub'];   // 0.5.0 (№624)
+    if ($m['merged']) { $r['merged'] = 1; $r['error'] = trim('одобрено руководителем — отправлено в работу. ' . $m['error']); if (!empty($m['commit'])) $r['commit'] = $m['commit']; }
+    else { $r['status'] = $m['status'] ?? 'failed'; $r['error'] = 'одобрено, но в главную не попало: ' . $m['error']; }
     a_as_db('devfinish', (string)$id, json_encode($r, JSON_UNESCAPED_UNICODE));
     a_log("поручение №$id: одобренные правки " . ($r['merged'] ? 'в главной ветке' : 'не попали в главную'));
   }
+}
+/* 0.5.0 (№624) · проверки правок: синтаксис PHP/JS, при правках kosmos/ — все проверки сервера (от пользователя разработчика) */
+function a_dev_checks(string $dev, array $changed, string $u): array {
+  $q = escapeshellarg($dev); $ok = true; $checks = [];
+  foreach ($changed as $f) {
+    if (!is_file("$dev/$f")) continue;
+    if (substr($f, -4) === '.php') { a_sh('php -l ' . escapeshellarg("$dev/$f"), $c); if ($c !== 0) { $ok = false; $checks[] = 'ошибка PHP: ' . $f; } }
+    if (substr($f, -3) === '.js') { a_sh('command -v node >/dev/null && node --check ' . escapeshellarg("$dev/$f"), $c); if ($c !== 0) { $ok = false; $checks[] = 'ошибка JS: ' . $f; } }
+  }
+  if ($ok && preg_grep('~^kosmos/~', $changed)) {
+    $o = a_sh('cd ' . $q . ' && runuser -u ' . escapeshellarg($u) . ' -- timeout 900 python3 kosmos/tests/run_tests.py | tail -3', $c);
+    $checks[] = 'проверки сервера: ' . trim(preg_replace('~\s+~', ' ', $o)); if ($c !== 0 || stripos($o, 'не прошло') === false || !preg_match('~\b0 не прошло~u', $o)) $ok = false;
+  }
+  return [$ok, $checks];
+}
+/* 0.5.0 (№624) · токен GitHub из сейфа «Авто» (GITHUB_TOKEN). Только в памяти root; '' — нет токена или сейфа */
+function a_gh_token(): string {
+  static $tok = null; if ($tok !== null) return $tok; $tok = '';
+  if (getenv('KOSMOS_GH_TOKEN_TEST') !== false) return $tok = (string)getenv('KOSMOS_GH_TOKEN_TEST');   // для проверок
+  $info = json_decode(a_as_db('bwinfo'), true); $bt = is_array($info) ? (string)($info['token'] ?? '') : '';
+  if ($bt === '' || a_bws_install() !== '') return $tok;
+  [$rc, $pr] = a_bws($bt, ['project', 'list']); if ($rc !== 0 || !is_array($pr) || !$pr) return $tok;
+  $pid = (string)$pr[0]['id']; foreach ($pr as $x) if (mb_strtolower((string)($x['name'] ?? '')) === 'авто') $pid = (string)$x['id'];
+  [$rc, $list] = a_bws($bt, ['secret', 'list', $pid]); if ($rc !== 0 || !is_array($list)) return $tok;
+  foreach ($list as $x) if ((string)($x['key'] ?? '') === 'GITHUB_TOKEN') $tok = trim((string)($x['value'] ?? ''));
+  return $tok;
+}
+/* запрос к GitHub API: [код, ответ]. Токен — только в заголовке, в журнал не попадает */
+function a_gh(string $method, string $path, ?array $body = null): array {
+  global $C; $tok = a_gh_token(); if ($tok === '') return [0, []];
+  $ch = curl_init(rtrim((string)$C['gh_api'], '/') . $path);
+  curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_CUSTOMREQUEST => $method, CURLOPT_TIMEOUT => 60, CURLOPT_CONNECTTIMEOUT => 10,
+    CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $tok, 'Accept: application/vnd.github+json', 'X-GitHub-Api-Version: 2022-11-28', 'User-Agent: itc-kosmos-agent', 'Content-Type: application/json']]
+    + ($body !== null ? [CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE)] : []));
+  $r = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+  $j = is_string($r) ? json_decode($r, true) : null;
+  return [$code, is_array($j) ? $j : []];
+}
+/* 0.5.0 (№624) · довести ветку до main. Если в main появились чужие коммиты — rebase на свежий main, перепроверка, и только потом слияние.
+   Конфликт — стоп, чужое не трогаем. Есть GITHUB_TOKEN — Pull request + слияние squash; нет — по-старому (push в main) и пометка «нужен GITHUB_TOKEN в сейфе».
+   Возвращает ['merged' => 0|1, 'error' => текст, 'status' => (если не done), 'checks' => …, 'commit' => …, 'pr' => №] */
+function a_dev_to_main(string $br, string $title, string $u): array {
+  global $C;
+  $dev = rtrim((string)$C['dev_dir'], '/'); $q = escapeshellarg($dev); $rk = (string)$C['git_key']; $wk = a_dev_key();
+  $tok = a_gh_token(); $need = 'нужен GITHUB_TOKEN в сейфе («Авто»), чтобы сервер сам сливал правки в main через Pull request';
+  $out = ['merged' => 0, 'error' => '', 'checks' => ''];
+  for ($try = 0; $try < 3; $try++) {
+    a_sh(a_git_env($rk) . "git -C $q fetch -q origin", $c0);
+    if ($c0 !== 0) return ['error' => 'нет связи с GitHub — правки в ветке ' . $br] + $out;
+    a_sh("git -C $q merge-base --is-ancestor origin/main HEAD", $anc);
+    if ($anc !== 0) {   // в main за это время появились чужие коммиты
+      a_sh("git -C $q -c user.name=Космос-разработчик -c user.email=kosmos@itcpartner.store rebase -q origin/main", $c1);
+      if ($c1 !== 0) { a_sh("git -C $q rebase --abort");
+        a_log("ветка $br: конфликт с main — остановлено, нужен руководитель");
+        return ['status' => 'failed', 'error' => 'Конфликт: пока шло поручение, в main появились чужие правки в тех же местах. Ничего не слито и ничего чужого не затёрто; правки лежат в ветке ' . $br . '. Нужно решение руководителя (поручить заново поверх нового main или передать Claude).'] + $out; }
+      $changed = array_values(array_filter(explode("\n", trim(a_sh("git -C $q diff --name-only origin/main HEAD")))));
+      a_sh('chown -R ' . escapeshellarg($u) . ': ' . $q); [$ok, $ch] = a_dev_checks($dev, $changed, $u); a_sh('chown -R root: ' . $q);
+      $out['checks'] = 'перепроверка поверх нового main: ' . ($ch ? implode('; ', $ch) : 'синтаксис в порядке');
+      if (!$ok) return ['status' => 'checks_failed', 'error' => 'После обновления от main проверки не прошли — в main не слито, правки в ветке ' . $br] + $out;
+      a_sh(a_git_env($wk) . "git -C $q push -q -f origin " . escapeshellarg('HEAD:refs/heads/' . $br), $cp);
+      if ($cp !== 0) return ['error' => 'GitHub не принял обновлённую ветку ' . $br] + $out;
+    }
+    $sha = trim(a_sh("git -C $q rev-parse HEAD"));
+    if ($tok === '') {   // по-старому: прямо в main ключом записи
+      a_sh(a_git_env($wk) . "git -C $q push -q origin HEAD:main", $c2);
+      if ($c2 === 0) return ['merged' => 1, 'error' => $need . ' (сейчас отправлено напрямую)', 'commit' => substr($sha, 0, 7)] + $out;
+      return ['error' => 'правки в ветке ' . $br . ', но в main не попали — ' . $need] + $out;
+    }
+    $repo = (string)$C['gh_repo']; $owner = explode('/', $repo)[0];
+    [$c, $j] = a_gh('GET', "/repos/$repo/pulls?state=open&base=main&head=" . rawurlencode($owner . ':' . $br));
+    $num = ($c === 200 && !empty($j[0]['number'])) ? (int)$j[0]['number'] : 0;
+    if (!$num) {
+      [$c, $j] = a_gh('POST', "/repos/$repo/pulls", ['title' => mb_substr($title, 0, 200), 'head' => $br, 'base' => 'main',
+        'body' => "Сервер «Космоса»: проверки прошли, сливаю сам (squash).\n\n" . $title]);
+      $num = (int)($j['number'] ?? 0);
+      if (!$num) return ['error' => 'GitHub не создал Pull request (' . $c . ($j['message'] ?? '' ? ': ' . mb_substr((string)$j['message'], 0, 160) : '') . ') — правки в ветке ' . $br] + $out;
+    }
+    [$c, $j] = a_gh('PUT', "/repos/$repo/pulls/$num/merge", ['merge_method' => 'squash', 'sha' => $sha, 'commit_title' => mb_substr($title, 0, 200) . " (#$num)"]);
+    if ($c === 200 && !empty($j['merged'])) { a_log("ветка $br слита в main (Pull request №$num, squash)"); return ['merged' => 1, 'pr' => $num, 'commit' => substr((string)($j['sha'] ?? $sha), 0, 7)] + $out; }
+    if (in_array($c, [405, 409], true)) { sleep(3); continue; }   // main успел сдвинуться / GitHub ещё считает — ещё раз с перепроверкой
+    return ['error' => 'GitHub не слил Pull request №' . $num . ' (' . $c . ($j['message'] ?? '' ? ': ' . mb_substr((string)$j['message'], 0, 160) : '') . ') — правки в ветке ' . $br] + $out;
+  }
+  return ['error' => 'main всё время меняется — слить не удалось, правки в ветке ' . $br . ' (Pull request открыт)'] + $out;
 }
 function a_devrun(): bool {
   global $C;
@@ -884,16 +969,7 @@ function a_devrun(): bool {
   $checks = [];
   $diff = a_sh("git -C $q add -A && git -C $q diff --cached");
   if (preg_match('~sk-ant-[A-Za-z0-9_\-]{20,}|\bsk-[a-f0-9]{32}\b|BEGIN [A-Z ]*PRIVATE KEY|define\(\s*.UPD_KEY~', $diff)) { $res['error'] = 'в правках найден ключ — ничего не записано'; a_sh("git -C $q reset -q --hard"); $finish($res); return false; }
-  $ok = true;
-  foreach ($changed as $f) {
-    if (!is_file("$dev/$f")) continue;
-    if (substr($f, -4) === '.php') { $o = a_sh('php -l ' . escapeshellarg("$dev/$f"), $c); if ($c !== 0) { $ok = false; $checks[] = 'ошибка PHP: ' . $f; } }
-    if (substr($f, -3) === '.js') { $o = a_sh('command -v node >/dev/null && node --check ' . escapeshellarg("$dev/$f"), $c); if ($c !== 0) { $ok = false; $checks[] = 'ошибка JS: ' . $f; } }
-  }
-  if ($ok && preg_grep('~^kosmos/~', $changed)) {
-    $o = a_sh('cd ' . $q . ' && runuser -u ' . escapeshellarg($u) . ' -- timeout 900 python3 kosmos/tests/run_tests.py | tail -3', $c);
-    $checks[] = 'проверки сервера: ' . trim(preg_replace('~\s+~', ' ', $o)); if ($c !== 0 || stripos($o, 'не прошло') === false || !preg_match('~\b0 не прошло~u', $o)) $ok = false;
-  }
+  [$ok, $checks] = a_dev_checks($dev, $changed, $u);
   $res['checks'] = $checks ? implode('; ', $checks) : 'синтаксис в порядке (' . count($changed) . ' файлов)';
   a_sh("git -C $q -c user.name=" . escapeshellarg($ds ? 'Фил-разработчик' : 'Космос-разработчик') . " -c user.email=kosmos@itcpartner.store commit -q -m " . escapeshellarg(($ds ? 'Фил-разработчик' : 'Космос-разработчик') . ', поручение №' . $id . ': ' . mb_substr((string)$t['text'], 0, 120)));
   $res['commit'] = trim(a_sh("git -C $q rev-parse --short HEAD"));
@@ -908,13 +984,14 @@ function a_devrun(): bool {
   // 0.4.2 · решение — за руководителем (кнопка «Одобрить» в настройках «Космоса» или ответ Филу/«Космосу»)
   if ($rel && $risky) { $res['status'] = 'needs_ok'; $res['release_n'] = (int)basename($rel[0], '.json');
     $res['error'] = 'Затронуты настройки сборки (' . implode(', ', array_slice($risky, 0, 4)) . '): через них проходит ключ подписи приложений. Проверки прошли. Нажмите «Одобрить», чтобы выпустить, или «Отклонить».'; $finish($res); return true; }
-  if ($rel) {   // поручение выпускает обновление: в главную ветку, сервер соберёт его и предложит руководителю «Установить»
-    a_sh(a_git_env($rk) . "git -C $q fetch -q origin && git -C $q rebase -q origin/main", $c1);
-    a_sh(a_git_env($wk) . "git -C $q push -q origin HEAD:main", $c2);
-    if ($c1 === 0 && $c2 === 0) { $res['merged'] = 1; $res['release_n'] = (int)basename($rel[0], '.json'); }
-    else $res['error'] = 'правки в ветке ' . $res['branch'] . ', но в главную не попали (кто-то изменил код раньше) — нужен Claude';
-  }
   $res['status'] = 'done';
+  if ($rel) {   // поручение выпускает обновление: в главную ветку, сервер соберёт его и предложит руководителю «Установить»
+    $res['release_n'] = (int)basename($rel[0], '.json');
+    $m = a_dev_to_main($res['branch'], ($ds ? 'Фил-разработчик' : 'Космос-разработчик') . ', поручение №' . $id . ': ' . mb_substr((string)$t['text'], 0, 120), $u);   // 0.5.0 (№624)
+    $res['merged'] = $m['merged']; $res['error'] = $m['error']; if (!empty($m['status'])) $res['status'] = $m['status'];
+    if (!empty($m['checks'])) $res['checks'] .= '; ' . $m['checks'];
+    if (!empty($m['commit'])) $res['commit'] = $m['commit'];
+  }
   $finish($res);
   return true;
 }

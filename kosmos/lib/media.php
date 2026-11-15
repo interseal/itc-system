@@ -36,7 +36,7 @@ function gw_media(array $in): void {
   $src = "$tmp/in." . (preg_match('~^[a-z0-9]{1,5}$~', $ext) ? $ext : 'bin');
   $url = (string)($in['url'] ?? '');
   if ($url !== '') {   // 0.4.6 · большой файл (до 500 МБ) — забираем сами по разовой ссылке магазина
-    if (!preg_match('~^https://([a-z0-9-]+\.)*itcpartner\.store/api/flow\.php\?action=ff_dl&~', $url)) { media_rm($tmp); fail('Ссылка не с нашего магазина'); }
+    if (!preg_match('~^https://([a-z0-9-]+\.)*itcpartner\.store/api/(?:kosmos_)?flow\.php\?action=ff_dl&~', $url))   // 0.5.0: и ссылки «Космоса» (kosmos_flow.php) { media_rm($tmp); fail('Ссылка не с нашего магазина'); }
     $fh = fopen($src, 'wb'); $ch = curl_init($url);
     curl_setopt_array($ch, [CURLOPT_FILE => $fh, CURLOPT_TIMEOUT => 1200, CURLOPT_CONNECTTIMEOUT => 15, CURLOPT_FOLLOWLOCATION => false, CURLOPT_NOPROGRESS => false,
       CURLOPT_PROGRESSFUNCTION => function ($c, $dt, $d) { return $d > MEDIA_MAX_URL ? 1 : 0; }]);
@@ -69,7 +69,7 @@ function media_do(string $op, string $src, string $out, array $in): array {
   switch ($op) {
     case 'pdf_text': {
       media_need('pdftotext');
-      [$rc, , $e] = media_run(['pdftotext', '-layout', $src, "$out/../text.txt"]);
+      [$rc, , $e] = media_run(['pdftotext', '-layout', $src, "$out/../text.txt"], 300);   // 0.5.0: PDF до 50 МБ и больше
       if ($rc !== 0) throw new RuntimeException('не удалось прочитать PDF: ' . mb_substr($e, 0, 200));
       return ['text' => mb_substr((string)file_get_contents("$out/../text.txt"), 0, 300000)];
     }

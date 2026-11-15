@@ -8,6 +8,8 @@ declare(strict_types=1);
 // Ключи Claude отсюда никуда не уходят: магазин получает только текст ответа.
 // Доступ сотрудников, лимиты и расход — те же, что в настройках «Космоса» (кто спросил, магазин сообщает в поле who).
 
+const GW_IMG_MAX = 10; const GW_IMG_TOT = 26000000;   // 0.5.0 (№624)
+
 function gw_handle(): void {
   $want = '';
   $f = (string)cfg('gw_key_file');
@@ -49,7 +51,7 @@ function gw_who(array $w): array {
   $t = time();
   $d->prepare('DELETE FROM rate WHERE at < ?')->execute([$t - 60]);
   $q = $d->prepare('SELECT COUNT(*) FROM rate WHERE phone=?'); $q->execute(['gw:' . $phone]);
-  if ((int)$q->fetchColumn() >= max(20, (int)cfg('msg_per_min') * 3)) fail('Слишком много запросов за минуту — подождите немного', 429);
+  if ((int)$q->fetchColumn() >= max(40, (int)cfg('msg_per_min') * 3)) fail(   /* 0.5.0 (№624): было 20 — 60 шагов разговора идут быстро */ 'Слишком много запросов за минуту — подождите немного', 429);
   $lim = (int)setting('daily_limit', '150');
   if (!$u['boss'] && $lim > 0) {
     $q = $d->prepare('SELECT COALESCE(SUM(calls),0) FROM gw_use WHERE day=? AND phone=?'); $q->execute([date('Y-m-d'), $phone]);
@@ -68,14 +70,20 @@ function gw_ask(array $in): void {
   $model = str($in['model'] ?? '', 60);
   if (!preg_match('~^claude-[a-z0-9.\-]{3,50}$~', $model)) $model = model('deep');
   $max = max(256, min(32000, (int)($in['max_tokens'] ?? 4000)));
-  // 0.4.6 · фото к вопросу: Claude видит сами снимки (до 4, каждый до 5 МБ), а не только распознанный текст
-  $content = $user; $imgs = [];
-  foreach (array_slice((array)($in['images'] ?? []), 0, 4) as $im) {
+  // 0.4.6 · фото к вопросу: Claude видит сами снимки, а не только распознанный текст · 0.5.0 (№624): до 10 снимков (было 4), каждый до ~5 МБ,
+  // все вместе — до 26 МБ в base64 (предел запроса Claude — 32 МБ; предел тела у nginx/PHP «Космоса» — 64 МБ)
+  $content = $user; $imgs = []; $tot = 0;
+  foreach (array_slice((array)($in['images'] ?? []), 0, GW_IMG_MAX) as $im) {
     $mt = (string)($im['media_type'] ?? ''); $d = (string)($im['data'] ?? '');
     if (!in_array($mt, ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], true) || $d === '' || strlen($d) > 7000000 || !preg_match('~^[A-Za-z0-9+/=]+$~', substr($d, 0, 200))) continue;
+    if ($tot + strlen($d) > GW_IMG_TOT) break; $tot += strlen($d);
     $imgs[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mt, 'data' => $d]];
   }
-  if ($imgs) $content = array_merge($imgs, [['type' => 'text', 'text' => $user]]);
+  if ($imgs) {
+    // 0.5.0 (№624): снимки теперь идут на каждом шаге разговора — ставим их в кеш Claude вместе с правилами: следующие шаги платят ~10% за снимки
+    $imgs[count($imgs) - 1]['cache_control'] = ['type' => 'ephemeral'];
+    $content = array_merge($imgs, [['type' => 'text', 'text' => $user]]);
+  }
   $payload = ['model' => $model, 'max_tokens' => $max, 'messages' => [['role' => 'user', 'content' => $content]]];
   // большая постоянная часть (правила, инструменты, памятка) — в кеш Claude: следующие шаги той же команды дешевле и быстрее
   if (trim($sys) !== '') $payload['system'] = [['type' => 'text', 'text' => $sys, 'cache_control' => ['type' => 'ephemeral']]];

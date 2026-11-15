@@ -1788,14 +1788,17 @@ const CRM_RULES = "\nКЛИЕНТЫ (раздел «Клиенты» → «Ра�
    деньги, грузы в Китае, сотрудники, переписка с фабриками. Смотрит до 5 источников подряд, потом отвечает
    или выполняет действие (то же, что fc_exec: завести сделку, задача, запись, стадия, ответственный, сумма).
    Деньги видят только руководитель и бухгалтерия. Ничего не удаляет. */
-const AG_MAX_STEPS = 24;   // №550: глубже и шире (было 16) · №18: больше шагов — Фил успевает посмотреть несколько мест и перепроверить
-/* №24 · большие поручения («составь базу клиентов…») Фил выполняет в фоне: до 80 шагов и 25 минут, потом присылает уведомление */
-const AG_BG_STEPS = 160;
+const AG_MAX_STEPS = 60;   // №550: глубже и шире (было 16) · №18 · №624 (решение руководителя 15.11.2026): 60 обращений к инструментам в разговоре (было 24)
+/* №24 · большие поручения («составь базу клиентов…») Фил выполняет в фоне и присылает уведомление · №624: до 400 шагов и 3 часов (было 160 и час) */
+const AG_BG_STEPS = 400;
+/* №624 · защита от зацикливания: один и тот же вызов (инструмент + те же данные) 3 раза подряд — стоп;
+   фоновая задача: AG_STALL шагов подряд без нового результата — стоп с причиной */
+const AG_REPEAT = 3; const AG_STALL = 12;
 /* №550 · думать глубоко и широко — одинаково у Фила и у «Космоса» */
 const AG_DEEP_RULES = "\nДУМАЙ ГЛУБОКО И ШИРОКО: прежде чем ответить, разложи задачу на части и проверь каждую в нескольких местах (наша база, интернет, сделки, переписка с фабриками). Сравнивай варианты, ищи то, о чём человек не подумал (совместимость, комплектность, сроки, доставка), и скажи об этом коротко.\nКОМПЛЕКСНОЕ КП: если клиенту нужна система из разных товаров (например, солнечные панели + аккумуляторы + инверторы + крепления), найди поставщика под каждый раздел через suppliers (по 1–2 лучших) и сделай ОДНО предложение: make_kp с sups=[{sup, section}], разделы назови понятно. Не делай несколько отдельных КП, если просили одно.\nWECHAT СОТРУДНИКА (программа «Фил на компьютере»): «прочитай переписку», «скачай каталоги», «что прислали поставщики» — wechat_read / wechat_files (работа идёт в фоне на его компьютере, итог — уведомлением; затем анализ по chats и sup_history: кто что прислал, где нет цены за единицу, MOQ, веса и объёма, сроков; кто молчит). Чего не хватает — предложи письмо поставщику на китайском с переводом и спроси «отправить?»; после «да» — wechat_send. Без подтверждения не пиши поставщикам.\nДОКУМЕНТЫ — ТОЛЬКО ПО ШАБЛОНУ ИТК: КП — make_kp, счёт — make_invoice, запрос цены поставщику — make_request. Они сами берут фирменный стиль (логотип, цвета, шапку, реквизиты) из одной базы — у всех менеджеров одинаково. Не составляй документы текстом «от себя» и не меняй вид; новый логотип или цвета ставит только руководитель (brand_set).\nИСТОРИЯ ПОСТАВЩИКА (единая база): скриншот переписки, прайс, каталог, предложение, «занеси в базу» — определи поставщика сам (по названию, логотипу, контактам в тексте; suppliers), вытащи суть (цены с валютой, ассортимент, MOQ, сроки, оплата) и запиши sup_note с файлами (они прикрепятся к карточке поставщика; по сделке — укажи deal). Вопросы «работали ли мы с …», «какие цены давал», «когда последнее предложение», «как изменилось» — sup_history, сравни по датам.\nПОИСК КЛИЕНТОВ: ищи в интернете (web, page) компании, которым подходит наш товар, — по городам и видам деятельности, проверяй сайт и контакты, найденных заноси в базу (add_clients) с пометкой, откуда взял и чем интересны. Большой поиск — фоновой задачей.";
-const AG_BG_MIN = 60;      // №28: фоновая задача — до 60 минут
-const AG_TASK_RULES = "\nПОРУЧЕНИЕ, А НЕ ВОПРОС? Если человек даёт задание, которое требует больше 3–4 действий (поискать в нескольких местах, занести несколько записей, обойти сайты, составить подборку, план или отчёт) — это задача в работу.\nБОЛЬШАЯ ЗАДАЧА? Если для ответа нужно много работы — собрать базу клиентов, найти много компаний в регионе, обойти десятки сайтов, сравнить много поставщиков, сделать подборку — НЕ пытайся успеть сейчас. Сразу верни {\"do\":\"task\",\"title\":\"коротко, что делаю\",\"plan\":[\"шаг 1\",\"шаг 2\",\"…\"],\"say\":\"Взял в работу: … Это займёт 10–30 минут, пришлю уведомление, когда закончу.\"}. В плане распиши конкретно: какие города, какие виды компаний, где искать, что достать (телефон, почта, сайт, адрес), куда занести. Задачу ты потом выполнишь сам, в фоне, с запасом в 160 шагов и час времени. Если в просьбе не хватает главного (непонятно, кого именно искать) — сначала do=ask одним вопросом.";
-const AG_BG_RULES = "\nЭТО ФОНОВАЯ ЗАДАЧА: человек не ждёт у экрана, у тебя до 160 обращений к инструментам и около часа. Работай по плану тщательно и до конца:"
+const AG_BG_MIN = 180;     // №28: фоновая задача · №624: до 3 часов (было 60 минут)
+const AG_TASK_RULES = "\nПОРУЧЕНИЕ, А НЕ ВОПРОС? Если человек даёт задание, которое требует больше 3–4 действий (поискать в нескольких местах, занести несколько записей, обойти сайты, составить подборку, план или отчёт) — это задача в работу.\nБОЛЬШАЯ ЗАДАЧА? Если для ответа нужно много работы — собрать базу клиентов, найти много компаний в регионе, обойти десятки сайтов, сравнить много поставщиков, сделать подборку — НЕ пытайся успеть сейчас. Сразу верни {\"do\":\"task\",\"title\":\"коротко, что делаю\",\"plan\":[\"шаг 1\",\"шаг 2\",\"…\"],\"say\":\"Взял в работу: … Это займёт 10–30 минут, пришлю уведомление, когда закончу.\"}. В плане распиши конкретно: какие города, какие виды компаний, где искать, что достать (телефон, почта, сайт, адрес), куда занести. Задачу ты потом выполнишь сам, в фоне, с запасом до 400 шагов и до 3 часов времени. Если в просьбе не хватает главного (непонятно, кого именно искать) — сначала do=ask одним вопросом.";
+const AG_BG_RULES = "\nЭТО ФОНОВАЯ ЗАДАЧА: человек не ждёт у экрана, у тебя до 400 обращений к инструментам и до 3 часов. Работай по плану тщательно и до конца:"
   . "\n• по каждому городу и каждому виду компаний — отдельные запросы web, разными словами (\"детские магазины Краснодар\", \"магазин игрушек Краснодар\", \"детская одежда Краснодар магазин\");"
   . "\n• открывай page сайтов компаний и справочников (2gis.ru, zoon.ru, flamp.ru, rusprofile.ru, list-org.com, сайты компаний — страницы «Контакты»), чтобы достать телефон, почту, сайт, адрес;"
   . "\n• заноси найденное add_clients сразу пачками по 5–30, не копи до конца; без названия и хотя бы одного контакта (телефон, почта или сайт) не заноси; дубли база отсеет сама;"
@@ -2351,23 +2354,37 @@ function ag_run($me, $ctx, $text, $talk = '', $opt = []) {
   $GLOBALS['FIL_MODEL'] = $GLOBALS['FIL_MODEL'] ?? sp_get('fil_model2');
   $head = ($talk !== '' ? "РАЗГОВОР ДО ЭТОГО (последние реплики — помни контекст, новый вопрос может продолжать старый):\n" . $talk . "\n\n" : '') . ($bg ? 'ФОНОВАЯ ЗАДАЧА: ' : 'НОВЫЙ ЗАПРОС: ') . $text;
   $ent = $opt['ent'] ?? []; $trace = array_column($ent, 'n'); $keep = $bg ? 8 : 99; $cut = $bg ? 6000 : 4000;
-  $imgs = $GLOBALS['FC_IMGS'] ?? [];   // №623 · снимки Claude видит на первых шагах (бюджет токенов): разговор — 8, фоновая задача — 4
+  $imgs = $GLOBALS['FC_IMGS'] ?? [];   // №623 · снимки видит Claude · №624: в разговоре — на всех шагах, в фоновой задаче — на первых 12
+  /* №624 · защита от зацикливания и от работы без толку (считаем и по уже сделанным шагам фоновой задачи) */
+  $rep = 0; $stall = 0; $seen = []; $prev = '';
+  $sig = function ($e) { $x = json_decode((string)$e['j'], true); return (string)$e['n'] . '|' . json_encode(is_array($x) ? ($x['args'] ?? null) : null, JSON_UNESCAPED_UNICODE); };
+  $mark = function ($e) use (&$rep, &$stall, &$seen, &$prev, $sig) { $s = $sig($e); $rep = $s === $prev ? $rep + 1 : 1; $prev = $s;
+    $h = md5((string)$e['o']); $stall = isset($seen[$h]) ? $stall + 1 : 0; $seen[$h] = 1; };
+  foreach ($ent as $e) $mark($e);
   for ($step = count($ent); $step <= $max; $step++) {
-    $GLOBALS['FC_IMGS'] = $step < ($bg ? 4 : 8) ? $imgs : [];
+    $GLOBALS['FC_IMGS'] = (!$bg || $step < 12) ? $imgs : [];
+    $why = $rep >= AG_REPEAT ? 'один и тот же запрос («' . end($trace) . '») повторился ' . $rep . ' раза подряд' : ($bg && $stall >= AG_STALL ? 'последние ' . $stall . ' шагов не дали ничего нового' : '');   // №624 · нет прогресса
     if ($bg && !empty($opt['stop']) && ($opt['stop'])()) return [['do' => 'answer', 'say' => 'Остановил задачу по вашей просьбе.'], $trace];
     $late = $bg && !empty($opt['until']) && time() > $opt['until'];
     $hist = $head; $nE = count($ent);
-    foreach ($ent as $i => $e) $hist .= "\n\nТЫ: " . $e['j'] . "\nРЕЗУЛЬТАТ " . $e['n'] . ': ' . ($i < $nE - $keep ? mb_substr($e['o'], 0, 300) . '…(старый результат сокращён — что важно, уже занесено)' : $e['o']);
-    $last = $step >= $max || $late;
-    $j = fl_ai($sys, $hist . ($last ? "\n\nИнструменты больше нельзя — ответь по тому, что уже узнал и сделал." : ''), 2500, true);
+    foreach ($ent as $i => $e) $hist .= "\n\nТЫ: " . ($i < $nE - 60 ? mb_substr($e['j'], 0, 200) : $e['j']) . "\nРЕЗУЛЬТАТ " . $e['n'] . ': ' . ($i < $nE - $keep ? mb_substr($e['o'], 0, $i < $nE - 60 ? 100 : 300) . '…(старый результат сокращён — что важно, уже занесено)' : $e['o']);   // №624: очень старые шаги — короче (400 шагов не раздувают запрос)
+    $last = $step >= $max || $late || $why !== '';
+    if ($why !== '') $GLOBALS['FC_IMGS'] = [];
+    $j = fl_ai($sys, $hist . ($why !== '' ? "\n\nСТОП, нет продвижения: " . $why . '.' : '') . ($last ? "\n\nИнструменты больше нельзя — ответь по тому, что уже узнал и сделал" . ($why !== '' ? ', и честно скажи, чего не удалось найти и почему.' : '.') : ''), 2500, true);
     if (!is_array($j)) return [null, $trace];
+    if ($why !== '') {   // №624 · остановились из-за зацикливания — причину видит человек
+      $pre = ($bg ? 'Остановил задачу: нет продвижения — ' : 'Остановился: ') . $why . '.';
+      if (!empty($j['tool']) || trim((string)($j['say'] ?? '')) === '') $j = ['do' => 'answer', 'say' => $pre . ($bg ? ' Найденное до этого уже сохранено; уточните задачу или дайте другие источники.' : ' Уточните вопрос, пожалуйста.')];
+      elseif ($bg) $j['say'] = $pre . "\n" . $j['say'];
+      $j['stall'] = $why; return [$j, $trace];
+    }
     if (!empty($j['tool']) && !$last) {
       $n = (string)$j['tool']; $args = is_array($j['args'] ?? null) ? $j['args'] : [];
       if (!empty($opt['on_pre'])) ($opt['on_pre'])($n, $args, (string)($j['think'] ?? ''));
       $res = isset($tools[$n]) ? ($tools[$n][1])($args) : 'нет такого инструмента';
       $out = json_encode($res, JSON_UNESCAPED_UNICODE); if (mb_strlen($out) > $cut) $out = mb_substr($out, 0, $cut) . '…(обрезано)';
       $jj = $j; unset($jj['_model']);
-      $ent[] = ['j' => json_encode($jj, JSON_UNESCAPED_UNICODE), 'n' => $n, 'o' => $out]; $trace[] = $n;
+      $ent[] = ['j' => json_encode($jj, JSON_UNESCAPED_UNICODE), 'n' => $n, 'o' => $out]; $trace[] = $n; $mark(end($ent));
       if (!empty($opt['on_step'])) ($opt['on_step'])($ent, $n, $args, $res);
       continue;
     }
@@ -2452,7 +2469,7 @@ function ff_xlsx($bin) {
 }
 /* прикреплённые файлы → кусок текста для Фила */
 function ff_attach_text($me, $ids) {
-  ff_ensure(); $ids = array_slice(array_filter(array_map('strval', (array)$ids)), 0, 6); if (!$ids) return '';
+  ff_ensure(); $ids = array_slice(array_filter(array_map('strval', (array)$ids)), 0, defined('KS_MODEL0') ? FF_IMG_MAX : 6); if (!$ids) return '';   // №624: «Космос» — до 10 файлов, Фил — как было
   $in = implode(',', array_fill(0, count($ids), '?'));
   $q = db()->prepare("SELECT id,name,kind,text FROM itc_fc_file WHERE phone=? AND id IN ($in)"); $q->execute(array_merge([$me['phone']], $ids));
   $o = ''; $left = 14000;
@@ -2473,7 +2490,8 @@ function ff_link($id, $ttl = 3600) {   // разовая ссылка на ор�
 /* №575 · «Космос» (Claude) видит сами фото, а не только распознанный текст: снимки идут к Claude вместе с вопросом */
 /* №623 · снимок перед отправкой Claude уменьшаем: длинная сторона до FF_IMG_SIDE точек (JPEG 85) — меньше токенов и трафика.
    Уже небольшой — как есть. Нет GD / не открылся / слишком велик — исходник, если он не больше 3,5 МБ, иначе null. Ошибки не роняют ответ. */
-const FF_IMG_SIDE = 1600; const FF_IMG_MAX = 4; const FF_IMG_RAW = 3500000;
+/* №624 (решение руководителя): до 10 снимков, сторона 2000. Общий объём снимков — до FF_IMG_TOT байт (в base64 ≈ 24 МБ < 32 МБ предела Claude) */
+const FF_IMG_SIDE = 2000; const FF_IMG_MAX = 10; const FF_IMG_RAW = 3500000; const FF_IMG_TOT = 18000000;
 function ff_img_small($bin, $m) {
   $bin = (string)$bin; if ($bin === '') return null;
   $raw = strlen($bin) <= FF_IMG_RAW ? [$m, $bin] : null;
@@ -2492,7 +2510,7 @@ function ff_img_small($bin, $m) {
 }
 function ff_attach_imgs($me, $ids) {
   try {   // №623 · любая ошибка — просто без снимков, как раньше
-    $ids = array_values(array_unique(array_slice(array_filter(array_map('strval', (array)$ids)), 0, 6))); if (!$ids) return [];
+    $ids = array_values(array_unique(array_slice(array_filter(array_map('strval', (array)$ids)), 0, FF_IMG_MAX))); if (!$ids) return [];
     ff_cols(); $in = implode(',', array_fill(0, count($ids), '?'));
     $q = db()->prepare("SELECT id,name,kind,path,mime FROM itc_fc_file WHERE phone=? AND id IN ($in)"); $q->execute(array_merge([$me['phone']], $ids));
     $rows = []; foreach ($q->fetchAll() as $f) $rows[(string)$f['id']] = $f;
@@ -2502,7 +2520,7 @@ function ff_attach_imgs($me, $ids) {
       $fn = ff_dir() . '/' . basename((string)$f['path']); if ((string)$f['path'] === '' || !is_file($fn)) continue;
       $ext = strtolower(pathinfo($fn, PATHINFO_EXTENSION)); $m = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif'][$ext] ?? '';
       if ($m === '' || filesize($fn) > 25 * 1048576) continue;
-      $im = ff_img_small((string)@file_get_contents($fn), $m); if (!$im || $tot + strlen($im[1]) > 12000000) continue;
+      $im = ff_img_small((string)@file_get_contents($fn), $m); if (!$im || $tot + strlen($im[1]) > FF_IMG_TOT) continue;
       $tot += strlen($im[1]); $o[] = ['m' => $im[0], 'd' => base64_encode($im[1]), 'n' => (string)$f['name']];
     }
     return $o;
@@ -2518,22 +2536,30 @@ function ff_imgs_note($imgs, $old = false) {
 }
 
 /* ========== №554 · ФАЙЛЫ: PDF-каталоги, фото, видео — обрабатывает сервер «Космоса» (там есть программы), готовое — ссылками ========== */
+/* №624 · файл больше FF_INLINE_MAX сервер «Космоса» забирает сам по разовой ссылке (а не в теле запроса) — так проходят PDF 50 МБ, видео 100 МБ и больше;
+   по ссылке из интернета — до FF_URL_MAX (было 40 МБ), скачанное сохраняется как обычный файл */
+const FF_INLINE_MAX = 8 * 1048576; const FF_URL_MAX = 100 * 1048576;
 function ag_files($me, $a) {
   $op = (string)($a['op'] ?? ''); $bin = ''; $name = 'file';
   if (trim((string)($a['file'] ?? '')) !== '') {
     ff_cols(); $q = db()->prepare('SELECT name,path FROM itc_fc_file WHERE id=? AND (phone=? OR ?=1)'); $q->execute([(string)$a['file'], $me['phone'], !empty($me['boss']) ? 1 : 0]);
     $f = $q->fetch(); if (!$f) return 'нет такого файла (id из «ПРИЛОЖЕН ФАЙЛ»)';
     if ((string)$f['path'] === '' || !is_file(ff_dir() . '/' . basename((string)$f['path']))) return 'оригинал этого файла не сохранился (бывает с большими PDF) — попросите прислать его ещё раз или дать ссылку';
-    $fp = ff_dir() . '/' . basename((string)$f['path']); $fid = (string)$a['file']; $big = filesize($fp) > 30 * 1048576;   // №581 · большой файл в память не читаем
+    $fp = ff_dir() . '/' . basename((string)$f['path']); $fid = (string)$a['file']; $big = filesize($fp) > FF_INLINE_MAX;   // №581 · большой файл в память не читаем · №624: порог 8 МБ
     $bin = $big ? '' : (string)file_get_contents($fp); $name = (string)$f['name'] ?: basename((string)$f['path']);
     if (pathinfo($name, PATHINFO_EXTENSION) === '') $name .= '.' . pathinfo((string)$f['path'], PATHINFO_EXTENSION);
-  } elseif (preg_match('~^https?://~i', (string)($a['url'] ?? ''))) {
-    $ch = curl_init((string)$a['url']); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 4, CURLOPT_TIMEOUT => 90, CURLOPT_CONNECTTIMEOUT => 10,
-      CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS, CURLOPT_USERAGENT => 'Mozilla/5.0 ITC', CURLOPT_NOPROGRESSFUNCTION => false,
-      CURLOPT_PROGRESSFUNCTION => function ($c, $dt, $d) { return $d > 40 * 1048576 ? 1 : 0; }]);
-    $bin = (string)curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-    if ($code !== 200 || $bin === '') return 'не удалось скачать файл по ссылке (код ' . $code . ', или больше 40 МБ)';
-    $name = basename((string)parse_url((string)$a['url'], PHP_URL_PATH)) ?: 'file';
+  } elseif (preg_match('~^https?://~i', (string)($a['url'] ?? ''))) {   // №624: до 100 МБ, сразу в файл (не в память)
+    ff_ensure(); ff_cols(); $name = basename((string)parse_url((string)$a['url'], PHP_URL_PATH)) ?: 'file'; $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    $sx = preg_match('~^[a-z0-9]{1,6}$~', $ext) && !preg_match('~^(php\d?|phtml|phar|pht|cgi|pl|py|sh|exe|bat|cmd|js|htaccess|html?|svgz?)$~', $ext) ? $ext : 'bin';
+    $fid = fl_id('ff'); $fp = ff_dir() . "/$fid.$sx"; $fh = @fopen($fp, 'wb'); if (!$fh) return 'не получилось сохранить файл';
+    $ch = curl_init((string)$a['url']); curl_setopt_array($ch, [CURLOPT_FILE => $fh, CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 4, CURLOPT_TIMEOUT => 300, CURLOPT_CONNECTTIMEOUT => 10,
+      CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS, CURLOPT_USERAGENT => 'Mozilla/5.0 ITC', CURLOPT_NOPROGRESS => false,
+      CURLOPT_PROGRESSFUNCTION => function ($c, $dt, $d) { return $d > FF_URL_MAX ? 1 : 0; }]);
+    curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); fclose($fh); clearstatcache();
+    if ($code !== 200 || !is_file($fp) || filesize($fp) < 1 || filesize($fp) > FF_URL_MAX) { @unlink($fp); return 'не удалось скачать файл по ссылке (код ' . $code . ', или больше 100 МБ)'; }
+    try { db()->prepare('INSERT INTO itc_fc_file (id,phone,name,kind,text,chars) VALUES (?,?,?,?,?,?)')->execute([$fid, $me['phone'], mb_substr($name, 0, 250), 'файл', 'Скачан по ссылке: ' . mb_substr((string)$a['url'], 0, 500), 0]);
+      db()->prepare('UPDATE itc_fc_file SET path=?,mime=?,bytes=? WHERE id=?')->execute(["$fid.$sx", 'application/octet-stream', filesize($fp), $fid]); } catch (Throwable $e) { @unlink($fp); return 'не получилось сохранить файл'; }
+    $big = filesize($fp) > FF_INLINE_MAX; $bin = $big ? '' : (string)file_get_contents($fp);
   } else return 'нужен file (id приложенного файла) или url';
   $data = ['a' => 'media', 'op' => $op, 'name' => $name];
   if (!empty($big)) $data['url'] = ff_link($fid, 7200);   // №581 · большой — сервер скачает сам по разовой ссылке
@@ -3037,7 +3063,7 @@ function fs_attach($me, $supId, $fileIds) {
     $q = db()->prepare('SELECT * FROM itc_fc_file WHERE id=? AND phone=?'); $q->execute([$fid, $me['phone']]); $f = $q->fetch();
     if (!$f) { $err[] = $fid . ': не найден'; continue; }
     $p = ff_dir() . '/' . basename((string)$f['path']);
-    if ((string)$f['path'] === '' || !is_file($p)) { $err[] = $f['name'] . ': оригинал не сохранился (файл больше 12 МБ или прислан старой версией) — загрузите его в карточку в Экосистеме'; continue; }
+    if ((string)$f['path'] === '' || !is_file($p)) { $err[] = $f['name'] . ': оригинал не сохранился (файл прислан старой версией приложения) — загрузите его в карточку в Экосистеме'; continue; }
     $ext = strtolower(pathinfo($p, PATHINFO_EXTENSION)); if (!isset($ext2[$ext])) { $err[] = $f['name'] . ': такой тип не прикрепить'; continue; }
     $kind = ($ext === 'pdf' || $ext === 'docx' || $ext === 'xlsx') ? 'file' : (preg_match('~визитк|card~iu', $f['name']) ? 'card' : 'file');
     $key = 'sup/' . preg_replace('/[^a-z0-9_\-]/i', '', $supId) . '/' . $kind . '_' . date('Ymd') . '_' . bin2hex(random_bytes(5)) . '.' . $ext;
@@ -3214,7 +3240,7 @@ function fy_stats() {
 
 /* ========== №24 · ФОНОВЫЕ ЗАДАЧИ ФИЛА ==========
    «Составь базу детских магазинов юга России» — Фил отвечает «взял в работу», составляет план и работает сам
-   (до 80 шагов, 25 минут): ищет, читает сайты, заносит клиентов. Ход работы виден в приложении «Фил»,
+   (№624: до 400 шагов и 3 часов): ищет, читает сайты, заносит клиентов. Ход работы виден в приложении «Фил»,
    по окончании — уведомление на телефон. Если сервер прервал работу, задача продолжится, когда приложение спросит о ней. */
 function ft_ensure() {
   static $d = false; if ($d) return; $d = true;
@@ -3303,7 +3329,7 @@ function ft_run($me, $id) {
   $say = itcai_clean((string)($j['say'] ?? '')) ?: 'Задачу закончил.';   // №621
   if (!empty($j['learn'])) { $lt = fil_learn_add($me, (string)$j['learn']); if ($lt !== '') $say .= "\nЗапомнил на будущее: " . $lt; }   // №38
   $say .= nvk_take($me, $j, $trace);   // №538 · навыки
-  $st = $now['status'] === 'stop' ? 'stop' : 'done';
+  $st = $now['status'] === 'stop' || !empty($j['stall']) ? 'stop' : 'done';   // №624: остановился из-за зацикливания — «Остановлено», причина в тексте
   /* №28 · отчёт всегда с цифрами: сколько шагов сделал и сколько занёс */
   $q = db()->prepare('SELECT steps,added FROM itc_fil_task WHERE id=?'); $q->execute([$id]); $cnt = $q->fetch() ?: ['steps' => 0, 'added' => 0];
   $tail = ($st === 'stop' ? 'Остановлено' : 'Готово') . ': действий сделано — ' . (int)$cnt['steps'] . ', новых записей в базе «Клиенты» — ' . (int)$cnt['added'] . '.';
@@ -3312,6 +3338,7 @@ function ft_run($me, $id) {
     foreach ($q->fetchAll() as $k) $say .= "\n[[kp:" . $k['id'] . '|' . str_replace([']', '|'], '', $k['title']) . ']]'; } catch (Throwable $e) {}
   db()->prepare('UPDATE itc_fil_task SET status=?, result=?, done_at=NOW(), lock_until=NULL WHERE id=?')->execute([$st, $say, $id]);
   try { db()->prepare('INSERT INTO itc_fc_log (phone,who,said,reply,kind,deal_id) VALUES (?,?,?,?,?,?)')->execute([$me['phone'], $me['name'], 'Задача: ' . $t['title'], $say, 'task_done', '']); fm_tag_last((string)($t['conv_id'] ?? '')); } catch (Throwable $e) {}
+  if (!empty($j['stall'])) fl_push([$me['phone']], 'Фил остановил задачу', mb_substr($t['title'] . ': нет продвижения — ' . $j['stall'], 0, 180), '/apps/fil/?task=' . $id);   // №624
   if ($st === 'done') fl_push([$me['phone']], 'Фил закончил задачу', mb_substr($t['title'] . ': ' . $say, 0, 180), '/apps/fil/?task=' . $id);
 }
 
@@ -3914,7 +3941,7 @@ try {
     else {
       $bin = base64_decode((string)fl_in('data'), true);
       if ($bin === false || $bin === '') fl_fail('Файл не дошёл — попробуйте ещё раз');
-      if (strlen($bin) > 20 * 1024 * 1024) fl_fail('Файл больше 20 МБ — сожмите его, пришлите частями или ссылкой (ссылку Фил скачает сам, до 40 МБ)');
+      if (strlen($bin) > 20 * 1024 * 1024) fl_fail('Файл больше 20 МБ — сожмите его, пришлите частями или ссылкой (ссылку Фил скачает сам, до 100 МБ)');
       $isVid = in_array($ext, ['mp4', 'mov', 'webm', 'm4v'], true) || strpos($mime, 'video/') === 0;   // №554 · видео — для обработки на сервере
       // №558 · ЛЮБОЙ ФОРМАТ: быстрые — здесь, остальное (TIFF, HEIC, BMP, GIF, старые .doc/.xls, PowerPoint, RTF, ODT, звук…) — переводит сервер «Космоса»
       $fastImg = in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) || in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) && !in_array($ext, ['tif', 'tiff', 'heic', 'heif', 'bmp', 'gif'], true);
@@ -4096,7 +4123,7 @@ try {
   /* ===== Команды Филу ===== */
   case 'fc_cmd': {
     if (function_exists('session_write_close')) @session_write_close();   // №34: пока Фил думает — телефон спрашивает ход работы
-    ignore_user_abort(true); @set_time_limit(900);     // №28 (№160: до 15 минут): свернули приложение — Фил всё равно доделает и запишет ответ
+    ignore_user_abort(true); @set_time_limit(1800);    // №28 (№160: до 15 минут · №624: до 30 минут — 60 обращений к инструментам): свернули приложение — Фил всё равно доделает и запишет ответ
     fc_ensure();
     $t = trim(preg_replace('~\s+~u', ' ', (string)fl_in('text')));
     if ($t === '' && fl_in('files')) $t = 'Посмотри приложенный файл: что это, что в нём главное, сверь с нашей базой (клиенты, поставщики, сделки) и предложи, что с ним сделать.';
@@ -4113,7 +4140,7 @@ try {
       $hh = $q->fetchAll(); foreach (array_reverse($hh) as $h) $talk .= 'Сотрудник: ' . mb_substr($h['said'], 0, 400) . "\nФил: " . mb_substr($h['reply'], 0, 700) . "\n";
       if (!$GLOBALS['FC_IMGS'] && defined('KS_MODEL0')) {   // №623 · вопрос о снимке, приложенном раньше («что я подсветил?») — «Космос» снова видит сам снимок (последние 4 реплики)
         $pid = []; foreach (array_slice($hh, 0, 4) as $h) $pid = array_merge($pid, ff_ids_in($h['said']));
-        if ($pid) { $GLOBALS['FC_IMGS'] = ff_attach_imgs($me, array_slice(array_unique($pid), 0, 6)); $att .= ff_imgs_note($GLOBALS['FC_IMGS'], true); }
+        if ($pid) { $GLOBALS['FC_IMGS'] = ff_attach_imgs($me, array_slice(array_unique($pid), 0, FF_IMG_MAX)); $att .= ff_imgs_note($GLOBALS['FC_IMGS'], true); }
       } } catch (Throwable $e) {}
     $pf = fp_file($me, fl_in('rid', '')); $steps = []; fp_save($pf, $steps); $GLOBALS['KP_MADE'] = [];
     $popt = ['on_pre' => function ($n, $a, $think) use ($pf, &$steps) { $steps[] = ['t' => fp_pre_line($n, $a), 'd' => fp_think($think), 'run' => 1]; fp_save($pf, $steps); },
