@@ -24,7 +24,10 @@ CONF = f'''<?php return [
   ],
 ];'''
 open(f'{TMP}/config.php', 'w').write(CONF)
-env = dict(os.environ, KOSMOS_CONFIG=f'{TMP}/config.php', PHP_CLI_SERVER_WORKERS='4')
+# №622: своя временная папка — замки агента (kosmos-agent.lock, -dev.lock, -android.lock) не пересекаются с настоящим
+# агентом сервера (у него /tmp/kosmos-agent.lock от root: без этого проверка 13 видела «уже работает другой проход»)
+os.makedirs(f'{TMP}/tmp', exist_ok=True)
+env = dict(os.environ, KOSMOS_CONFIG=f'{TMP}/config.php', PHP_CLI_SERVER_WORKERS='4', TMPDIR=f'{TMP}/tmp')
 procs = [
     subprocess.Popen([sys.executable, f'{ROOT}/tests/mock_claude.py', str(MOCK_PORT), f'{TMP}/mock.log']),
     subprocess.Popen(['php', '-S', '127.0.0.1:8781', '-t', f'{ROOT}/www'], env=env, stdout=open(f'{TMP}/php.log', 'w'), stderr=subprocess.STDOUT),
@@ -445,11 +448,21 @@ try:
     dc = f'{TMP}/agent_dev.php'
     open(dc, 'w').write(CONF.replace("];", f"  'git_repo' => '{O}', 'git_key' => '{TMP}/gitkey', 'dev_dir' => '{TMP}/itcdev', 'dev_key' => '{TMP}/devkey', 'claude_bin' => '/tmp/fake_claude.py', 'dev_user' => 'kosmosdev', 'db_user' => '', 'agent_state' => '{TMP}/agent_state.json',\n];"))
     denv = dict(env, KOSMOS_CONFIG=dc)
+    if os.geteuid() != 0:   # №622: сервер гоняет проверки от kosmosdev (runuser -u kosmosdev), а runuser работает только у root —
+        # подставляем runuser, который просто запускает команду от текущего (тоже не root) пользователя; под root — настоящий
+        os.makedirs(f'{TMP}/bin', exist_ok=True)
+        # (агент зовёт Claude Code как «timeout N runuser -u ИМЯ -- …» с постоянным PATH, поэтому подменяем и timeout:
+        # он записывает, от какого пользователя агент просил запуск, убирает «runuser -u ИМЯ --» и зовёт настоящий timeout)
+        open(f'{TMP}/bin/runuser', 'w').write(f'#!/bin/sh\n# тестовый runuser: -u ИМЯ -- команда\n[ "$1" = "-u" ] && {{ echo "$2" >> {TMP}/runuser_calls; shift 2; }}\n[ "$1" = "--" ] && shift\nexec "$@"\n')
+        open(f'{TMP}/bin/timeout', 'w').write(f'#!/bin/sh\nn="$1"; shift\nif [ "$1" = runuser ] && [ "$2" = "-u" ] && [ "$4" = "--" ]; then echo "$3" >> {TMP}/runuser_calls; shift 4; fi\nexec /usr/bin/timeout "$n" "$@"\n')
+        for f in ('runuser', 'timeout'): os.chmod(f'{TMP}/bin/{f}', 0o755)
+        denv['PATH'] = f'{TMP}/bin:' + denv.get('PATH', '/usr/bin:/bin')
     c, j = call('dev', S); check('разработчик — только руководителю', c == 403, (c, j))
     c, j = call('dev_add', B, {'text': 'Сделай новую страницу и выпусти обновление', 'model': 'opus'}); tid = j.get('id')
     r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'devrun'], env=denv, capture_output=True, text=True, timeout=120)
     c, j = call('dev', B); t = next(x for x in j['tasks'] if x['id'] == tid); fa = json.load(open('/tmp/fake_claude_args.json'))
     check('поручение выполнено: Claude Code от отдельного пользователя, модель Opus, с правилами и ключом', t['status'] == 'done' and fa['model'] == 'claude-opus-5-5' and fa['rules'] and fa['key'] and fa['user'] != 0, (t, fa, r.stdout[-300:], r.stderr[-300:]))
+    if os.geteuid() != 0: check('агент просил запуск Claude Code от kosmosdev (runuser -u kosmosdev)', 'kosmosdev' in (open(f'{TMP}/runuser_calls').read().split() if os.path.exists(f'{TMP}/runuser_calls') else []), r.stdout[-300:])
     lg = subprocess.run(f'git --git-dir={O} log --oneline main', shell=True, capture_output=True, text=True).stdout
     check('проверки прошли — правки в GitHub, обновление №9100 в главной ветке', t['merged'] == 1 and t['release_n'] == 9100 and 'Космос-разработчик' in lg and t['cost'] == 1.23, (t, lg))
     check('ответ руководителю виден в настройках', 'Босс, готово' in t['result'])
@@ -510,17 +523,26 @@ try:
     check('стоимость — за всё поручение', abs(t['cost'] - 1.2) < 0.01, t['cost'])
     c, j = call('dev_answer', B, {'id': tq, 'text': 'ещё'}); check('без вопроса ответ не принимается', c == 400, j)
     print('20. Файлы на сервере: PDF, фото, видео (0.4.4)')
-    from PIL import Image as _Im
     import io as _io, base64 as _b64
-    _Im.new('RGB', (600, 400), (200, 30, 30)).save(f'{TMP}/cat.pdf')
+    try: from PIL import Image as _Im
+    except ImportError: _Im = None   # №622: на сервере «Космоса» Pillow нет — картинки для проверок рисует ImageMagick
+    def mk_img(path, size, rgb, fmt=None):   # одноцветная картинка; fmt по расширению; rgb из 4 чисел — с прозрачностью
+        if _Im: _Im.new('RGBA' if len(rgb) == 4 else 'RGB', size, rgb).save(path, fmt); return
+        col = f'rgba({rgb[0]},{rgb[1]},{rgb[2]},{rgb[3] / 255:.3f})' if len(rgb) == 4 else 'rgb(%d,%d,%d)' % rgb
+        subprocess.run(['convert', '-size', '%dx%d' % size, 'xc:' + col] + (['-compress', 'jpeg'] if path.endswith('.pdf') else []) + [('PNG32:' if len(rgb) == 4 else '') + path], check=True)
+    def img_info(data):   # (ширина, высота, формат) картинки из байтов
+        if _Im: im = _Im.open(_io.BytesIO(data)); return (im.size[0], im.size[1], im.format)
+        o = subprocess.run(['identify', '-format', '%w %h %m', '-'], input=data, capture_output=True, check=True).stdout.decode().split()
+        return (int(o[0]), int(o[1]), o[2])
+    mk_img(f'{TMP}/cat.pdf', (600, 400), (200, 30, 30))
     pdf = _b64.b64encode(open(f'{TMP}/cat.pdf', 'rb').read()).decode()
     c, j = gw({'a': 'media', 'op': 'pdf_images', 'name': 'каталог.pdf', 'data': pdf}, key='ab' * 32)
     check('PDF-каталог: картинки достаются', c == 200 and len(j.get('files', [])) == 1 and j['files'][0]['name'].endswith('.jpg') and j['info']['картинок'] == 1, (c, str(j)[:300]))
     c, j = gw({'a': 'media', 'op': 'pdf_pages', 'name': 'каталог.pdf', 'data': pdf}, key='ab' * 32); check('PDF: страницы картинками', c == 200 and len(j.get('files', [])) == 1, str(j)[:300])
-    bio = _io.BytesIO(); _Im.new('RGBA', (900, 500), (0, 0, 255, 128)).save(bio, 'PNG')
-    c, j = gw({'a': 'media', 'op': 'img', 'name': 'лого.png', 'data': _b64.b64encode(bio.getvalue()).decode(), 'size': 300, 'square': True, 'format': 'jpg'}, key='ab' * 32)
-    im = _Im.open(_io.BytesIO(_b64.b64decode(j['files'][0]['data']))) if j.get('files') else None
-    check('фото: квадрат 300×300, jpg, белое поле', im is not None and im.size == (300, 300) and im.format == 'JPEG', (str(j)[:200], im.size if im else None))
+    mk_img(f'{TMP}/logo.png', (900, 500), (0, 0, 255, 128))
+    c, j = gw({'a': 'media', 'op': 'img', 'name': 'лого.png', 'data': _b64.b64encode(open(f'{TMP}/logo.png', 'rb').read()).decode(), 'size': 300, 'square': True, 'format': 'jpg'}, key='ab' * 32)
+    im = img_info(_b64.b64decode(j['files'][0]['data'])) if j.get('files') else None
+    check('фото: квадрат 300×300, jpg, белое поле', im == (300, 300, 'JPEG'), (str(j)[:200], im))
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=duration=4:size=320x240:rate=10', '-pix_fmt', 'yuv420p', f'{TMP}/v.mp4'], check=True)
     vid = _b64.b64encode(open(f'{TMP}/v.mp4', 'rb').read()).decode()
     c, j = gw({'a': 'media', 'op': 'video_frames', 'name': 'видео.mp4', 'data': vid, 'count': 3}, key='ab' * 32); check('видео: 3 кадра', len(j.get('files', [])) == 3, str(j)[:300])
@@ -531,7 +553,7 @@ try:
     def conv(name, path):
         return gw({'a': 'media', 'op': 'convert', 'name': name, 'data': _b64.b64encode(open(path, 'rb').read()).decode()}, key='ab' * 32)
     for fmt in ('TIFF', 'BMP', 'GIF'):
-        _Im.new('RGB', (300, 200), (10, 120, 200)).save(f'{TMP}/p.{fmt.lower()}', fmt)
+        mk_img(f'{TMP}/p.{fmt.lower()}', (300, 200), (10, 120, 200), fmt)
         c, j = conv(f'фото.{fmt.lower()}', f'{TMP}/p.{fmt.lower()}')
         check(f'{fmt} → JPEG', c == 200 and j.get('kind') == 'фото' and j['files'] and j['files'][0]['name'].endswith('.jpg'), str(j)[:200])
     open(f'{TMP}/d.txt', 'w').write('Прайс GP Solar: панель 550 Вт 0,6 $/Вт')

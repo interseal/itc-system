@@ -3242,7 +3242,8 @@ function fp_pre_line($n, $a) {
   if ($n === 'add_clients') return 'Заношу компании в базу клиентов';
   return ft_line($n, $a, null);
 }
-function fp_think($t) { $t = trim(preg_replace('~\s+~u', ' ', (string)$t)); return mb_strlen($t) > 220 ? mb_substr($t, 0, 218) . '…' : $t; }
+function fp_think($t) { $t = trim(preg_replace('~\s+~u', ' ', itcai_clean((string)$t)));   // №622: и здесь без <invoke…>
+  return mb_strlen($t) > 220 ? mb_substr($t, 0, 218) . '…' : $t; }
 function fp_save($f, $steps) { if ($f) @file_put_contents($f, json_encode(['steps' => $steps], JSON_UNESCAPED_UNICODE), LOCK_EX); }
 /* отдать ответ телефону и продолжить работу на сервере */
 function fl_out_keep($a) {
