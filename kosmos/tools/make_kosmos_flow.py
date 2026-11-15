@@ -7,6 +7,8 @@
   • своя переписка, свои разговоры и фоновые задачи (таблицы itc_ks_log, itc_ks_conv, itc_ks_task);
   • свои настройки: модель и голос (ks_model, ks_voice);
   • №536: памятка и выученное — ОБЩИЕ с «Филом» (fil_memo, fil_learn): чему научился один, знает и другой;
+    №631: они и правила помощников — в единой базе знаний (api/kb_lib.php, таблица itc_kb); правила из flow.php
+    «Космос» берёт оттуда же с заменой имени (kb_rule, kb_name), а если его код отличается — свой вариант;
     каждый видит журнал второго (AG_PEER, инструмент journal) — что тот делал и отвечал;
   • имя «Космос» во всех подсказках и ответах, ссылки на /apps/kosmos/;
   • фоновые задачи будит сервер «Космоса» раз в минуту (без планировщика хостинга); общие дела «Фила»
@@ -152,7 +154,7 @@ rep("// «Космос»: это делает «Космос»", "// «Косм�
 
 # 9) №536: памятка и выученное общие с «Филом». Один раз переносим в общую память то, что «Космос» выучил отдельно
 #    (ks_learn, ks_memo с №533), без повторов: строки, отличающиеся только именем помощника, считаем одинаковыми
-rep("function fil_learn() { return sp_get('fil_learn'); }",
+rep("function fil_learn() { return kb_learn(); }",
     "function ks_mem_norm($l) {\n"
     "  $l = preg_replace('~\\s*\\([^()]*\\)\\s*$~u', '', (string)$l);\n"
     "  $l = preg_replace('~(?<![\\p{L}\\p{N}_])(Фил|Космос)(а|у|ом|е)?(?![\\p{L}\\p{N}_])~u', '', $l);\n"
@@ -170,9 +172,9 @@ rep("function fil_learn() { return sp_get('fil_learn'); }",
     "  }\n"
     "  sp_put('ks_mem_merged', '1', 'Космос');\n"
     "}\n"
-    "function fil_learn() { ks_mem_merge(); return sp_get('fil_learn'); }")
-rep("function fil_memo() { $m = sp_get('fil_memo'); return $m !== '' ? $m : FIL_MEMO0; }",
-    "function fil_memo() { ks_mem_merge(); $m = sp_get('fil_memo'); return $m !== '' ? $m : FIL_MEMO0; }")
+    "function fil_learn() { ks_mem_merge(); return kb_learn(); }")
+rep("function fil_memo() { return kb_memo_text(); }",   # №631 · памятка и выученное — из базы знаний (kb_lib.php)
+    "function fil_memo() { ks_mem_merge(); return kb_memo_text(); }")
 
 # 10) №536 · второй помощник для «Космоса» — «Фил»: его журнал itc_fc_log (после всех замен)
 rep("const AG_PEER = ['log' => 'itc_ks_log', 'name' => 'Космос', 'gen' => 'Космоса', 'ins' => 'Космосом', 'me' => 'Космос'];",

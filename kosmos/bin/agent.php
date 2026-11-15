@@ -47,6 +47,8 @@ switch ($cmd) {
   case 'claudeskills': require_once __DIR__ . '/../lib/boot.php'; echo json_encode(skill_sync_claude((string)($argv[2] ?? ''), (string)($argv[3] ?? 'claude') === 'hist' ? 'hist' : 'claude')); exit;   // 0.3.5 · от www-data
   case 'devclaim':  require_once __DIR__ . '/../lib/boot.php'; echo json_encode(dev_claim()); exit;   // 0.3.9 · от www-data
   case 'devapproved': require_once __DIR__ . '/../lib/boot.php'; echo json_encode(dev_approved()); exit;   // 0.4.2
+  case 'kbdata':   require_once __DIR__ . '/../lib/boot.php'; echo json_encode(a_kbdata(), JSON_UNESCAPED_UNICODE); exit;   // 0.5.7 · от www-data: поручения и память — в базу знаний ИТК
+  case 'kb':       a_lock(); exit(a_kb(true) ? 0 : 1);
   case 'devfinish': require_once __DIR__ . '/../lib/boot.php'; dev_finish((int)($argv[2] ?? 0), (array)json_decode((string)($argv[3] ?? '{}'), true)); echo 'ok'; exit;
   case 'devrun':    exit(a_devrun() ? 0 : 1);
   case 'android':   exit(a_android((int)($argv[2] ?? 0)) ? 0 : 1);   // 0.4.1 · фоновая сборка Android для обновления №N
@@ -66,6 +68,7 @@ switch ($cmd) {
     if (time() - (int)($st['upd_at'] ?? 0) > 600) a_update(false);
     a_cert();
     a_backup(false);
+    a_kb(false);   // 0.5.7 · база знаний ИТК: история разработки — в магазин (раз в час), копия базы знаний — сюда (раз в сутки)
     a_report();
     a_git(false);
     a_claude_skills(false);
@@ -203,7 +206,7 @@ function a_report(): void {
   $free = @disk_free_space(dirname((string)$C['db']));
   $up = is_file('/proc/uptime') ? (int)explode(' ', (string)file_get_contents('/proc/uptime'))[0] : 0;
   $rep = ['ver' => a_ver(), 'ip' => $ip, 'dns_ok' => a_dns_ok($ip), 'https' => a_https(), 'worker' => !empty($db['worker']), 'key' => !empty($db['key']),
-          'disk_free_gb' => $free ? round($free / 1073741824, 1) : null, 'backup' => (string)(a_state()['backup_day'] ?? ''),
+          'disk_free_gb' => $free ? round($free / 1073741824, 1) : null, 'backup' => (string)(a_state()['backup_day'] ?? ''), 'kb' => (string)(a_state()['kb_day'] ?? ''),
           'up' => $up ? floor($up / 86400) . ' дн ' . gmdate('H:i', $up % 86400) : ''];
   // 0.3.3 · для страницы обновлений магазина: нагрузка, рабочая копия GitHub, расход денег Claude по ключам
   $la = function_exists('sys_getloadavg') ? sys_getloadavg() : false;
@@ -307,6 +310,55 @@ function a_backup(bool $force): bool {
   } while (!$last);
   fclose($fh);
   if ($ok) { a_state_put(['backup_day' => $day]); a_log('копия базы ' . $day . ' отправлена в магазин (' . round($size / 1024) . ' КБ)'); }
+  return $ok;
+}
+
+/* 0.5.7 (№631) · ЕДИНАЯ БАЗА ЗНАНИЙ ИТК (главное место — база магазина, api/kb_lib.php).
+   Раз в час: поручения разработчику с итогами и память «Космоса» отсюда → в базу знаний магазина (раздел «история разработки»).
+   Раз в сутки: копия всей базы знаний (архив .zip с README) → /var/backups/kosmos/kb, хранятся 14 последних. */
+function a_kbdata(): array {
+  $d = db(); $dev = []; $mem = [];
+  if (function_exists('dev_schema')) dev_schema($d);
+  foreach ($d->query('SELECT * FROM dev_tasks ORDER BY id DESC LIMIT 1000')->fetchAll() as $r) {
+    $eng = (string)($r['engine'] ?? 'claude');
+    $t = 'ПОРУЧЕНИЕ: ' . trim((string)$r['text']);
+    if ((string)($r['question'] ?? '') !== '') $t .= "\n\nВОПРОС РАЗРАБОТЧИКА: " . trim((string)$r['question']) . ((string)($r['answer'] ?? '') !== '' ? "\nОТВЕТ РУКОВОДИТЕЛЯ: " . trim((string)$r['answer']) : '');
+    if ((string)$r['result'] !== '') $t .= "\n\nИТОГ: " . trim((string)$r['result']);
+    if ((string)$r['error'] !== '') $t .= "\n\nОШИБКА: " . trim((string)$r['error']);
+    if ((string)$r['checks'] !== '') $t .= "\n\nПРОВЕРКИ: " . mb_substr(trim((string)$r['checks']), 0, 3000);
+    $dev[] = ['id' => (int)$r['id'], 'text' => mb_substr($t, 0, 60000), 'created_at' => (string)$r['created_at'], 'author' => 'руководитель',
+              'src' => 'сервер «Космоса», поручение №' . (int)$r['id'] . ', выполнял ' . ($eng === 'deepseek' ? 'Фил (DeepSeek)' : 'Космос (Claude)'),
+              'status' => (string)$r['status'], 'release_n' => (int)$r['release_n'], 'engine' => $eng, 'model' => (string)$r['model'], 'finished_at' => (string)$r['finished_at']];
+  }
+  foreach ($d->query("SELECT m.*, COALESCE(u.name,'') name FROM memory m LEFT JOIN users u ON u.phone=m.phone ORDER BY m.id")->fetchAll() as $r)
+    $mem[] = ['id' => (int)$r['id'], 'text' => (string)$r['text'], 'created_at' => (string)$r['created_at'], 'author' => 'Космос',
+              'src' => 'сервер «Космоса», память ' . ($r['scope'] === 'company' ? 'о компании' : 'о человеке: ' . ((string)$r['name'] !== '' ? $r['name'] : $r['phone'])) . ((string)$r['source'] !== '' ? ' · ' . $r['source'] : ''),
+              'scope' => (string)$r['scope'], 'name' => (string)$r['name'], 'deleted' => (int)$r['deleted']];
+  return ['dev' => $dev, 'mem' => $mem];
+}
+function a_kb(bool $force): bool {
+  global $C; $st = a_state(); $ok = true;
+  if ($force || time() - (int)($st['kb_put_at'] ?? 0) > 3600) {
+    $data = a_as_db('kbdata');
+    if ($data !== '' && is_array(json_decode($data, true))) {
+      [$code, $body] = a_store('a=kb_put', $data, null, 60);
+      if ($code === 200) a_state_put(['kb_put_at' => time()]); else { $ok = false; a_log('база знаний: магазин не принял историю (' . $code . ')'); }
+    }
+  }
+  $day = date('Ymd');
+  if (!$force && ($st['kb_day'] ?? '') === $day) return $ok;
+  if (!$force && time() - (int)($st['kb_try'] ?? 0) < 3600) return $ok;   // не получилось — пробуем раз в час
+  a_state_put(['kb_try' => time()]);
+  $dir = rtrim((string)$C['backup_dir'], '/') . '/kb'; @mkdir($dir, 0700, true);
+  $tmp = $dir . '/.kb_' . $day . '.part';
+  [$code] = a_store('a=kb_copy', null, $tmp, 300);
+  $head = is_file($tmp) ? (string)file_get_contents($tmp, false, null, 0, 2) : '';
+  if ($code !== 200 || $head !== 'PK' || filesize($tmp) < 200) { @unlink($tmp); a_log('база знаний: копия не получена (' . $code . ')'); return false; }
+  rename($tmp, $dir . '/kb_' . $day . '.zip'); @chmod($dir . '/kb_' . $day . '.zip', 0600);
+  $all = glob($dir . '/kb_2*.zip') ?: []; sort($all);
+  while (count($all) > 14) @unlink(array_shift($all));
+  a_state_put(['kb_day' => $day]);
+  a_log('копия базы знаний ' . $day . ' сохранена (' . round(filesize($dir . '/kb_' . $day . '.zip') / 1024) . ' КБ)');
   return $ok;
 }
 

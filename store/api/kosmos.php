@@ -10,6 +10,8 @@
 //   pkgs/pkg — сервер забирает новые версии «Космоса» (их подпись проверяет сам сервер);
 //   report   — сервер раз в минуту сообщает, что жив, и получает ключ шлюза и адрес фоновых задач (№533);
 //   backup/backups/backup_get — ночные копии его базы (7 последних).
+//   kb_copy — №631: сервер раз в сутки забирает копию базы знаний ИТК (архив, api/kb_lib.php) и хранит у себя;
+//   kb_put  — №631: сервер присылает в базу знаний поручения разработчику с итогами и память «Космоса» со своего сервера.
 // Всё хранится в uploads/kosmos: пакеты — в pkg/, остальное — в закрытой папке со случайным именем.
 
 require_once __DIR__ . '/config.php';
@@ -137,7 +139,7 @@ switch ($a) {
         'pkgs' => array_values(array_map(function ($m) { return $m['ver']; }, ks_pkgs())),
         // №541 · для строки «Сингапур» на странице обновлений и денег Claude
         'at_ts' => (int)($st['at'] ?? 0), 'now' => time(), 'load' => $st['load'] ?? null, 'up' => (string)($st['up'] ?? ''),
-        'git' => $st['git'] ?? null, 'money' => ks_money_view($st), 'bw' => $st['bw'] ?? null];
+        'git' => $st['git'] ?? null, 'money' => ks_money_view($st), 'bw' => $st['bw'] ?? null, 'kb' => (string)($st['kb'] ?? '')];
     }
     ks_out($out);
   }
@@ -269,7 +271,7 @@ switch ($a) {
     ks_server();
     $b = ks_body();
     $st = ['at' => time()];
-    foreach (['ver', 'ip', 'backup', 'up'] as $k) $st[$k] = mb_substr((string)($b[$k] ?? ''), 0, 80);
+    foreach (['ver', 'ip', 'backup', 'up', 'kb'] as $k) $st[$k] = mb_substr((string)($b[$k] ?? ''), 0, 80);   // №631 · kb — день последней копии базы знаний на сервере
     foreach (['dns_ok', 'https', 'worker', 'key'] as $k) $st[$k] = !empty($b[$k]);
     $st['disk_free_gb'] = isset($b['disk_free_gb']) ? round((float)$b['disk_free_gb'], 1) : null;
     // №541 · нагрузка, рабочая копия GitHub и расход денег Claude по ключам — для страницы обновлений
@@ -312,6 +314,22 @@ switch ($a) {
       while (count($all) > 7) @unlink(array_shift($all));
     }
     ks_out(['ok' => true, 'have' => is_file($part) ? filesize($part) : 0]);
+  }
+
+  /* №631 · база знаний ИТК: копия — на сервер «Космоса»; от сервера — поручения разработчику и его память */
+  case 'kb_copy': {
+    ks_server(); @set_time_limit(300);
+    require_once __DIR__ . '/kb_lib.php';
+    $tmp = tempnam(sys_get_temp_dir(), 'kbs'); kb_export_zip($tmp);
+    while (ob_get_level() > 0) @ob_end_clean();
+    header('Content-Type: application/zip'); header('Content-Length: ' . filesize($tmp)); header('X-KB-Sha: ' . hash_file('sha256', $tmp));
+    readfile($tmp); @unlink($tmp); exit;
+  }
+  case 'kb_put': {
+    ks_server();
+    require_once __DIR__ . '/kb_lib.php';
+    $b = ks_body();
+    ks_out(['ok' => true, 'dev' => kb_ext_put('dev', (array)($b['dev'] ?? [])), 'ks_mem' => kb_ext_put('ks_mem', (array)($b['mem'] ?? []))]);
   }
 
   case 'backups': {

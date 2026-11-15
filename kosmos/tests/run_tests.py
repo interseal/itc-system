@@ -671,6 +671,12 @@ try:
     c, j = gw({'a': 'ask', 'user': 'Короткий вопрос', 'who': BOSS, 'max_tokens': 8000}, key='ab' * 32)
     rec = [json.loads(l) for l in open(f'{TMP}/mock.log')][-1]
     check('шлюз: обычный запас — обычным запросом, как раньше', c == 200 and j.get('ok') and rec.get('stream') is False and rec.get('max_tokens') == 8000, (c, j, rec))
+    print('30. Единая база знаний ИТК (№631): перенос, правила из базы, одна подсказка для Claude и DeepSeek, выгрузка и восстановление')
+    r = subprocess.run(['php', f'{ROOT}/tests/kb_test.php'], capture_output=True, text=True, timeout=120)
+    check('база знаний: ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-2500:] + r.stderr[-500:])
+    r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'kbdata'], env=env, capture_output=True, text=True, timeout=60)
+    kd = json.loads(r.stdout or '{}') if r.stdout.strip().startswith('{') else {}
+    check('сервер: история поручений и память для базы знаний собираются (agent.php kbdata)', isinstance(kd.get('dev'), list) and isinstance(kd.get('mem'), list) and (not kd['mem'] or all(m.get('author') == 'Космос' and m.get('src') for m in kd['mem'])), (r.stdout[:500], r.stderr[:500]))
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

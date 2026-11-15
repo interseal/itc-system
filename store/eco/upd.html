@@ -112,6 +112,21 @@ input[type=password]{width:100%;padding:10px;border:1px solid var(--line);border
     <div id="bkBox"><div class="mut">Загрузка…</div></div>
   </div>
 
+  <div class="card" id="cKb">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z"/></svg>База знаний ИТК</h2>
+    <div class="mut">Всё, что знают «Фил» и «Космос»: памятка, выученное из поправок, навыки, правила работы, журнал дел, история разработки. Хранится у нас, а не у модели ИИ: при смене модели новый ИИ сразу знает всё то же. Копия — каждую ночь.</div>
+    <div id="kbBox"><div class="mut">Загрузка…</div></div>
+    <button class="btn w" id="bKbOut" onclick="kbExport()"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Выгрузить базу знаний</button>
+    <button class="btn w" onclick="document.getElementById('kbFile').click()"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Загрузить из архива</button>
+    <input type="file" id="kbFile" accept=".zip,application/zip" class="hide" onchange="kbImport(this)">
+    <div id="kbMsg"></div>
+    <h3 style="margin:14px 0 6px;font-size:15px">Другие модели ИИ</h3>
+    <div class="mut">Можно подключить любую модель с OpenAI-совместимым входом (OpenAI, OpenRouter, Qwen, Mistral и др.): «Фил» будет думать ею с теми же знаниями. Не ответила — «Фил» сам вернётся к DeepSeek.</div>
+    <div id="kbProv"></div>
+    <button class="lnk" onclick="kbProvForm()">Подключить другую модель</button>
+    <div id="kbProvF"></div>
+  </div>
+
   <div class="card" id="cSrv">
     <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM20 3H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>Сервер в Китае</h2>
     <div class="mut">Сервер Aliyun в Гуанчжоу: хранит копии базы и работает для удалённого доступа. Здесь видно, жив ли он, сколько места, баланс Aliyun и до какого числа оплачен сервер.</div>
@@ -340,6 +355,71 @@ function bkPassForm(){ document.getElementById('bkPF').innerHTML = '<input type=
 function bkNow(){ api('flow.php','bk_now',{}).then(function(d){ if (!d.ok) { bkMsg('bad', esc(d.error)); return; } BK.running = true; bkDraw(); setTimeout(function(){ bkLoad(); }, 20000); }); }
 function bkCopy(){ var v = BK_PULL; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(function(){ bkMsg('ok', 'Ссылка скопирована'); }, function(){ bkMsg('bad', 'Не скопировалась — выделите ссылку и скопируйте вручную'); }); }
 
+/* №631 · база знаний ИТК: разделы, копии по местам, выгрузка одним архивом, восстановление, другие модели */
+var KB = null;
+function kbLoad(){ api('kb.php','status').then(function(d){ KB = d; kbDraw(); }).catch(function(){}); }
+function kbDraw(){
+  var d = KB, b = document.getElementById('kbBox'); if (!b) return;
+  if (!d || !d.ok) { b.innerHTML = '<div class="err">' + esc((d && d.error) || 'База знаний не ответила') + '</div>'; return; }
+  var h = '<div class="kv">' + (d.sec || []).map(function(x){ return '<div><b>' + n0(x.n) + '</b><span>' + esc(x.title) + (x.del ? ' · в истории ' + n0(x.del) : '') + '</span></div>'; }).join('') + '</div>';
+  if (!d.ready) h += '<div class="note">База знаний заполнится при первом ответе «Фила» или «Космоса» после обновления: туда перейдут памятка, выученное и правила.</div>';
+  h += '<h3 style="margin:14px 0 6px;font-size:15px">Копии базы знаний</h3>' + (d.copies || []).map(function(c){
+    return '<div class="row ' + (c.day ? 'ok' : 'mut') + '">' + (c.day ? IC.ok : IC.wait) + '<div>' + esc(c.where) + ': ' + (c.day ? 'последняя копия <b>' + esc(c.day) + '</b>' : 'копии пока нет') + (c.note ? ' <span class="mut">· ' + esc(c.note) + '</span>' : '') + '</div></div>'; }).join('');
+  b.innerHTML = h; kbProvDraw();
+}
+function kbMsg(cls, t){ var m = document.getElementById('kbMsg'); m.innerHTML = ''; return step(m, cls, t); }
+function kbExport(){
+  var b = document.getElementById('bKbOut'); b.disabled = true; var w = kbMsg('wait', 'Собираю архив…');
+  fetch('/api/kb.php?action=export&t=' + encodeURIComponent(T)).then(function(r){
+    if ((r.headers.get('Content-Type') || '').indexOf('zip') < 0) return r.json().then(function(d){ throw new Error(d.error || 'Не получилось'); });
+    var cd = r.headers.get('Content-Disposition') || '', m = cd.match(/filename="([^"]+)"/), what = decodeURIComponent(r.headers.get('X-KB-What') || '');
+    return r.blob().then(function(bl){ return [bl, m ? m[1] : 'baza_znaniy_ITK.zip', what]; });
+  }).then(function(x){
+    var a = document.createElement('a'); a.href = URL.createObjectURL(x[0]); a.download = x[1]; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    kbMsg('ok', 'Скачан архив <b>' + esc(x[1]) + '</b> (' + mb(x[0].size) + ')' + (x[2] ? ': ' + esc(x[2]) : '') + '. Внутри README — как подключить эти знания к любому новому ИИ.');
+  }).catch(function(e){ kbMsg('bad', esc(e.message)); }).then(function(){ b.disabled = false; });
+}
+function kbImport(inp){
+  var f = inp.files && inp.files[0]; inp.value = ''; if (!f) return;
+  if (!confirm('Восстановить базу знаний из архива «' + f.name + '»?\nПамятка, выученное и правила станут как в архиве; нынешние записи уйдут в историю (не пропадут).')) return;
+  kbMsg('wait', 'Загружаю ' + esc(f.name) + '…');
+  fetch('/api/kb.php?action=import&t=' + encodeURIComponent(T), {method:'POST', headers:{'Content-Type':'application/zip'}, body:f}).then(function(r){ return r.json(); }).then(function(d){
+    if (!d.ok) { kbMsg('bad', esc(d.error || 'Не получилось')); return; }
+    kbMsg('ok', 'Восстановлено из архива от ' + esc(d.from) + ': памятка — ' + d.memo + ', выученное — ' + d.learn + ', правила — ' + d.rule + ', история разработки — ' + d.dev
+      + ', навыки — ' + d.skills + (d.skills_added === null ? ' (сервер «Космоса» не ответил — вернутся позже кнопкой ещё раз)' : ' (новых на сервере: ' + d.skills_added + ')') + ', журнал — добавлено ' + d.journal + '.');
+    kbLoad();
+  }).catch(function(e){ kbMsg('bad', esc(e.message)); });
+}
+function kbProvDraw(){
+  var d = KB, b = document.getElementById('kbProv'); if (!b || !d) return;
+  var cur = String(d.fil_model || '');
+  b.innerHTML = (d.prov || []).map(function(p){
+    var on = cur === 'oa:' + p.id;
+    return '<div class="hist"><b>' + esc(p.name) + '</b> · ' + esc(p.model) + (on ? ' · <span class="ok">«Фил» думает этой моделью</span>' : '') + '<div class="mut">' + esc(p.url) + (p.key4 ? ' · ключ …' + esc(p.key4) : '') + ' · ' + esc(p.at || '') + '</div>'
+      + (on ? '<button class="lnk" onclick="kbProvUse(\'\')">Вернуть DeepSeek</button>' : '<button class="lnk" onclick="kbProvUse(\'' + esc(p.id) + '\')">«Фил» думает этой моделью</button>')
+      + ' · <button class="lnk" onclick="kbProvTest(\'' + esc(p.id) + '\')">Проверить</button> · <button class="lnk" onclick="kbProvDel(\'' + esc(p.id) + '\')">Удалить</button></div>';
+  }).join('');
+}
+function kbProvForm(){
+  document.getElementById('kbProvF').innerHTML = '<input type="text" id="kpN" placeholder="Название (например, OpenRouter)" style="margin-top:8px">'
+    + '<input type="text" id="kpU" placeholder="Адрес, например https://api.openai.com/v1" style="margin-top:6px"><input type="text" id="kpM" placeholder="Модель, например gpt-5" style="margin-top:6px">'
+    + '<input type="password" id="kpK" placeholder="Ключ этой модели" autocomplete="new-password"><button class="btn g" onclick="kbProvSave()">Сохранить и проверить</button>'
+    + '<div class="mut">Ключ хранится только на сервере и больше нигде не показывается.</div>';
+}
+function kbProvSave(){
+  var v = function(id){ return document.getElementById(id).value; };
+  api('kb.php','prov_save',{name:v('kpN'), url:v('kpU'), model:v('kpM'), key:v('kpK')}).then(function(r){
+    if (!r.ok) { kbMsg('bad', esc(r.error)); return; }
+    document.getElementById('kbProvF').innerHTML = '';
+    kbMsg(r.test && r.test.ok ? 'ok' : 'bad', r.test && r.test.ok ? 'Модель подключена и отвечает.' : 'Модель сохранена, но не ответила: ' + esc((r.test && r.test.error) || ''));
+    kbLoad();
+  });
+}
+function kbProvTest(id){ kbMsg('wait', 'Проверяю…'); api('kb.php','prov_test',{id:id}).then(function(r){ kbMsg(r.ok ? 'ok' : 'bad', r.ok ? 'Модель отвечает.' : esc(r.error)); }); }
+function kbProvUse(id){ api('kb.php','prov_use',{id:id}).then(function(r){ if (!r.ok) { kbMsg('bad', esc(r.error)); return; } kbMsg('ok', id ? '«Фил» теперь думает этой моделью — с теми же знаниями.' : '«Фил» снова думает DeepSeek.'); kbLoad(); }); }
+function kbProvDel(id){ if (!confirm('Удалить эту модель?')) return; api('kb.php','prov_del',{id:id}).then(function(){ kbLoad(); }); }
+
 /* №39 · сервер в Китае */
 var SRV = null, SRV_LINK = '';
 function srvLoad(show, isNew){ api('flow.php','srv_status',{show:show?1:0,'new':isNew?1:0}).then(function(d){ if (!d.ok) { document.getElementById('srvBox').innerHTML = '<div class="err">' + esc(d.error || 'Нет доступа') + '</div>'; return; } SRV = d; if (d.link) SRV_LINK = d.link; srvDraw(); }); }
@@ -397,7 +477,7 @@ function load(){
   if (!T) { document.getElementById('cState').innerHTML = '<div class="err">Войдите в Экосистему как босс, затем откройте этот раздел снова.</div>'; return; }
   api('upd.php','upd_status').then(function(d){
     if (!d.ok) { document.getElementById('cState').innerHTML = '<div class="err">' + esc(d.error || 'Нет доступа') + '</div>'; document.getElementById('cUp').classList.add('hide'); document.getElementById('cHist').classList.add('hide'); return; }
-    ST = d; drawState(); drawCats(); drawHist(); yaDraw(); bkLoad(); srvLoad(); dsDraw(); sgLoad(); rdLoad();
+    ST = d; drawState(); drawCats(); drawHist(); yaDraw(); bkLoad(); srvLoad(); dsDraw(); sgLoad(); rdLoad(); kbLoad();
     document.getElementById('cSeed').classList.toggle('hide', !d.seed_left);
   });
 }
@@ -534,6 +614,7 @@ function sgHtml(){
   if (x.disk_free_gb !== null && x.disk_free_gb !== undefined) p.push('свободно ' + String(x.disk_free_gb).replace('.', ',') + ' ГБ');
   if (x.load !== null && x.load !== undefined) p.push('нагрузка ' + String(x.load).replace('.', ','));
   p.push(x.backup ? 'копия данных ' + String(x.backup).slice(6, 8) + '.' + String(x.backup).slice(4, 6) : 'копий данных пока нет');
+  if (x.kb) p.push('копия базы знаний ' + String(x.kb).slice(6, 8) + '.' + String(x.kb).slice(4, 6));   // №631
   if (g) p.push(g.ok ? 'копия кода с GitHub ' + esc(g.hash || '') + (g.at ? ' (проверена ' + esc(dtShort(g.at)) + ')' : '') : 'GitHub: ' + esc(g.err || 'не обновляется'));
   if (x.up) p.push('без перезагрузки ' + esc(x.up));
   h += '<div class="mut">Сингапур: ' + p.join(' · ') + '</div>';

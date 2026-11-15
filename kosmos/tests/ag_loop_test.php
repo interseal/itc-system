@@ -18,7 +18,9 @@ $src = (string)file_get_contents("$root/store/api/flow.php");
 $a = strpos($src, 'function ag_calls(');   // №626 · ag_calls лежит прямо перед ag_run
 $b = strpos($src, "\n}\n", strpos($src, 'function ag_run(', $a));
 preg_match_all('~^const (AG_REPEAT|AG_STALL|AG_MAX_STEPS|AG_BG_STEPS|AG_MULTI|AG_DYN|AG_FAST_RULES|AG_TOOL_CUT|AG_TOOL_CUT_BG|AG_TOOL_KEEP|AG_TOOL_OLD|AG_ANS_TOK|AG_HIST_MAX|AG_LIM)\b[^\n]*~m', $src, $cm);
-foreach (['FIL_SELF', 'FIL_CORE', 'FIL_KP', 'FIL_CATALOG', 'FE_RULES', 'PL_RULES', 'FIL_SEARCH', 'CRM_RULES', 'RB_RULES', 'FIL_EX', 'FIL_LAST', 'AG_BG_RULES', 'AG_TASK_RULES', 'AG_DEEP_RULES'] as $c) define($c, '');
+foreach (['FIL_SELF', 'FIL_CORE', 'FIL_KP', 'FIL_CATALOG', 'FE_RULES', 'PL_RULES', 'FIL_SEARCH', 'CRM_RULES', 'RB_RULES', 'FIL_EX', 'FIL_LAST', 'AG_BG_RULES', 'AG_TASK_RULES', 'AG_DEEP_RULES', 'AG_MEMO_HOW', 'AG_LEARN_HOW', 'AG_FACT_RULES'] as $c) define($c, '');   // №631 · + правила, вынесенные в константы
+function kb_rule($k, $code, $named = false) { return $code; }   // №631 · база знаний: здесь — запасной вариант (текст из кода)
+function kb_prompt($me, $t) { return ['know' => '', 'dyn' => ag_peer_block($me) . nvk_block($t)]; }
 eval(implode("\n", $cm[0]) . "\n");
 function ag_tools($me, $ctx) { return ['web' => ['{"q":""}', function ($a) { return is_int($GLOBALS['TOOL_OUT']) ? str_repeat('я', $GLOBALS['TOOL_OUT']) . 'КОНЕЦ' : ($GLOBALS['TOOL_OUT'] === 'same' ? 'ничего не нашёл' : 'нашёл: ' . json_encode($a, JSON_UNESCAPED_UNICODE) . ' ' . (++$GLOBALS['N'])); }]]; }
 function fl_staff() { return []; } function fil_io($p, $n) { return ''; } function fil_boss_io() { return 'Алексей Николаевич'; }
