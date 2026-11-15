@@ -256,6 +256,9 @@ function fl_yk() { $k = sp_get('yc_main'); return $k !== '' ? $k : (defined('YC_
 /* «Космос»: модели Claude на выбор руководителю (настройки). По умолчанию — Sonnet. */
 const KS_MODELS = [['claude-sonnet-5-5', 'Claude Sonnet 5.5 (рекомендую)'], ['claude-opus-5-5', 'Claude Opus 5.5 — самый сильный, дороже'], ['claude-haiku-5-5', 'Claude Haiku 5.5 — быстрый и недорогой'], ['claude-fable-5-2', 'Claude Fable 5.2 — старший уровень, самый дорогой']];
 const KS_MODEL0 = 'claude-sonnet-5-5';
+/* №630 · запас токенов на ответ Claude: предел моделей 64000 (шлюз сам снизит до 32000, если модель столько не берёт) */
+const KS_TOK_TOP = 64000;
+function ks_tok_first($model, $maxTok) { return preg_match('~opus|fable~i', (string)$model) ? 32000 : min(16000, max(2000, (int)$maxTok * 2)); }
 function ks_model_pick() { $m = (string)($GLOBALS['FIL_MODEL'] ?? ''); if ($m === '') $m = sp_get('ks_model'); return preg_match('~^claude-[a-z0-9.-]{3,50}$~', $m) ? $m : KS_MODEL0; }
 function fil_model_name($id) { foreach (KS_MODELS as $m) if ($m[0] === $id) return $m[1]; return ks_model_title($id); }
 /* ========== №40 · DeepSeek напрямую (platform.deepseek.com, счёт Jinjia Enterprise) ==========
@@ -311,17 +314,18 @@ function fl_ai($sys, $user, $maxTok = 1500, $soft = false) {
   // ответ не уместился или не разобрался — ещё одна попытка (не уместился — с запасом 16000)
   // №621: служебные теги (<invoke>, <function_calls>…) вырезаются; вызов <invoke name=…> выполняется как {"tool":…};
   // не разобралось — вторая попытка с напоминанием «строго один JSON»; сырой текст человеку не показываем
-  $model = ks_model_pick(); $mt = min(16000, max(2000, (int)$maxTok * 2)); $txt = null; $err = ''; $GLOBALS['FL_AI_BAD'] = 0;
+  // №630: запас на ответ — Opus/Fable сразу 32000, остальные как раньше (до 16000); упёрся — повтор с KS_TOK_TOP (64000, предел моделей)
+  $model = ks_model_pick(); $mt = ks_tok_first($model, $maxTok); $txt = null; $err = ''; $GLOBALS['FL_AI_BAD'] = 0;
   for ($try = 0; $try < 2; $try++) {
     [$txt, $err, $real] = ks_gw_ask($sys, $user . ($try ? ITCAI_ONE_JSON : ''), $mt, $model, $GLOBALS['me'] ?? []);
     if ($txt === null) break;
     $j = ks_ai_json($txt); $stop = (string)($GLOBALS['KS_STOP'] ?? '');
     // №628: ответ упёрся в max_tokens, но разобрался (простой текст без JSON) — это обрывок; просим заново с запасом 16000
-    if ($j && $stop === 'max_tokens' && $mt < 16000) { $mt = 16000; $try--; continue; }
+    if ($j && $stop === 'max_tokens' && $mt < KS_TOK_TOP) { $mt = KS_TOK_TOP; $try--; continue; }
     if ($j) { $j['_model'] = $real !== '' ? $real : fil_model_name($model); return $j; }
     $err = 'Claude: ' . ($stop === 'max_tokens' ? 'ответ не уместился' : (trim((string)$txt) === '' ? 'пустой ответ' : 'ответ без разметки'));
     error_log('kosmos ai: ' . $err . ' [' . $stop . '] ' . mb_substr((string)$txt, 0, 600));
-    if ($stop === 'max_tokens') $mt = 16000;
+    if ($stop === 'max_tokens') $mt = KS_TOK_TOP;
     $GLOBALS['FL_AI_BAD'] = 1;
   }
   error_log('kosmos ai: ' . $err); $GLOBALS['FL_AI_ERR'] = $err;
@@ -1797,14 +1801,20 @@ const AG_BG_STEPS = 400;
 const AG_REPEAT = 3; const AG_STALL = 12;
 /* №626 · скорость ответа: несколько независимых инструментов за один ход (каждый считается в лимит шагов);
    переменная часть правил — после AG_DYN (постоянная часть берётся из кеша модели) */
-const AG_MULTI = 4;
+const AG_MULTI = 8;   // №630 · «Космос»: до 8 инструментов за ход (у «Фила» 4)
 /* №628 · ответы «Космоса» обрывались: в «РАЗГОВОР ДО ЭТОГО» прошлые реплики помощника шли обрезанными до 700 знаков,
    и он сам считал свой прошлый ответ оборванным и переспрашивал вместо «Да — делаю». Теперь последние AG_TALK_FULL реплик
    целиком (страховка AG_TALK_MAX), более ранние — до AG_TALK_CUT; вопрос человека — до AG_TALK_SAID.
    Результаты инструментов: до AG_TOOL_CUT (фон — AG_TOOL_CUT_BG) знаков, было 4000/6000; в разговоре последние AG_TOOL_KEEP —
    целиком, более ранние — до AG_TOOL_OLD (чтобы длинный разговор не раздувал расход). */
 const AG_TALK_FULL = 3; const AG_TALK_CUT = 4000; const AG_TALK_MAX = 12000; const AG_TALK_SAID = 1500;
-const AG_TOOL_CUT = 8000; const AG_TOOL_CUT_BG = 10000; const AG_TOOL_KEEP = 8; const AG_TOOL_OLD = 3000;
+const AG_TOOL_CUT = 32000; const AG_TOOL_CUT_BG = 32000; const AG_TOOL_KEEP = 8; const AG_TOOL_OLD = 4000;   // №630 · «Космос»: результат до 32000 знаков (у «Фила» 8000/10000)
+/* №630 · пределы результатов инструментов (сколько записей и знаков отдаёт инструмент модели). Здесь — значения для DeepSeek;
+   версия на Claude (kosmos_flow.php) получает от make_kosmos_flow.py свои, побольше. AG_HIST_MAX — страховка контекста:
+   если история шагов длиннее (знаков), ранние результаты сокращаются, начиная со старых (0 — выключено). */
+const AG_LIM = ['journal' => 40, 'deals' => 60, 'clients' => 50, 'sup_rows' => 150, 'sup_show' => 40, 'orders' => 40, 'chats' => 10, 'chat_msgs' => 20, 'chat_len' => 1000, 'web' => 20, 'web_len' => 800, 'page' => 20000, 'dev_res' => 20000, 'dev_n' => 30, 'code_read' => 400, 'code_find' => 80, 'pick' => 1000, 'sh_n' => 100, 'sh_feed' => 200, 'sh_len' => 1500, 'pdf_text' => 30000];   // №630 · «Космос» (Claude)
+const AG_HIST_MAX = 300000;   // №630 · ~110 тыс. токенов истории шагов: дальше ранние результаты сокращаются (контекст Claude — 200 тыс.)
+function ag_lim($k, $d = 0) { return isset(AG_LIM[$k]) ? AG_LIM[$k] : $d; }
 const AG_ANS_TOK = 4000;   // №628 · запас на ответ модели (было 2500; платится только написанное — расход не растёт)
 const AG_DYN = "\n\n=== ПО ЭТОМУ ЗАПРОСУ ===";
 const AG_FAST_RULES = "\nБЫСТРО, ГДЕ МОЖНО: приветствие, благодарность, «как дела», вопрос о тебе, просьба повторить или пояснить твой прошлый ответ — отвечай сразу, без инструментов. Нужны данные из нескольких мест — запроси их одним ходом через \"tools\", а не по очереди. Глубину проверки это не отменяет: где нужны данные — смотри их.";
@@ -1884,7 +1894,7 @@ const FIL_EX = "\n\nПРИМЕРЫ — ТАК ПРАВИЛЬНО (шаги → �
   . "\n14) «Когда сделка уходит в «КП отправлено», ставь менеджеру задачу позвонить через 2 дня» (руководитель) → robot_add {stage:\"КП отправлено\", kind:\"task\", days:2, text:\"Позвонить {клиент}: получили ли КП\", who:\"resp\"} → «Готово: робот на стадии «КП отправлено».»"
   . "\n15) «Найди 30 детских магазинов в Краснодаре и занеси» → do=task (большая работа — в фон) с планом."
   . "\nНЕПРАВИЛЬНО: переспрашивать, когда можно сделать; искать клиента для простой задачи; путать по общему слову; заводить сделку без просьбы; обещать написать фабрике; выдумывать цифры.";
-const FIL_LAST = "\nПЕРЕД ОТВЕТОМ ПРОВЕРЬ: сделано ли ВСЁ, что просили в этой фразе (и в недоделанной прошлой)? не переспрашиваю ли зря? все цифры из данных? ответ короткий и по делу?";
+const FIL_LAST = "\nПЕРЕД ОТВЕТОМ ПРОВЕРЬ: сделано ли ВСЁ, что просили в этой фразе (и в недоделанной прошлой)? не переспрашиваю ли зря? все цифры из данных? ответ по делу, а его длина — по задаче (простое — коротко, сложное — полностью)?";
 
 /* №33 · каталоги фабрик — как это делает Claude */
 const FIL_CATALOG = "\nКАТАЛОГ / ФЛАЕР / ВИЗИТКА ФАБРИКИ (если прислали и просят занести — или явно это материалы поставщика):"
@@ -2039,10 +2049,10 @@ function dv_tools($me) {
       }],
     'develop_status' => ['{} — как идут поручения разработчику: статус, что сделано, выпущено ли обновление, сколько стоило. Статус needs_ok — ждёт решения руководителя: перескажи ему, что затронуто, и спроси «одобрить или отклонить?». Статус question — разработчик спрашивает: перескажи вопрос (поле «вопрос») и передай ответ руководителя через develop_answer',
       function ($a) {
-        [$c, $j] = dv_gw('list');
+        [$c, $j] = dv_gw('list', ['n' => ag_lim('dev_n', 8)]);   // №630 · у «Космоса» больше записей
         if ($c !== 200 || empty($j['ok'])) return 'нет связи с сервером «Космоса»';
         return array_map(function ($t) { return ['№' => $t['id'], 'кто' => $t['engine'] === 'deepseek' ? 'Космос (DeepSeek)' : 'Космос (Claude)', 'статус' => $t['status'], 'поручение' => mb_substr($t['text'], 0, 200),
-          'итог' => mb_substr($t['result'], 0, 800), 'вопрос' => (string)($t['question'] ?? ''), 'обновление' => $t['release_n'] ? '№' . $t['release_n'] . ' — ставит руководитель' : '', 'проверки' => $t['checks'], 'ошибка' => $t['error'], 'стоимость' => '$' . $t['cost']]; }, array_slice((array)($j['tasks'] ?? []), 0, 8));
+          'итог' => mb_substr($t['result'], 0, ag_lim('dev_res', 800)), 'вопрос' => (string)($t['question'] ?? ''), 'обновление' => $t['release_n'] ? '№' . $t['release_n'] . ' — ставит руководитель' : '', 'проверки' => $t['checks'], 'ошибка' => $t['error'], 'стоимость' => '$' . $t['cost']]; }, array_slice((array)($j['tasks'] ?? []), 0, ag_lim('dev_n', 8)));
       }],
   ];
 }
@@ -2172,7 +2182,7 @@ function nvk_take($me, $j, $trace) {
   return "\n" . (!empty($r['new']) ? 'Записал навык' : 'Обновил навык') . ' «' . $r['title'] . '» — теперь так сможет и ' . AG_PEER['name'] . '.';
 }
 function ag_like($q) { return '%' . str_replace(['%', '_'], ['\%', '\_'], mb_substr(trim((string)$q), 0, 80)) . '%'; }
-function ag_pick($row, $keys) { $o = []; foreach ($keys as $k) if (array_key_exists($k, $row) && $row[$k] !== null && $row[$k] !== '') $o[$k] = is_string($row[$k]) ? mb_substr($row[$k], 0, 300) : $row[$k]; return $o; }
+function ag_pick($row, $keys) { $o = []; foreach ($keys as $k) if (array_key_exists($k, $row) && $row[$k] !== null && $row[$k] !== '') $o[$k] = is_string($row[$k]) ? mb_substr($row[$k], 0, ag_lim('pick', 300)) : $row[$k]; return $o; }
 function ag_money_ok($me) { return $me['boss'] || in_array($me['role'], ['accountant', 'chief_accountant', 'bossacct'], true); }
 function ag_rows($sql, $args = []) { try { $q = db()->prepare($sql); $q->execute($args); return $q->fetchAll(); } catch (Throwable $e) { return ['ошибка' => 'нет такой таблицы или поля']; } }
 
@@ -2188,10 +2198,10 @@ function ag_tools($me, $ctx) {
       function ($a) use ($me) {
         $q = (string)($a['q'] ?? ''); $days = (int)($a['days'] ?? 7) ?: 7; $who = mb_strtolower((string)($a['who'] ?? 'оба'));
         $rows = [];
-        if ($who !== 'второй') foreach (ag_journal_rows($me, 'itc_ks_log', $q, $days, 20) as $r) { $r['_n'] = AG_PEER['me']; $rows[] = $r; }
-        if ($who !== 'я') foreach (ag_journal_rows($me, AG_PEER['log'], $q, $days, 20) as $r) { $r['_n'] = AG_PEER['name']; $rows[] = $r; }
+        if ($who !== 'второй') foreach (ag_journal_rows($me, 'itc_ks_log', $q, $days, ag_lim('journal', 20)) as $r) { $r['_n'] = AG_PEER['me']; $rows[] = $r; }
+        if ($who !== 'я') foreach (ag_journal_rows($me, AG_PEER['log'], $q, $days, ag_lim('journal', 20)) as $r) { $r['_n'] = AG_PEER['name']; $rows[] = $r; }
         usort($rows, function ($x, $y) { return strcmp((string)$y['created_at'], (string)$x['created_at']); });
-        $rows = array_slice($rows, 0, 20);
+        $rows = array_slice($rows, 0, ag_lim('journal', 20));
         return $rows ? array_map(function ($r) { return ag_journal_line($r, $r['_n']); }, $rows) : 'в журнале ничего не нашёл' . ($q !== '' ? ' по «' . $q . '»' : '') . ' за ' . $days . ' дн.';
       }],
     'deals' => ['{"q":"слово из названия/клиента или пусто","pipe":"id воронки или пусто","late":true|false} — найти сделки (с открытыми задачами, стадией, суммой)',
@@ -2203,7 +2213,7 @@ function ag_tools($me, $ctx) {
           if ($late && (!$d['next_at'] || $d['next_at'] > date('Y-m-d'))) continue;
           $o[] = ['id' => $d['id'], 'название' => $d['title'], 'клиент' => $d['client'], 'воронка' => $ctx['pn'][$d['pipe_id']] ?? '', 'стадия' => $d['sn'], 'ответственный' => $d['resp_name'],
             'шаг' => trim(($d['next_at'] ?: '') . ' ' . $d['next_do']), 'сумма' => (0 + $d['amount']) . ' ' . $d['currency']];
-          if (count($o) >= 25) break;
+          if (count($o) >= ag_lim('deals', 25)) break;
         }
         return $o ?: 'ничего не нашёл';
       }],
@@ -2219,7 +2229,7 @@ function ag_tools($me, $ctx) {
       }],
     'clients' => ['{"q":"название, город, тип (гостиница, ресторан…)"} — база ПОТЕНЦИАЛЬНЫХ клиентов (компании для рассылок и КП). Рабочие клиенты, с которыми уже работаем, их история и счета — client_card',
       function ($a) {
-        $l = ag_like($a['q'] ?? ''); $r = ag_rows('SELECT * FROM itc_lead WHERE deleted=0 AND (name LIKE ? OR city LIKE ?' . (ag_col('itc_lead', 'type') ? ' OR type LIKE ?' : '') . ') ORDER BY name LIMIT 20', ag_col('itc_lead', 'type') ? [$l, $l, $l] : [$l, $l]);
+        $l = ag_like($a['q'] ?? ''); $r = ag_rows('SELECT * FROM itc_lead WHERE deleted=0 AND (name LIKE ? OR city LIKE ?' . (ag_col('itc_lead', 'type') ? ' OR type LIKE ?' : '') . ') ORDER BY name LIMIT ' . (int)ag_lim('clients', 20), ag_col('itc_lead', 'type') ? [$l, $l, $l] : [$l, $l]);
         if (isset($r['ошибка'])) return $r;
         return array_map(function ($x) { return ag_pick($x, ['name', 'type', 'city', 'locality', 'stars', 'rooms', 'phone', 'email', 'site', 'status']); }, $r) ?: 'не нашёл';
       }],
@@ -2231,12 +2241,12 @@ function ag_tools($me, $ctx) {
         if (!$ws) $ws = [''];
         $cond = []; $args = [];
         foreach ($ws as $w) { $l = ag_like($w); $cond[] = '(name LIKE ? OR what LIKE ? OR products LIKE ? OR city LIKE ?' . (ag_col('itc_sup', 'seg') ? ' OR seg LIKE ?' : '') . ')'; array_push($args, $l, $l, $l, $l); if (ag_col('itc_sup', 'seg')) $args[] = $l; }
-        $r = ag_rows('SELECT * FROM itc_sup WHERE deleted=0 AND (' . implode(' OR ', $cond) . ') LIMIT 60', $args);
+        $r = ag_rows('SELECT * FROM itc_sup WHERE deleted=0 AND (' . implode(' OR ', $cond) . ') LIMIT ' . (int)ag_lim('sup_rows', 60), $args);
         if (isset($r['ошибка'])) return $r;
         foreach ($r as &$x) { $t = mb_strtolower($x['name'] . ' ' . $x['what'] . ' ' . $x['products'] . ' ' . ($x['seg'] ?? '')); $x['_n'] = 0; foreach ($ws as $w) if ($w !== '' && mb_strpos($t, $w) !== false) $x['_n']++; }
         unset($x); usort($r, function ($p, $q) { return $q['_n'] - $p['_n']; });
         $fz = sup_fuzzy($a['q'] ?? '');    // №37: голос мог исказить латинское название
-        $res = array_map(function ($x) { $o = ag_pick($x, ['id', 'name', 'city', 'seg', 'kind', 'what']); $o['товары'] = implode(', ', array_slice(array_map('strval', fl_dec($x['products'] ?? '')), 0, 10)); $o['совпало слов'] = $x['_n']; return $o; }, array_slice($r, 0, 15));
+        $res = array_map(function ($x) { $o = ag_pick($x, ['id', 'name', 'city', 'seg', 'kind', 'what']); $o['товары'] = implode(', ', array_slice(array_map('strval', fl_dec($x['products'] ?? '')), 0, 10)); $o['совпало слов'] = $x['_n']; return $o; }, array_slice($r, 0, ag_lim('sup_show', 15)));
         if ($fz) return ['похожие по звучанию названия фабрик (голос мог написать латинское название русскими буквами — бери самое похожее)' => $fz, 'по словам' => $res ?: 'ничего'];
         return $res ?: 'не нашёл по словам: ' . implode(', ', $ws);
       }],
@@ -2274,7 +2284,7 @@ function ag_tools($me, $ctx) {
         if (isset($r['ошибка'])) return $r;
         $sum = 0; foreach ($r as $x) $sum += (float)($x['total'] ?? 0);
         $keys = ['num', 'total', 'status', 'created_at', 'paid_at', 'addr_city', 'pay_kind', 'inv_company']; if ($me['boss']) $keys[] = 'addr_name';
-        return ['заказов' => count($r), 'на сумму' => round($sum), 'последние' => array_map(function ($x) use ($keys) { return ag_pick($x, $keys); }, array_slice($r, 0, 15))];
+        return ['заказов' => count($r), 'на сумму' => round($sum), 'последние' => array_map(function ($x) use ($keys) { return ag_pick($x, $keys); }, array_slice($r, 0, ag_lim('orders', 15)))];
       }],
     'money' => ['{"month":"ГГГГ-ММ или пусто"} — деньги (только руководитель и бухгалтерия): остатки на счетах по последним выпискам, оплаты на согласовании, расходы по статьям, поступления по договорам',
       function ($a) use ($me) {
@@ -2328,9 +2338,9 @@ function ag_tools($me, $ctx) {
     'chats' => ['{"q":"фабрика или слово"} — переписка с фабриками (WeCom): последние сообщения в переводе',
       function ($a) {
         $l = ag_like($a['q'] ?? '');
-        $c = ag_rows('SELECT id,title,last_at,unread FROM itc_wc_chat WHERE title LIKE ? OR last_text LIKE ? ORDER BY last_at DESC LIMIT 5', [$l, $l]);
+        $c = ag_rows('SELECT id,title,last_at,unread FROM itc_wc_chat WHERE title LIKE ? OR last_text LIKE ? ORDER BY last_at DESC LIMIT ' . (int)ag_lim('chats', 5), [$l, $l]);
         if (isset($c['ошибка'])) return $c;
-        foreach ($c as &$x) $x['сообщения'] = array_map(function ($m) { return $m['at'] . ' ' . ($m['dir'] === 'in' ? 'фабрика' : 'мы') . ': ' . mb_substr((string)($m['ru'] ?: $m['text']), 0, 200); }, array_reverse(ag_rows('SELECT dir,text,ru,at FROM itc_wc_msg WHERE chat_id=? ORDER BY at DESC LIMIT 8', [$x['id']])));
+        foreach ($c as &$x) $x['сообщения'] = array_map(function ($m) { return $m['at'] . ' ' . ($m['dir'] === 'in' ? 'фабрика' : 'мы') . ': ' . mb_substr((string)($m['ru'] ?: $m['text']), 0, ag_lim('chat_len', 200)); }, array_reverse(ag_rows('SELECT dir,text,ru,at FROM itc_wc_msg WHERE chat_id=? ORDER BY at DESC LIMIT ' . (int)ag_lim('chat_msgs', 8), [$x['id']])));
         return $c ?: 'не нашёл';
       }],
   ] + fe_tools($me) + pl_tools($me) + crm_fil_tools($me) + rb_tools($me, $ctx) + rp_tools($me) + fl_items_tools($me) + (function_exists('ml_tools') ? ml_tools($me) : []) + (function_exists('msp_tools') ? msp_tools($me) : []) + (function_exists('pr_tools') ? pr_tools($me) : []) + dr_tools($me) + dv_tools($me) + sh_tools($me) + br_tools($me) + pc_tools($me);   // №42, №43, №237 клиенты и счета
@@ -2397,7 +2407,7 @@ function ag_run($me, $ctx, $text, $talk = '', $opt = []) {
     . "\nЦИФРЫ ПРО СДЕЛАННОЕ — только из результатов инструментов и строки «Готово: …» в разговоре. «Действий сделано» — это не количество найденных компаний; сколько занесено — смотри «новых записей в базе». Если занесено 0 — так и скажи и объясни почему (поиск не ответил, нет контактов и т. п.)."
     . "\nПрежде чем ответить «нет в базе», поищи 2–3 раза разными словами и синонимами (товар целиком, его части, материал, назначение)."
     . "\nПРАВИЛА: факты бери только из инструментов, ничего не выдумывай; не хватает данных — посмотри ещё один инструмент или честно скажи, чего нет. Сделку для действия находи через deals (id не выдумывай). Две похожие — do=ask."
-    . ' Ответ «say» — по-русски, по-деловому, коротко (до ' . ($bg ? 10 : 6) . ' предложений), с цифрами; это будет сказано вслух. От первого лица, без эмодзи и без markdown. Максимум ' . $max . ' обращений к инструментам.'
+    . ' Ответ «say» — по-русски, по-деловому, с цифрами; это будет сказано вслух. Длина — по задаче: на простой вопрос — коротко (1–3 предложения), разбор, сравнение, план или отчёт — развёрнуто и полностью, без воды и повторов. От первого лица, без эмодзи и без markdown. Максимум ' . $max . ' обращений к инструментам.'
     . ($bg ? AG_BG_RULES : AG_TASK_RULES) . AG_DEEP_RULES . AG_FAST_RULES
     . FIL_EX
     . "\n\nВОРОНКИ И СТАДИИ:\n" . implode("\n", $pl) . "\n\nСОТРУДНИКИ:\n" . implode("\n", $sf)
@@ -2423,7 +2433,13 @@ function ag_run($me, $ctx, $text, $talk = '', $opt = []) {
     if ($bg && !empty($opt['stop']) && ($opt['stop'])()) return [['do' => 'answer', 'say' => 'Остановил задачу по вашей просьбе.'], $trace];
     $late = $bg && !empty($opt['until']) && time() > $opt['until'];
     $hist = $head; $nE = count($ent);
-    foreach ($ent as $i => $e) $hist .= "\n\nТЫ: " . ($i < $nE - 60 ? mb_substr($e['j'], 0, 200) : $e['j']) . "\nРЕЗУЛЬТАТ " . $e['n'] . ': ' . ($i < $nE - $keep ? (!$bg ? (mb_strlen($e['o']) > AG_TOOL_OLD ? mb_substr($e['o'], 0, AG_TOOL_OLD) . '…(ранний результат сокращён)' : $e['o']) : mb_substr($e['o'], 0, $i < $nE - 60 ? 100 : 300) . '…(старый результат сокращён — что важно, уже занесено)') : $e['o']);   // №624: очень старые шаги — короче (400 шагов не раздувают запрос) · №628: в разговоре ранние — до AG_TOOL_OLD
+    $hp = [];
+    foreach ($ent as $i => $e) $hp[$i] = ["\n\nТЫ: " . ($i < $nE - 60 ? mb_substr($e['j'], 0, 200) : $e['j']) . "\nРЕЗУЛЬТАТ " . $e['n'] . ': ', ($i < $nE - $keep ? (!$bg ? (mb_strlen($e['o']) > AG_TOOL_OLD ? mb_substr($e['o'], 0, AG_TOOL_OLD) . '…(ранний результат сокращён)' : $e['o']) : mb_substr($e['o'], 0, $i < $nE - 60 ? 100 : 300) . '…(старый результат сокращён — что важно, уже занесено)') : $e['o'])];   // №624: очень старые шаги — короче (400 шагов не раздувают запрос) · №628: в разговоре ранние — до AG_TOOL_OLD
+    if (AG_HIST_MAX > 0) {   // №630 · страховка контекста: история длиннее AG_HIST_MAX — ранние результаты сокращаем, начиная со старых
+      $tot = mb_strlen($hist); foreach ($hp as $x) $tot += mb_strlen($x[0]) + mb_strlen($x[1]);
+      for ($i = 0; $tot > AG_HIST_MAX && $i < $nE - 1; $i++) { $l = mb_strlen($hp[$i][1]); if ($l <= 700) continue; $hp[$i][1] = mb_substr($hp[$i][1], 0, 600) . '…(ранний результат сокращён — не хватает места)'; $tot -= $l - mb_strlen($hp[$i][1]); }
+    }
+    foreach ($hp as $x) $hist .= $x[0] . $x[1];
     $last = $step >= $max || $late || $why !== '';
     if ($why !== '') $GLOBALS['FC_IMGS'] = [];
     $j = fl_ai($sys, $hist . ($why !== '' ? "\n\nСТОП, нет продвижения: " . $why . '.' : '') . ($last ? "\n\nИнструменты больше нельзя — ответь по тому, что уже узнал и сделал" . ($why !== '' ? ', и честно скажи, чего не удалось найти и почему.' : '.') : ''), AG_ANS_TOK, true);   // №628 · было 2500
@@ -2705,7 +2721,7 @@ function ag_files($me, $a) {
   $j = is_string($r) ? json_decode($r, true) : null;
   if ($code !== 200 || !is_array($j) || empty($j['ok'])) return 'сервер не обработал: ' . (is_array($j) ? (string)($j['error'] ?? '') : '') . ($code ? ' (' . $code . ')' : ' (нет связи)');
   $out = ['готово' => $op];
-  if (!empty($j['text'])) $out['текст'] = mb_substr((string)$j['text'], 0, 30000) . (mb_strlen((string)$j['text']) > 30000 ? "\n…(текст длиннее — дальше страницами: from/to)" : '');
+  if (!empty($j['text'])) $out['текст'] = mb_substr((string)$j['text'], 0, ag_lim('pdf_text', 30000)) . (mb_strlen((string)$j['text']) > ag_lim('pdf_text', 30000) ? "\n…(текст длиннее — дальше страницами: from/to)" : '');
   if (!empty($j['info'])) $out['сведения'] = $j['info'];
   if (!empty($j['note'])) $out['заметка'] = $j['note'];
   $files = (array)($j['files'] ?? []);
@@ -2734,9 +2750,10 @@ function ag_web($q, $region = '') {
   $q = trim(mb_substr($q . ($region !== '' ? ' ' . $region : ''), 0, 300)); if ($q === '') return 'пустой запрос';
   $YK = fl_yk(); $YF = defined('YC_FOLDER_ID') ? YC_FOLDER_ID : ($GLOBALS['YC_FOLDER_ID'] ?? '');
   if (!$YK) return 'поиск не подключён: нет ключа Яндекса';
-  $c = itcai_cache_get('web', md5($q), 86400 * 3); if ($c) return $c['r'];
+  $wn = (int)ag_lim('web', 10); $ck = md5($q . ($wn !== 10 ? '#' . $wn : ''));   // №630 · у «Космоса» больше результатов — свой кеш
+  $c = itcai_cache_get('web', $ck, 86400 * 3); if ($c) return $c['r'];
   $body = json_encode(['query' => ['searchType' => 'SEARCH_TYPE_RU', 'queryText' => $q, 'familyMode' => 'FAMILY_MODE_MODERATE'], 'folderId' => $YF, 'responseFormat' => 'FORMAT_XML',
-    'groupSpec' => ['groupMode' => 'GROUP_MODE_DEEP', 'groupsOnPage' => 10, 'docsInGroup' => 1], 'l10n' => 'LOCALIZATION_RU'], JSON_UNESCAPED_UNICODE);
+    'groupSpec' => ['groupMode' => 'GROUP_MODE_DEEP', 'groupsOnPage' => $wn, 'docsInGroup' => 1], 'l10n' => 'LOCALIZATION_RU'], JSON_UNESCAPED_UNICODE);
   [$http, $r] = itcai_post('https://searchapi.api.cloud.yandex.net/v2/web/search', $body, ['Content-Type: application/json', 'Authorization: Api-Key ' . $YK], 25);
   $j = json_decode($r, true);
   if ($http !== 200) {
@@ -2745,14 +2762,14 @@ function ag_web($q, $region = '') {
     return 'поиск не ответил: ' . $http . ' ' . mb_substr($m, 0, 120);
   }
   $xml = base64_decode((string)($j['rawData'] ?? '')); $out = [];
-  if ($xml && preg_match_all('~<doc\b.*?</doc>~s', $xml, $docs)) foreach (array_slice($docs[0], 0, 10) as $d) {
+  if ($xml && preg_match_all('~<doc\b.*?</doc>~s', $xml, $docs)) foreach (array_slice($docs[0], 0, $wn) as $d) {
     $u = preg_match('~<url>(.*?)</url>~s', $d, $m) ? html_entity_decode(strip_tags($m[1])) : '';
     $t = preg_match('~<title>(.*?)</title>~s', $d, $m) ? trim(html_entity_decode(strip_tags($m[1]))) : '';
     $p = preg_match_all('~<passage>(.*?)</passage>~s', $d, $m) ? trim(html_entity_decode(strip_tags(implode(' … ', $m[1])))) : (preg_match('~<headline>(.*?)</headline>~s', $d, $m2) ? html_entity_decode(strip_tags($m2[1])) : '');
-    if ($u) $out[] = ['заголовок' => $t, 'адрес' => $u, 'отрывок' => mb_substr($p, 0, 400)];
+    if ($u) $out[] = ['заголовок' => $t, 'адрес' => $u, 'отрывок' => mb_substr($p, 0, ag_lim('web_len', 400))];
   }
   $res = $out ?: 'ничего не нашлось';
-  itcai_cache_put('web', md5($q), ['r' => $res]);
+  itcai_cache_put('web', $ck, ['r' => $res]);
   return $res;
 }
 function ag_page($url) {
@@ -2769,7 +2786,7 @@ function ag_page($url) {
   $mail = []; if (preg_match_all('~[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}~', $html, $m)) $mail = array_slice(array_values(array_unique(array_filter($m[0], function ($e) { return !preg_match('~\.(png|jpg|gif|webp)$~i', $e); }))), 0, 6);
   $html = preg_replace(['~<(script|style|noscript|svg)\b.*?</\1>~si', '~<br\s*/?>|</(p|div|li|tr|h\d)>~i'], ['', "\n"], $html);
   $txt = trim(preg_replace(["~[ \t]+~u", "~\n\s*\n+~u"], [' ', "\n"], html_entity_decode(strip_tags($html), ENT_QUOTES, 'UTF-8')));
-  return ['телефоны' => $tel, 'почта' => $mail, 'текст' => mb_substr($txt, 0, 5000)];
+  return ['телефоны' => $tel, 'почта' => $mail, 'текст' => mb_substr($txt, 0, ag_lim('page', 5000))];
 }
 function ag_segs() {
   try { return implode(', ', array_map(function ($r) { return $r['code'] . '=' . $r['name']; }, db()->query('SELECT code,name FROM itc_lead_seg ORDER BY sort,name')->fetchAll())); } catch (Throwable $e) { return 'hotel, rest, bar, build, bshop, other'; }

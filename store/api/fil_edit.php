@@ -61,7 +61,7 @@ function fe_tools($me) {
   if (empty($me['boss'])) return [];
   $GLOBALS['FE_ME'] = $me;
   return [
-    'code_find' => ['{"q":"точный текст или слово с сайта/из кода","where":"site|store|metro|all"} — ПРАВКИ САЙТА: найти, в каком файле и строке есть этот текст (до 25 мест). site — сайт itcpartner.ru, store — магазин itcpartner.store, Экосистема и приложения, metro — «Мой Гуанчжоу». Ищи коротким точным куском текста, который виден на странице',
+    'code_find' => ['{"q":"точный текст или слово с сайта/из кода","where":"site|store|metro|all"} — ПРАВКИ САЙТА: найти, в каком файле и строке есть этот текст (до ' . (function_exists('ag_lim') ? (int)ag_lim('code_find', 25) : 25) . ' мест). site — сайт itcpartner.ru, store — магазин itcpartner.store, Экосистема и приложения, metro — «Мой Гуанчжоу». Ищи коротким точным куском текста, который виден на странице',
       function ($a) {
         $q = trim((string)($a['q'] ?? '')); if (mb_strlen($q) < 2) return 'напиши, что искать';
         $ws = ($a['where'] ?? 'all') === 'all' || !in_array($a['where'] ?? '', ['site', 'store', 'metro'], true) ? ['site', 'store', 'metro'] : [$a['where']];
@@ -70,15 +70,15 @@ function fe_tools($me) {
           $abs = fe_roots()[$k] . '/' . $rel; $c = (string)@file_get_contents($abs); if (mb_stripos($c, $q) === false) continue;
           foreach (preg_split('~\R~', $c) as $i => $line) if (mb_stripos($line, $q) !== false) {
             $o[] = $k . '/' . $rel . ':' . ($i + 1) . ': ' . mb_substr(trim($line), 0, 200) . (fe_locked($k . '/' . $rel) ? '  [менять нельзя]' : '');
-            if (count($o) >= 25) break 3;
+            if (count($o) >= (function_exists('ag_lim') ? (int)ag_lim('code_find', 25) : 25)) break 3;
           }
         }
         return $o ?: 'не нашёл «' . $q . '» — попробуй другой кусок текста или слово';
       }],
-    'code_read' => ['{"file":"site/pages/contacts.php","from":1,"lines":80} — ПРАВКИ САЙТА: прочитать файл с номерами строк (до 150 строк за раз). Без from — покажу размер и начало',
+    'code_read' => ['{"file":"site/pages/contacts.php","from":1,"lines":80} — ПРАВКИ САЙТА: прочитать файл с номерами строк (до ' . (function_exists('ag_lim') ? (int)ag_lim('code_read', 150) : 150) . ' строк за раз). Без from — покажу размер и начало',
       function ($a) {
         $p = fe_path($a['file'] ?? ''); if (!is_array($p)) return $p; if (!is_file($p[0])) return 'нет такого файла: ' . $p[1];
-        $ls = preg_split('~\R~', (string)file_get_contents($p[0])); $from = max(1, (int)($a['from'] ?? 1)); $n = min(150, max(10, (int)($a['lines'] ?? 80)));
+        $ls = preg_split('~\R~', (string)file_get_contents($p[0])); $from = max(1, (int)($a['from'] ?? 1)); $n = min((function_exists('ag_lim') ? (int)ag_lim('code_read', 150) : 150), max(10, (int)($a['lines'] ?? 80)));
         $o = ['файл' => $p[1], 'всего строк' => count($ls)] + (fe_locked($p[1]) ? ['внимание' => 'этот файл менять нельзя'] : []); $t = [];
         for ($i = $from; $i < $from + $n && $i <= count($ls); $i++) $t[] = $i . ': ' . mb_substr($ls[$i - 1], 0, 600);
         $o['строки'] = implode("\n", $t); return $o;

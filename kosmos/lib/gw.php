@@ -93,6 +93,18 @@ function gw_who(array $w): array {
   return $u;
 }
 
+/* 0.5.6 (№630) · запрос к Claude для шлюза: большой max_tokens — потоком (curl до 600 с, без простоя), сбой связи/перегрузка — ещё раз */
+const GW_TOK_MAX = 64000; const GW_TOK_STREAM = 16000;
+function gw_claude(array $payload, callable $onSw): array {
+  if ((int)($payload['max_tokens'] ?? 0) <= GW_TOK_STREAM) return claude_call($payload, null, $onSw);
+  $res = [];
+  for ($i = 0; $i < 2; $i++) {
+    $res = claude_call($payload, function ($t) {}, $onSw);
+    if (empty($res['error']) || !in_array((int)($res['http'] ?? 0), [0, 500, 502, 503, 504, 529], true)) break;
+    usleep(1500000);
+  }
+  return $res;
+}
 function gw_ask(array $in): void {
   // 0.5.3 (№627) · снимок по отпечатку, которого здесь нет — просим целиком (до учёта обращения, чтобы повтор не считался дважды)
   $need = gw_img_need((array)($in['images'] ?? []));
@@ -104,7 +116,9 @@ function gw_ask(array $in): void {
   if (strlen($sys) + strlen($user) > 1500000) fail('Слишком большой запрос');
   $model = str($in['model'] ?? '', 60);
   if (!preg_match('~^claude-[a-z0-9.\-]{3,50}$~', $model)) $model = model('deep');
-  $max = max(256, min(32000, (int)($in['max_tokens'] ?? 4000)));
+  // 0.5.6 (№630) · предел ответа поднят до 64000 (было 32000) — столько пишут нынешние модели Claude; модель с меньшим пределом
+  // ответит 400 — тогда тот же запрос ещё раз с 32000 (ниже). Платится только написанное, запас денег не тратит.
+  $max = max(256, min(GW_TOK_MAX, (int)($in['max_tokens'] ?? 4000)));
   // 0.4.6 · фото к вопросу: Claude видит сами снимки, а не только распознанный текст · 0.5.0 (№624): до 10 снимков (было 4), каждый до ~5 МБ,
   // все вместе — до 26 МБ в base64 (предел запроса Claude — 32 МБ; предел тела у nginx/PHP «Космоса» — 64 МБ)
   $content = $user; $imgs = []; $tot = 0;
@@ -127,7 +141,11 @@ function gw_ask(array $in): void {
   if (($cut = gw_sys_cut($sys)) > 0) $payload['system'] = [['type' => 'text', 'text' => substr($sys, 0, $cut), 'cache_control' => ['type' => 'ephemeral']],
                                                         ['type' => 'text', 'text' => substr($sys, $cut), 'cache_control' => ['type' => 'ephemeral']]];
   $switched = '';
-  $res = claude_call($payload, null, function ($old, $new) use (&$switched) { $switched = 'Ключ «' . $old . '» перестал работать — переключился на «' . $new . '»'; });
+  $onSw = function ($old, $new) use (&$switched) { $switched = 'Ключ «' . $old . '» перестал работать — переключился на «' . $new . '»'; };
+  // 0.5.6 (№630) · длинный ответ (больше 16000 токенов запаса, Opus пишет его минутами) — потоком: соединение не простаивает
+  // и не рвётся по пути; ответ собирается целиком, магазин получает его как раньше. Короткий — обычным запросом (с повторами).
+  $res = gw_claude($payload, $onSw);
+  if (!empty($res['error']) && (int)($res['http'] ?? 0) === 400 && $max > 32000) { $payload['max_tokens'] = $max = 32000; $res = gw_claude($payload, $onSw); }   // модель не берёт 64000
   $kid = (int)($res['key_id'] ?? 0);
   if (!empty($res['error'])) {
     log_add($u['phone'], 'gw_error', ['model' => $model, 'error' => mb_substr((string)$res['error'], 0, 300)]);

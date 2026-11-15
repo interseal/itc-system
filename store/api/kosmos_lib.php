@@ -118,10 +118,13 @@ function ks_gw_ask($sys, $user, $maxTok, $model, $me) {
   $GLOBALS['KS_STOP'] = '';
   $req = ['a' => 'ask', 'system' => (string)$sys, 'user' => (string)$user, 'max_tokens' => (int)$maxTok, 'model' => (string)$model, 'who' => $who];
   if (!empty($GLOBALS['FC_IMGS'])) $req['images'] = ks_gw_imgs((array)$GLOBALS['FC_IMGS']);   // №575 · фото — самому Claude (№627: уже отданные — по отпечатку)
-  [$code, $j] = ks_gw_call($req, !empty($req['images']) ? 240 : 150);
+  // №630 · длинный ответ (запас больше 16000 токенов) или Opus — ждём дольше: шлюз пишет такой ответ потоком до 10 минут (было 150/240 с)
+  $long = (int)$maxTok > 16000 || stripos((string)$model, 'opus') !== false;
+  $tmo = $long ? 660 : (!empty($req['images']) ? 240 : 150);
+  [$code, $j] = ks_gw_call($req, $tmo);
   if ($code === 409 && !empty($j['need_images']) && !empty($req['images'])) {   // №627 · шлюз снимка не нашёл — шлём целиком
     ks_gw_imgs_forget((array)$j['need_images']); $req['images'] = ks_gw_imgs((array)$GLOBALS['FC_IMGS'], true);
-    [$code, $j] = ks_gw_call($req, 240);
+    [$code, $j] = ks_gw_call($req, max(240, $tmo));
   }
   if ($code === 200 && !empty($j['ok']) && !empty($req['images']) && !empty($j['img_cache'])) ks_gw_imgs_sent($req['images']);
   if ($code === 200 && !empty($j['ok']) && is_string($j['text'] ?? null)) {

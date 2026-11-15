@@ -662,6 +662,15 @@ try:
     check('voice.js: одна версия ?v= в Фил, Космос, Сделки, Рисовалка', len(vers) == 1 and '' not in vers, vers)
     sh = open(f'{REPO}/android/ITCApp/app/src/main/java/store/itcpartner/app/SpeechHelper.java', encoding='utf-8').read()
     check('Android: частичные результаты включены и идут в itcSpeechPartial (с «неустоявшимся» концом фразы)', 'EXTRA_PARTIAL_RESULTS, true' in sh and 'itcSpeechPartial' in sh and 'UNSTABLE_TEXT' in sh)
+    print('29. «Космос» на максимуме (№630): пределы, 64000 токенов потоком, переключатель модели; «Фил» — как был')
+    r = subprocess.run(['php', f'{ROOT}/tests/kosmos_max_test.php'], capture_output=True, text=True, timeout=60)
+    check('пределы «Космоса» больше, «Фила» — прежние, защита не тронута, переключатель модели — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
+    c, j = gw({'a': 'ask', 'user': 'Большой разбор', 'who': BOSS, 'max_tokens': 90000}, key='ab' * 32)
+    rec = [json.loads(l) for l in open(f'{TMP}/mock.log')][-1]
+    check('шлюз: запас больше 16000 — потоком, предел 64000 (было 32000), ответ как раньше', c == 200 and j.get('ok') and rec.get('stream') is True and rec.get('max_tokens') == 64000, (c, j, rec))
+    c, j = gw({'a': 'ask', 'user': 'Короткий вопрос', 'who': BOSS, 'max_tokens': 8000}, key='ab' * 32)
+    rec = [json.loads(l) for l in open(f'{TMP}/mock.log')][-1]
+    check('шлюз: обычный запас — обычным запросом, как раньше', c == 200 and j.get('ok') and rec.get('stream') is False and rec.get('max_tokens') == 8000, (c, j, rec))
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

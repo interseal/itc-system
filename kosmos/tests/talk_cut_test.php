@@ -41,10 +41,11 @@ function ks_model_pick() { return 'claude-sonnet-5-5'; } function fil_model_name
 function test_ask($sys, $user, $mt, $model, $me) {   // вместо ks_gw_ask (сервер «Космоса»)
   $GLOBALS['MT'][] = $mt; $r = array_shift($GLOBALS['ANS']); $GLOBALS['KS_STOP'] = $r[1]; return [$r[0], '', 'Claude'];
 }
+preg_match('~^function ks_tok_first\(.*$~m', $ksrc, $tf); eval($tf[0]); preg_match('~^const KS_TOK_TOP = \d+;~m', $ksrc, $tc); eval($tc[0]);   // №630
 eval(str_replace('ks_gw_ask(', 'test_ask(', fn_src($ksrc, 'fl_ai')));
 $GLOBALS['MT'] = []; $GLOBALS['ANS'] = [['Для кода и агентов, то есть наших задач, почти все обзоры', 'max_tokens'], ['{"do":"answer","say":"Полный ответ с выводом."}', 'end_turn']];
 $j = fl_ai('s', 'u', 4000, true);
-t('Claude: обрывок по max_tokens не показываем — заново с 16000, приходит полный ответ', ($j['say'] ?? '') === 'Полный ответ с выводом.' && $GLOBALS['MT'] === [8000, 16000], [$j, $GLOBALS['MT']]);
+t('Claude: обрывок по max_tokens не показываем — заново с запасом (№630: 64000, было 16000), приходит полный ответ', ($j['say'] ?? '') === 'Полный ответ с выводом.' && $GLOBALS['MT'] === [8000, 64000], [$j, $GLOBALS['MT']]);
 $GLOBALS['MT'] = []; $GLOBALS['ANS'] = [['{"do":"answer","say":"Обычный ответ."}', 'end_turn']];
 $j = fl_ai('s', 'u', 4000, true);
 t('Claude: обычный ответ — одна попытка, как раньше', ($j['say'] ?? '') === 'Обычный ответ.' && $GLOBALS['MT'] === [8000], $GLOBALS['MT']);

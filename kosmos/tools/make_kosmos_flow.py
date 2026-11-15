@@ -52,6 +52,9 @@ rep(s[s.find('function fil_model_name($id) {'):s.find('\n', s.find('function fil
     "/* «Космос»: модели Claude на выбор руководителю (настройки). По умолчанию — Sonnet. */\n"
     "const KS_MODELS = [['claude-sonnet-5-5', 'Claude Sonnet 5.5 (рекомендую)'], ['claude-opus-5-5', 'Claude Opus 5.5 — самый сильный, дороже'], ['claude-haiku-5-5', 'Claude Haiku 5.5 — быстрый и недорогой'], ['claude-fable-5-2', 'Claude Fable 5.2 — старший уровень, самый дорогой']];\n"
     "const KS_MODEL0 = 'claude-sonnet-5-5';\n"
+    "/* №630 · запас токенов на ответ Claude: предел моделей 64000 (шлюз сам снизит до 32000, если модель столько не берёт) */\n"
+    "const KS_TOK_TOP = 64000;\n"
+    "function ks_tok_first($model, $maxTok) { return preg_match('~opus|fable~i', (string)$model) ? 32000 : min(16000, max(2000, (int)$maxTok * 2)); }\n"
     "function ks_model_pick() { $m = (string)($GLOBALS['FIL_MODEL'] ?? ''); if ($m === '') $m = sp_get('ks_model'); return preg_match('~^claude-[a-z0-9.-]{3,50}$~', $m) ? $m : KS_MODEL0; }\n"
     "function fil_model_name($id) { foreach (KS_MODELS as $m) if ($m[0] === $id) return $m[1]; return ks_model_title($id); }")
 cut('function fl_ai($sys, $user, $maxTok = 1500, $soft = false) {', 'const FL_ITC = ',
@@ -61,17 +64,18 @@ cut('function fl_ai($sys, $user, $maxTok = 1500, $soft = false) {', 'const FL_IT
     "  // ответ не уместился или не разобрался — ещё одна попытка (не уместился — с запасом 16000)\n"
     "  // №621: служебные теги (<invoke>, <function_calls>…) вырезаются; вызов <invoke name=…> выполняется как {\"tool\":…};\n"
     "  // не разобралось — вторая попытка с напоминанием «строго один JSON»; сырой текст человеку не показываем\n"
-    "  $model = ks_model_pick(); $mt = min(16000, max(2000, (int)$maxTok * 2)); $txt = null; $err = ''; $GLOBALS['FL_AI_BAD'] = 0;\n"
+    "  // №630: запас на ответ — Opus/Fable сразу 32000, остальные как раньше (до 16000); упёрся — повтор с KS_TOK_TOP (64000, предел моделей)\n"
+    "  $model = ks_model_pick(); $mt = ks_tok_first($model, $maxTok); $txt = null; $err = ''; $GLOBALS['FL_AI_BAD'] = 0;\n"
     "  for ($try = 0; $try < 2; $try++) {\n"
     "    [$txt, $err, $real] = ks_gw_ask($sys, $user . ($try ? ITCAI_ONE_JSON : ''), $mt, $model, $GLOBALS['me'] ?? []);\n"
     "    if ($txt === null) break;\n"
     "    $j = ks_ai_json($txt); $stop = (string)($GLOBALS['KS_STOP'] ?? '');\n"
     "    // №628: ответ упёрся в max_tokens, но разобрался (простой текст без JSON) — это обрывок; просим заново с запасом 16000\n"
-    "    if ($j && $stop === 'max_tokens' && $mt < 16000) { $mt = 16000; $try--; continue; }\n"
+    "    if ($j && $stop === 'max_tokens' && $mt < KS_TOK_TOP) { $mt = KS_TOK_TOP; $try--; continue; }\n"
     "    if ($j) { $j['_model'] = $real !== '' ? $real : fil_model_name($model); return $j; }\n"
     "    $err = 'Claude: ' . ($stop === 'max_tokens' ? 'ответ не уместился' : (trim((string)$txt) === '' ? 'пустой ответ' : 'ответ без разметки'));\n"
     "    error_log('kosmos ai: ' . $err . ' [' . $stop . '] ' . mb_substr((string)$txt, 0, 600));\n"
-    "    if ($stop === 'max_tokens') $mt = 16000;\n    $GLOBALS['FL_AI_BAD'] = 1;\n"
+    "    if ($stop === 'max_tokens') $mt = KS_TOK_TOP;\n    $GLOBALS['FL_AI_BAD'] = 1;\n"
     "  }\n"
     "  error_log('kosmos ai: ' . $err); $GLOBALS['FL_AI_ERR'] = $err;\n"
     "  if ($soft) return null;\n"
@@ -183,6 +187,20 @@ rep("const SP_PEER = ['key' => 'ks_voice', 'def' => 'anton', 'alt' => 'filipp', 
 
 # 12) №538 · навыки: записывает их «Космос» (Claude решает сложное лучше), пользуются оба — таблица itc_skill общая
 rep("const NVK_WRITE = false;", "const NVK_WRITE = true; ")
+
+# 13) №630 · «Космос» работает на максимуме: пределы результатов инструментов, инструментов за ход, длина ответа.
+#     Защита от зацикливания (AG_REPEAT, AG_STALL), шаги (AG_MAX_STEPS, AG_BG_STEPS) и учёт денег — как у «Фила», не трогаем.
+rep("const AG_MULTI = 4;", "const AG_MULTI = 8;   // №630 · «Космос»: до 8 инструментов за ход (у «Фила» 4)")
+rep("const AG_TOOL_CUT = 8000; const AG_TOOL_CUT_BG = 10000; const AG_TOOL_KEEP = 8; const AG_TOOL_OLD = 3000;",
+    "const AG_TOOL_CUT = 32000; const AG_TOOL_CUT_BG = 32000; const AG_TOOL_KEEP = 8; const AG_TOOL_OLD = 4000;   // №630 · «Космос»: результат до 32000 знаков (у «Фила» 8000/10000)")
+li = s.find("const AG_LIM = ["); le = s.find("\n", li)
+if li < 0 or s.count("const AG_LIM = [") != 1: raise SystemExit('нет AG_LIM')
+s = s[:li] + ("const AG_LIM = ['journal' => 40, 'deals' => 60, 'clients' => 50, 'sup_rows' => 150, 'sup_show' => 40, 'orders' => 40, 'chats' => 10, 'chat_msgs' => 20, 'chat_len' => 1000, "
+    "'web' => 20, 'web_len' => 800, 'page' => 20000, 'dev_res' => 20000, 'dev_n' => 30, 'code_read' => 400, 'code_find' => 80, 'pick' => 1000, 'sh_n' => 100, 'sh_feed' => 200, 'sh_len' => 1500, 'pdf_text' => 30000];   // №630 · «Космос» (Claude)") + s[le:]
+rep("const AG_HIST_MAX = 0;", "const AG_HIST_MAX = 300000;   // №630 · ~110 тыс. токенов истории шагов: дальше ранние результаты сокращаются (контекст Claude — 200 тыс.)")
+rep("' Ответ «say» — по-русски, по-деловому, коротко (до ' . ($bg ? 10 : 6) . ' предложений), с цифрами; это будет сказано вслух. От первого лица",
+    "' Ответ «say» — по-русски, по-деловому, с цифрами; это будет сказано вслух. Длина — по задаче: на простой вопрос — коротко (1–3 предложения), разбор, сравнение, план или отчёт — развёрнуто и полностью, без воды и повторов. От первого лица")
+rep("все цифры из данных? ответ короткий и по делу?", "все цифры из данных? ответ по делу, а его длина — по задаче (простое — коротко, сложное — полностью)?")
 
 # проверки
 for bad in ['itc_fil_conv', 'itc_fil_task', "sp_get('ft_cron_key')", 'pl_tick();   // №43 · напоминания планировщика', "'ks_memo'"]:

@@ -83,13 +83,13 @@ function sh_feed($supId, $q = '', $kind = '', $limit = 300) {
 function sh_history($me, $a) {
   [$sup, $err] = sh_sup((string)($a['sup'] ?? '')); if (!$sup) return $err;
   $kind = mb_strtolower(trim((string)($a['kind'] ?? ''))); if ($kind !== '' && !in_array($kind, SH_KINDS, true)) $kind = '';
-  $feed = sh_feed($sup['id'], trim((string)($a['q'] ?? '')), $kind, 120);
+  $feed = sh_feed($sup['id'], trim((string)($a['q'] ?? '')), $kind, (function_exists('ag_lim') ? (int)ag_lim('sh_feed', 120) : 120));   // №630 · у «Космоса» пределы больше
   if (!$feed) return ['поставщик' => $sup['name'], 'история' => 'пока пусто — с этим поставщиком ничего не записано и переписки в CRM нет', 'лента' => sh_link($sup['id'])];
   $cnt = []; foreach ($feed as $f) $cnt[$f['kind']] = ($cnt[$f['kind']] ?? 0) + 1;
   return ['поставщик' => $sup['name'], 'всего' => count($feed), 'по видам' => $cnt, 'первое' => substr((string)end($feed)['at'], 0, 10), 'последнее' => substr((string)$feed[0]['at'], 0, 10),
     'лента' => sh_link($sup['id']),
     'записи (новые сверху)' => array_map(function ($f) { return trim(substr((string)$f['at'], 0, 10) . ' · ' . $f['type'] . ' · ' . $f['kind'] . ' · ' . $f['title'] . ($f['who'] ? ' (' . $f['who'] . ')' : ''))
-      . ($f['text'] !== '' ? ': ' . mb_substr(preg_replace('~\s+~u', ' ', $f['text']), 0, 500) : '') . ($f['files'] ? ' [файлы: ' . implode(', ', array_map(function ($x) { return $x['url']; }, array_slice($f['files'], 0, 3))) . ']' : ''); }, array_slice($feed, 0, 40)),
+      . ($f['text'] !== '' ? ': ' . mb_substr(preg_replace('~\s+~u', ' ', $f['text']), 0, (function_exists('ag_lim') ? (int)ag_lim('sh_len', 500) : 500)) : '') . ($f['files'] ? ' [файлы: ' . implode(', ', array_map(function ($x) { return $x['url']; }, array_slice($f['files'], 0, 3))) . ']' : ''); }, array_slice($feed, 0, (function_exists('ag_lim') ? (int)ag_lim('sh_n', 40) : 40))),
     'как ответить' => 'ответь по сути вопроса (цены, сроки, ассортимент, как менялось — сравни по датам), с датами; дай ссылку на ленту'];
 }
 function sh_tools($me) {

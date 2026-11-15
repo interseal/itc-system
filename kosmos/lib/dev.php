@@ -105,7 +105,7 @@ function dev_claim(): ?array {
 function dev_finish(int $id, array $a): void {
   dev_schema(db());
   db()->prepare('UPDATE dev_tasks SET status=?, finished_at=?, cost_u=?, result=?, checks=?, branch=?, commit_hash=?, release_n=?, merged=?, error=? WHERE id=?')
-    ->execute([(string)($a['status'] ?? 'done'), now(), (int)round((float)($a['cost'] ?? 0) * 1000000), mb_substr((string)($a['result'] ?? ''), 0, 6000),
+    ->execute([(string)($a['status'] ?? 'done'), now(), (int)round((float)($a['cost'] ?? 0) * 1000000), mb_substr((string)($a['result'] ?? ''), 0, 20000),
                mb_substr((string)($a['checks'] ?? ''), 0, 3000), (string)($a['branch'] ?? ''), (string)($a['commit'] ?? ''), (int)($a['release_n'] ?? 0),
                !empty($a['merged']) ? 1 : 0, mb_substr((string)($a['error'] ?? ''), 0, 1000), $id]);
   if (array_key_exists('session', $a))   // 0.4.4 · сеанс Claude Code и вопрос руководителю (ответ после продолжения обнуляется)
@@ -118,7 +118,7 @@ function gw_dev(array $in): void {
   dev_schema(db());
   $op = (string)($in['op'] ?? '');
   $info = function () { return ['spent' => round(dev_spent_today_u() / 1000000, 2), 'limit' => (float)setting('dev_limit', '30')]; };
-  if ($op === 'list') jout(['ok' => true, 'tasks' => dev_list(10)] + $info());
+  if ($op === 'list') jout(['ok' => true, 'tasks' => dev_list(max(1, min(50, (int)($in['n'] ?? 10))))] + $info());   // 0.5.6 (№630) · «Космос» просит больше записей (n), «Фил» — как раньше 10
   if ($op === 'answer') { dev_answer((int)($in['id'] ?? 0), (string)($in['text'] ?? ''), 'магазин: ' . mb_substr((string)($in['who'] ?? ''), 0, 60)); jout(['ok' => true]); }
   if ($op === 'decide') { dev_decide((int)($in['id'] ?? 0), !empty($in['ok']), 'магазин: ' . mb_substr((string)($in['who'] ?? ''), 0, 60)); jout(['ok' => true]); }
   if ($op === 'add') {
