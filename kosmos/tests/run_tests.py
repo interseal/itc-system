@@ -624,6 +624,14 @@ try:
     print('24. Лимиты шагов (разговор 60, фон 400 и 3 часа) и защита от зацикливания (№624)')
     r = subprocess.run(['php', f'{ROOT}/tests/ag_loop_test.php'], capture_output=True, text=True, timeout=60)
     check('повтор одного вызова и работа без толку останавливаются с причиной, снимки на нужных шагах — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
+    print('25. Голос быстрее (№626): постоянная часть правил — отдельным блоком в кеше Claude, переменная — после метки')
+    c, j = gw({'a': 'ask', 'system': 'ПОСТОЯННЫЕ ПРАВИЛА ' * 50 + '\n\n=== ПО ЭТОМУ ЗАПРОСУ ===\nСЕЙЧАС У ЧЕЛОВЕКА: 12:05', 'user': 'Привет', 'who': BOSS}, key='ab' * 32)
+    rec = [json.loads(l) for l in open(f'{TMP}/mock.log')][-1]
+    sb = rec.get('sys_blocks', [])
+    check('шлюз: правила двумя блоками, оба с меткой кеша, постоянная часть первой', c == 200 and len(sb) == 2 and sb[0][0] == len('ПОСТОЯННЫЕ ПРАВИЛА ' * 50) and sb[0][1] and sb[1][1], (c, sb))
+    c, j = gw({'a': 'ask', 'system': 'Правила без метки', 'user': 'Привет', 'who': BOSS}, key='ab' * 32)
+    rec = [json.loads(l) for l in open(f'{TMP}/mock.log')][-1]
+    check('шлюз: правила без метки — одним блоком, как раньше', c == 200 and len(rec.get('sys_blocks', [])) == 1 and rec['sys_blocks'][0][1], (c, rec.get('sys_blocks')))
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

@@ -8,6 +8,9 @@ declare(strict_types=1);
 // Ключи Claude отсюда никуда не уходят: магазин получает только текст ответа.
 // Доступ сотрудников, лимиты и расход — те же, что в настройках «Космоса» (кто спросил, магазин сообщает в поле who).
 
+const GW_DYN = "\n\n=== ПО ЭТОМУ ЗАПРОСУ ===";   // 0.5.2 (№626) · как AG_DYN в store/api/flow.php
+/* где начинается меняющаяся часть правил (0 — метки нет или постоянная часть пустая) */
+function gw_sys_cut(string $sys): int { $p = strpos($sys, GW_DYN); return $p === false || trim(substr($sys, 0, $p)) === '' ? 0 : (int)$p; }
 const GW_IMG_MAX = 10; const GW_IMG_TOT = 26000000;   // 0.5.0 (№624)
 
 function gw_handle(): void {
@@ -87,6 +90,10 @@ function gw_ask(array $in): void {
   $payload = ['model' => $model, 'max_tokens' => $max, 'messages' => [['role' => 'user', 'content' => $content]]];
   // большая постоянная часть (правила, инструменты, памятка) — в кеш Claude: следующие шаги той же команды дешевле и быстрее
   if (trim($sys) !== '') $payload['system'] = [['type' => 'text', 'text' => $sys, 'cache_control' => ['type' => 'ephemeral']]];
+  // 0.5.2 (№626) · магазин ставит перед меняющейся частью правил (время, дела напарника, навыки) метку GW_DYN — постоянная часть
+  // идёт отдельным блоком со своей меткой кеша: её Claude берёт из кеша и в следующих командах, а не только в шагах одной команды
+  if (($cut = gw_sys_cut($sys)) > 0) $payload['system'] = [['type' => 'text', 'text' => substr($sys, 0, $cut), 'cache_control' => ['type' => 'ephemeral']],
+                                                        ['type' => 'text', 'text' => substr($sys, $cut), 'cache_control' => ['type' => 'ephemeral']]];
   $switched = '';
   $res = claude_call($payload, null, function ($old, $new) use (&$switched) { $switched = 'Ключ «' . $old . '» перестал работать — переключился на «' . $new . '»'; });
   $kid = (int)($res['key_id'] ?? 0);

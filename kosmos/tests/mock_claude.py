@@ -214,7 +214,8 @@ class H(BaseHTTPRequestHandler):
                                 'imgs': [b.get('source', {}).get('media_type', '') for m in req.get('messages', [])[:1] if isinstance(m.get('content'), list) for b in m['content'] if isinstance(b, dict) and b.get('type') == 'image'],
                                 'txt1': next((b.get('text', '')[:80] for m in req.get('messages', [])[:1] if isinstance(m.get('content'), list) for b in m['content'] if isinstance(b, dict) and b.get('type') == 'text'), ''),
                                 'sys_has_mem': '- [№' in system_text(req.get('system')),
-                                'cache': any(isinstance(b, dict) and 'cache_control' in b for b in (req.get('system') or []) if not isinstance(req.get('system'), str))},
+                                'cache': any(isinstance(b, dict) and 'cache_control' in b for b in (req.get('system') or []) if not isinstance(req.get('system'), str)),
+                                'sys_blocks': [(len(b.get('text', '')), 'cache_control' in b) for b in (req.get('system') or []) if isinstance(b, dict)] if not isinstance(req.get('system'), str) else []},
                                ensure_ascii=False) + '\n')
         if ver != '2023-06-01':
             return self.send_json(400, {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'bad version'}})

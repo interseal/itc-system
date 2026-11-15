@@ -17,11 +17,13 @@
     prev = { p: window.itcSpeechPartial, r: window.itcSpeechResult, e: window.itcSpeechError };
     /* №19 · слушаем, пока человек не закончит: телефон отдаёт фразу после короткой паузы — мы её копим
        и сразу слушаем дальше. Конец — повторное нажатие микрофона или долгая тишина (телефон сам скажет «ничего не услышал»). */
-    window.itcSpeechPartial = function (t) { if (!native) return; LASTP = String(t || '').trim(); if (cb.partial) cb.partial((BUF ? BUF + ' ' : '') + t); };   // №616 · помним недоговорённый кусок
+    window.itcSpeechPartial = function (t) { if (!native) return; clearTimeout(QT); LASTP = String(t || '').trim(); if (cb.partial) cb.partial((BUF ? BUF + ' ' : '') + t); };   // №616 · помним недоговорённый кусок
     window.itcSpeechResult = function (t) {
       if (!native) return; t = String(t || '').trim() || LASTP; LASTP = ''; if (t) BUF = (BUF ? BUF + ' ' : '') + t;
       if (STOP || Date.now() - T0 > (cb.keep ? 600000 : 120000)) { done(); return; }
       if (cb.partial && BUF) cb.partial(BUF + ' …');
+      // №626 · быстрый конец фразы («Сделки», рисунки): 1,2 с после куска нет новых слов — отправляем, не ждём, пока телефон скажет «ничего не услышал» (~5 с)
+      clearTimeout(QT); if (!cb.keep) QT = setTimeout(function () { if (native && !STOP && !LASTP && BUF) done(); }, 1200);
       setTimeout(function () { if (native && !STOP) { try { (cb.keep && typeof AndroidSpeech.listenLong === 'function' ? AndroidSpeech.listenLong('ru-RU') : AndroidSpeech.listen('ru-RU')); } catch (e) { done(); } } else if (native) done(); }, 0);   // №616 · без паузы: пока перезапускались — слова терялись
     };
     window.itcSpeechError = function (m) {
@@ -33,8 +35,8 @@
       native = null; unhook(); if (cb.error) cb.error(m || 'Не расслышал');
     };
   }
-  var BUF = '', STOP = false, T0 = 0, LASTP = '';
-  function done() { if (LASTP) { BUF = (BUF ? BUF + ' ' : '') + LASTP; LASTP = ''; } var t = BUF.trim(); BUF = ''; native = null; unhook(); if (cb.final) cb.final(t); }
+  var BUF = '', STOP = false, T0 = 0, LASTP = '', QT = 0;
+  function done() { clearTimeout(QT); if (LASTP) { BUF = (BUF ? BUF + ' ' : '') + LASTP; LASTP = ''; } var t = BUF.trim(); BUF = ''; native = null; unhook(); if (cb.final) cb.final(t); }
   function unhook() { if (!prev) return; window.itcSpeechPartial = prev.p; window.itcSpeechResult = prev.r; window.itcSpeechError = prev.e; prev = null; }
 
   /* начать слушать. ВАЖНО: вызывать прямо из нажатия кнопки (иначе браузер не даст звук) */
@@ -61,10 +63,10 @@
         var lvl = s / (d.length / 8); rec.peak = Math.max(rec.peak, lvl);
         rec.bufs.push(new Float32Array(d));
         if (cb.level) cb.level(lvl);
-        // сам замечаем конец фразы: была речь, потом 1,4 с тишины
-        if (lvl > 0.02) { heard = true; quiet = 0; } else if (heard && !cb.keep) { quiet += d.length / ctx.sampleRate; if (quiet > 3) V.stop(); }
+        // сам замечаем конец фразы: была речь, потом 2 с тишины (было 3 с)
+        if (lvl > 0.02) { heard = true; quiet = 0; } else if (heard) { quiet += d.length / ctx.sampleRate; if (!cb.keep && quiet > 2) V.stop(); }
         if (!cb.keep && Date.now() - rec.t0 > 29000) V.stop();
-        else if (cb.keep && Date.now() - rec.ct > 80000) chunk(rec);   // №616 · длинная диктовка: каждые ~80 с кусок уходит на распознавание, запись идёт дальше
+        else if (cb.keep && (Date.now() - rec.ct > 80000 || (Date.now() - rec.ct > 15000 && quiet > 0.4))) chunk(rec);   // №616 · длинная диктовка: кусок уходит на распознавание, запись идёт дальше · №626: на паузе после 15 с — при «стоп» остаётся распознать только короткий хвост
         if (cb.keep && Date.now() - rec.t0 > 1800000) V.stop();
       };
       rec.src.connect(rec.pr); rec.pr.connect(ctx.destination);
@@ -92,7 +94,8 @@
   }
   /* закончить: у телефона — «хватит слушать», в браузере — отправить запись на распознавание */
   V.stop = function () {
-    if (native) { STOP = true; try { AndroidSpeech.stopListen(); } catch (e) {} setTimeout(function () { if (native) done(); }, 1500); return; }
+    // №626 · всё сказанное уже пришло — отправляем почти сразу (0,25 с); есть недослушанный кусок — ждём точный текст не дольше 0,7 с (было всегда до 1,5 с)
+    if (native) { STOP = true; try { AndroidSpeech.stopListen(); } catch (e) {} setTimeout(function () { if (native) done(); }, LASTP ? 700 : 250); return; }
     if (!rec) return;
     var r = rec; rec = null;
     try { r.pr && r.pr.disconnect(); r.src && r.src.disconnect(); } catch (e) {}
@@ -122,6 +125,20 @@
   V.cancel = function () { if (native) { native = null; BUF = ''; unhook(); try { AndroidSpeech.stopListen(); } catch (e) {} } if (rec) { var r = rec; rec = null; try { r.stream && r.stream.getTracks().forEach(function (x) { x.stop(); }); r.ctx.close(); } catch (e) {} } };
 
   /* сказать вслух */
+  /* №626 · текст → куски для озвучки: первый — короткий (первое предложение), дальше — до 240 знаков (столько Яндекс берёт за раз) */
+  V.ttsParts = function (text) {
+    var t = String(text || '').replace(/\s+/g, ' ').trim().substr(0, 1800); if (!t) return [];
+    var ss = t.match(/[^.!?…;:]+(?:[.!?…;:]+|$)\s*/g) || [t], out = [], cur = '';
+    ss.forEach(function (x) {
+      x = x.trim(); if (!x) return;
+      while (x.length > 240) { var k = x.lastIndexOf(' ', 240); if (k < 60) k = 240; if (cur) { out.push(cur); cur = ''; } out.push(x.substr(0, k).trim()); x = x.substr(k).trim(); }
+      var lim = out.length ? 240 : 160;           // первый кусок короче — быстрее зазвучит
+      if (cur && (cur + ' ' + x).length > lim) { out.push(cur); cur = x; } else cur = cur ? cur + ' ' + x : x;
+      if (!out.length && cur.length >= 40) { out.push(cur); cur = ''; }   // первое предложение — сразу отдельным куском
+    });
+    if (cur) out.push(cur);
+    return out.slice(0, 8);
+  };
   var cur = null, SEQ = 0;
   /* №29 · звук Космоса: можно выключить совсем (запоминается) и остановить на полуслове */
   V.muted = function () { try { return localStorage.getItem('ks_mute') === '1'; } catch (e) { return false; } };
@@ -158,12 +175,26 @@
     V.hush(); var my = SEQ;
     function est() { V.talking(true); clearTimeout(V._t); V._t = setTimeout(function () { V.talking(false); }, Math.min(15000, 900 + String(text).length * 65)); }
     function phone() { if (my !== SEQ || mute()) return; est(); try { if (window.AndroidSpeech && AndroidSpeech.say) AndroidSpeech.say(String(text), 'ru-RU'); else if (window.speechSynthesis) { var u = new SpeechSynthesisUtterance(String(text)); u.lang = 'ru-RU'; speechSynthesis.speak(u); } } catch (e) {} }
-    // №20 · всегда сначала голос Космоса (Яндекс). Голос телефона — только если ключ Яндекса ещё не вставлен,
+    // №20 · всегда сначала голос помощника (Яндекс). Голос телефона — только если ключ Яндекса ещё не вставлен,
     // иначе телефон подставлял свой женский голос, когда Яндекс не успевал.
-    api('sp_say', voice ? { text: text, voice: voice } : { text: text }).then(function (r) {
-      if (my !== SEQ || mute()) return;          // пока ждали голос — нажали «замолчать»
-      if (r && r.ok) { try { cur = new Audio('data:' + (r.type || 'audio/mpeg') + ';base64,' + r.audio); cur.onplaying = function () { clearTimeout(V._t); V.talking(true); }; cur.onended = cur.onpause = function () { V.talking(false); }; cur.play().catch(function () {}); } catch (e) {} }
-      else if (r && /не подключ/i.test(r.error || '')) phone();
-    }).catch(function () {});
+    // №626 · озвучка кусками: первое предложение заказываем отдельно и начинаем читать, как только оно готово;
+    // остальные куски Яндекс готовит одновременно, пока звучит первый (раньше ждали, пока озвучится весь ответ).
+    var parts = V.ttsParts(text); if (!parts.length) return;
+    var reqs = parts.map(function (p) { return api('sp_say', voice ? { text: p, voice: voice } : { text: p }).catch(function () { return null; }); });
+    function play(i) {
+      if (i >= reqs.length) { V.talking(false); return; }
+      reqs[i].then(function (r) {
+        if (my !== SEQ || mute()) return;        // пока ждали голос — нажали «замолчать»
+        if (!(r && r.ok)) { if (i === 0 && r && /не подключ/i.test(r.error || '')) phone(); else play(i + 1); return; }
+        try {
+          var a = cur = new Audio('data:' + (r.type || 'audio/mpeg') + ';base64,' + r.audio);
+          a.onplaying = function () { clearTimeout(V._t); V.talking(true); };
+          a.onended = function () { if (my === SEQ && cur === a) play(i + 1); };
+          a.onpause = function () { if (!a.ended) V.talking(false); };
+          a.play().catch(function () { V.talking(false); });
+        } catch (e) { play(i + 1); }
+      });
+    }
+    play(0);
   };
 })();

@@ -15,17 +15,18 @@ foreach (['store/api/flow.php', 'store/api/kosmos_flow.php'] as $fn) {
 }
 
 $src = (string)file_get_contents("$root/store/api/flow.php");
-$a = strpos($src, 'function ag_run('); $b = strpos($src, "\n}\n", $a);
-preg_match_all('~^const (AG_REPEAT|AG_STALL|AG_MAX_STEPS|AG_BG_STEPS)\b[^\n]*~m', $src, $cm);
+$a = strpos($src, 'function ag_calls(');   // №626 · ag_calls лежит прямо перед ag_run
+$b = strpos($src, "\n}\n", strpos($src, 'function ag_run(', $a));
+preg_match_all('~^const (AG_REPEAT|AG_STALL|AG_MAX_STEPS|AG_BG_STEPS|AG_MULTI|AG_DYN|AG_FAST_RULES)\b[^\n]*~m', $src, $cm);
 foreach (['FIL_SELF', 'FIL_CORE', 'FIL_KP', 'FIL_CATALOG', 'FE_RULES', 'PL_RULES', 'FIL_SEARCH', 'CRM_RULES', 'RB_RULES', 'FIL_EX', 'FIL_LAST', 'AG_BG_RULES', 'AG_TASK_RULES', 'AG_DEEP_RULES'] as $c) define($c, '');
 eval(implode("\n", $cm[0]) . "\n");
 function ag_tools($me, $ctx) { return ['web' => ['{"q":""}', function ($a) { return $GLOBALS['TOOL_OUT'] === 'same' ? 'ничего не нашёл' : 'нашёл: ' . json_encode($a, JSON_UNESCAPED_UNICODE) . ' ' . (++$GLOBALS['N']); }]]; }
 function fl_staff() { return []; } function fil_io($p, $n) { return ''; } function fil_boss_io() { return 'Алексей Николаевич'; }
 function pl_loc($a, $b, $c) { return '1'; } function pl_tz() { return 'Europe/Moscow'; } function fil_memo() { return ''; } function fil_learn() { return ''; }
-function ag_peer_block($me) { return ''; } function nvk_block($t) { return ''; } function sp_get($k) { return ''; }
+function ag_peer_block($me) { return '[ДЕЛА НАПАРНИКА]'; } function nvk_block($t) { return '[НАВЫКИ]'; } function sp_get($k) { return ''; }
 /* «модель»: по очереди отдаёт заготовленные ответы; запоминает, что ей сказали и видела ли она снимки */
 function fl_ai($sys, $user, $max, $soft) {
-  $GLOBALS['ASKED'][] = $user; $GLOBALS['IMG_SEEN'][] = count($GLOBALS['FC_IMGS'] ?? []);
+  $GLOBALS['SYS'] = $sys; $GLOBALS['ASKED'][] = $user; $GLOBALS['IMG_SEEN'][] = count($GLOBALS['FC_IMGS'] ?? []);
   $f = $GLOBALS['SCRIPT']; return $f(count($GLOBALS['ASKED']), $user);
 }
 eval(substr($src, $a, $b + 3 - $a));
@@ -58,6 +59,18 @@ run(function ($n, $u) { return $n > 30 ? ['do' => 'answer', 'say' => 'ok'] : ['t
 t('разговор: снимки видны на всех шагах', count($GLOBALS['IMG_SEEN']) === 31 && min($GLOBALS['IMG_SEEN']) === 1, $GLOBALS['IMG_SEEN']);
 run(function ($n, $u) { return $n > 30 ? ['do' => 'answer', 'say' => 'ok'] : ['tool' => 'web', 'args' => ['q' => 'q' . $n]]; }, ['bg' => true], 'diff', [['m' => 'image/jpeg', 'd' => 'x', 'n' => 'a.jpg']]);
 t('фон: снимки видны на первых 12 шагах', array_sum($GLOBALS['IMG_SEEN']) === 12 && $GLOBALS['IMG_SEEN'][11] === 1 && $GLOBALS['IMG_SEEN'][12] === 0, $GLOBALS['IMG_SEEN']);
+
+// 6) №626 · несколько инструментов за один ход: все выполняются, результаты — в следующем вопросе модели, каждый считается в лимит
+[$j, $tr] = run(function ($n, $u) { return $n === 1 ? ['tools' => [['tool' => 'web', 'args' => ['q' => 'сделки']], ['tool' => 'web', 'args' => ['q' => 'переписка']], ['name' => 'web', 'input' => ['q' => 'грузы']]]] : ['do' => 'answer', 'say' => 'итог']; });
+t('«tools»: три инструмента за один ход — одно обращение к модели вместо трёх', count($tr) === 3 && count($GLOBALS['ASKED']) === 2 && ($j['say'] ?? '') === 'итог', [$tr, count($GLOBALS['ASKED'])]);
+t('«tools»: все три результата видны модели на следующем ходу', substr_count(end($GLOBALS['ASKED']), 'РЕЗУЛЬТАТ web') === 3 && strpos(end($GLOBALS['ASKED']), 'грузы') !== false, end($GLOBALS['ASKED']));
+[$j, $tr] = run(function ($n, $u) { return strpos($u, 'Инструменты больше нельзя') !== false ? ['do' => 'answer', 'say' => 'итог'] : ['tools' => array_map(function ($k) use ($n) { return ['tool' => 'web', 'args' => ['q' => "q$n-$k"]]; }, range(1, 9))]; });
+t('«tools»: не больше AG_MULTI за ход, общий лимит 60 соблюдается', count($tr) === 60 && ($j['say'] ?? '') === 'итог' && count($GLOBALS['ASKED']) === 16, [count($tr), count($GLOBALS['ASKED'])]);
+// 7) №626 · правила: меняющееся (время, дела напарника, навыки) — после метки AG_DYN; до метки — одинаково у разных запросов
+run(function ($n, $u) { return ['do' => 'answer', 'say' => 'ок']; });
+$sys = $GLOBALS['SYS']; $p = strpos($sys, AG_DYN);
+t('правила: время, дела напарника и навыки — после метки', $p > 0 && strpos($sys, 'СЕЙЧАС У ЧЕЛОВЕКА', $p) !== false && strpos($sys, '[ДЕЛА НАПАРНИКА]', $p) !== false && strpos($sys, '[НАВЫКИ]', $p) !== false && strpos(substr($sys, 0, $p), 'СЕЙЧАС У ЧЕЛОВЕКА') === false, $p);
+t('правила: «несколько сразу через tools» и «простое — сразу» есть в промпте', strpos($sys, '"tools":[') !== false && strpos($sys, 'БЫСТРО, ГДЕ МОЖНО') !== false);
 
 echo "Итого: $ok ✓, $bad ✗\n";
 exit($bad ? 1 : 0);
