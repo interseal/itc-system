@@ -6193,7 +6193,10 @@ function itcNeedsCat(){
 function render(){ try{ptrInit();}catch(e){}
   try{ if(S.booted&&!S._catFull&&!_catBusy&&itcNeedsCat()) setTimeout(function(){ ensureCatalog(); },0); }catch(e){}
   try{ document.body.classList.toggle("gate", !!S.showGate);
-       document.documentElement.classList.toggle("gate", !!S.showGate); }catch(e){}
+       document.documentElement.classList.toggle("gate", !!S.showGate);
+       /* №612 · вход в ITC GLOBAL — в стиле входа отдельных приложений («Мой Гуанчжоу»): тёмный фон, логотип ИТК, стеклянная плашка */
+       var _sg=!!S.showGate&&!document.documentElement.classList.contains("appgate");
+       document.body.classList.toggle("storegate",_sg); document.documentElement.classList.toggle("storegate",_sg); }catch(e){}
   setTimeout(function(){ try{fabInit();}catch(e){} },0);
   // Миграция: старые версии фиксировали body inline и ломали скролл. Чистим.
   var _b=document.body.style;
@@ -17900,6 +17903,35 @@ try{var _sa=JSON.parse(localStorage.getItem("itc_auth")||"null");if(_sa&&_sa.tok
   /* №585 · первый запуск — сразу ввод номера (как на втором экране); выбор «Войти / Войти как сотрудник» — по «← другой вход» */
   S.showGate=true; S.loginRole=(["fil","kosmos","crm","trade","sklad"].indexOf(X[1])>=0)?"itc":"buyer"; S.loginStep="phone"; S.loginPhone="";
   var sp=document.getElementById("splash"); if(sp) setTimeout(function(){try{sp.style.display="none"}catch(e){}},400);
+}catch(e){}})();
+/* №612 · ВХОД В ITC GLOBAL — тот же вид, что у входа в отдельные приложения: тёмный фон, сверху справа логотип ИТК,
+   внизу название и описание, под ними стеклянная плашка. Все варианты входа (покупатели, поставщики, сотрудники ИТК,
+   партнёры, ПВЗ и склад) и вся логика — прежние; меняется только оформление. */
+(function(){try{
+  var st=document.createElement("style");
+  st.textContent='html.storegate,body.storegate{background:#030b2e radial-gradient(120% 80% at 80% 0%,#16307e 0%,#06124a 45%,#030b2e 100%) fixed!important}'
+   +'body.storegate .topbar,body.storegate .guest-veil{display:none!important}'
+   +'body.storegate #app{min-height:100vh;display:flex;flex-direction:column;justify-content:flex-end;box-sizing:border-box;padding:0 0 max(22px,env(safe-area-inset-bottom))}'
+   +'.sg-lg{position:absolute;top:4.5vh;right:8%;height:clamp(30px,4.2vh,46px);filter:drop-shadow(0 2px 10px rgba(0,0,0,.6));z-index:2}'
+   +'.sg-tx{margin:24vh 9% 16px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6)}.sg-nm{font:700 clamp(36px,4.8vh,56px)/1 Roboto,Arial,sans-serif}'
+   +'.sg-rl{font-size:clamp(17px,2.3vh,26px);margin-top:10px;color:#e6edff}'
+   +'body.storegate .gate{max-width:560px;background:rgba(255,255,255,.12)!important;-webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);border:1px solid rgba(255,255,255,.26);border-radius:24px;margin:0 16px!important;padding:16px!important;color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.35)}'
+   +'@media(min-width:600px){body.storegate .gate{margin:0 auto!important;width:calc(100% - 32px)}}'
+   +'body.storegate .gate .glogo,body.storegate .gate .brandname,body.storegate .gate .tag{display:none!important}'
+   +'body.storegate .gate .card{background:transparent!important;box-shadow:none!important;border:0!important;padding:4px!important;color:#fff!important}'
+   +'body.storegate .gate .card *{color:inherit}body.storegate .gate input,body.storegate .gate select,body.storegate .gate textarea{color:#111!important;background:#fff!important}'
+   +'body.storegate .gate .lb,body.storegate .gate .role-desc{color:#e6edff!important}body.storegate .gate .hintbox{color:#e6edff!important;background:rgba(255,255,255,.08)!important;border:1px solid rgba(255,255,255,.35)!important}'
+   +'body.storegate .gate .btn.link,body.storegate .gate a{color:#cfe0ff!important}'
+   +'body.storegate .role-enter{background:rgba(255,255,255,.14)!important;border:1px solid rgba(255,255,255,.3)!important;box-shadow:none!important;color:#fff!important}'
+   +'body.storegate .role-enter.navy:first-child{background:#2fb24c!important;border-color:#2fb24c!important}'
+   +'body.storegate .role-enter .re-ic{background:rgba(255,255,255,.16)!important}body.storegate .role-enter .re-t{color:#fff!important;font-family:Roboto,Arial,sans-serif!important;font-size:19px!important}'
+   +'body.storegate .role-enter .re-ar{color:rgba(255,255,255,.8)!important;opacity:1!important}body.storegate .role-pick>div{border-top-color:rgba(255,255,255,.25)!important;color:#dfe7ff!important}'
+   +'body.storegate .inst-box{background:rgba(255,255,255,.1)!important;border:1px solid rgba(255,255,255,.25)!important;box-shadow:none!important}body.storegate .inst-box .inst-h{color:#fff!important}body.storegate .inst-box *:not(button):not(img):not(.inst-btn-rs *){color:#dfe7ff!important}body.storegate footer,body.storegate footer *{color:rgba(223,231,255,.75)!important}body.storegate .inst-box>div:last-child{color:#dfe7ff!important}'
+   +'body.storegate .gate .btn.navy,body.storegate .gate .btn.green{box-shadow:none}body.storegate .gate .btn.ghost{background:rgba(255,255,255,.14)!important;color:#fff!important;border-color:rgba(255,255,255,.35)!important}';
+  document.head.appendChild(st);
+  var _lv=loginView;
+  loginView=function(){var h=_lv();if(document.documentElement.classList.contains("appgate"))return h;
+    return '<img class="sg-lg" src="/apps/kosmos/itc-logo-w.svg" alt="ИТК"><div class="sg-tx"><div class="sg-nm">ITC GLOBAL</div><div class="sg-rl">'+L("Экосистема международной торговли","国际贸易生态系统","International trade ecosystem")+'</div></div>'+h};
 }catch(e){}})();
 try{var _c=JSON.parse(localStorage.getItem("itc_cart")||"null");if(_c&&_c.length)S.cart=_c;}catch(e){}
 try{var _wh=localStorage.getItem("itc_wh");if(_wh)S.deliveryWh=_wh;}catch(e){}
