@@ -572,6 +572,17 @@ try:
     print('22. «Фил» и «Космос»: служебные теги <invoke…> не попадают в ленту (№621)')
     r = subprocess.run(['php', f'{ROOT}/tests/ai_clean_test.php'], capture_output=True, text=True, timeout=60)
     check('очистка ответа и разбор <invoke name=…> — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
+    print('23. «Космос» видит сами снимки: скриншот без текста уходит Claude картинкой рядом с текстом (№623)')
+    r = subprocess.run(['php', f'{ROOT}/tests/ff_img_test.php', f'{TMP}/images.json'], capture_output=True, text=True, timeout=60)
+    check('уменьшение, не больше 4, ошибки не роняют, id прошлых снимков — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
+    imgs = json.load(open(f'{TMP}/images.json')) if os.path.exists(f'{TMP}/images.json') else []
+    c, j = gw({'a': 'ask', 'user': 'Что я подсветил на скриншоте?\n\n=== ПРИЛОЖЕН ФАЙЛ «72904.jpg» (фото, id файла ff261115a1b2c3d4) ===\nФото без текста', 'who': BOSS,
+               'images': imgs * 5 + [{'media_type': 'image/bmp', 'data': 'AAAA'}]}, key='ab' * 32)
+    rec = [json.loads(l) for l in open(f'{TMP}/mock.log')][-1]
+    check('шлюз: снимки — блоками image (не больше 4), текст OCR рядом', c == 200 and len(rec.get('imgs', [])) == 4 and rec['imgs'][0] in ('image/png', 'image/jpeg') and 'Что я подсветил' in rec.get('txt1', ''), (c, rec))
+    c, j = gw({'a': 'ask', 'user': 'Без картинки', 'who': BOSS, 'images': [{'media_type': 'image/png', 'data': '!!не base64!!'}]}, key='ab' * 32)
+    rec = [json.loads(l) for l in open(f'{TMP}/mock.log')][-1]
+    check('испорченный снимок пропущен — ответ как раньше, текстом', c == 200 and rec.get('imgs') == [], (c, rec))
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

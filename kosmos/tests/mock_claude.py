@@ -211,6 +211,8 @@ class H(BaseHTTPRequestHandler):
             f.write(json.dumps({'key4': key[-4:], 'model': req.get('model'), 'stream': bool(req.get('stream')), 'max_tokens': req.get('max_tokens'),
                                 'ver': ver, 'ws': self.headers.get('anthropic-workspace-id', ''), 'tools': [t['name'] for t in req.get('tools', [])],
                                 'n_msgs': len(req.get('messages', [])),
+                                'imgs': [b.get('source', {}).get('media_type', '') for m in req.get('messages', [])[:1] if isinstance(m.get('content'), list) for b in m['content'] if isinstance(b, dict) and b.get('type') == 'image'],
+                                'txt1': next((b.get('text', '')[:80] for m in req.get('messages', [])[:1] if isinstance(m.get('content'), list) for b in m['content'] if isinstance(b, dict) and b.get('type') == 'text'), ''),
                                 'sys_has_mem': '- [№' in system_text(req.get('system')),
                                 'cache': any(isinstance(b, dict) and 'cache_control' in b for b in (req.get('system') or []) if not isinstance(req.get('system'), str))},
                                ensure_ascii=False) + '\n')
