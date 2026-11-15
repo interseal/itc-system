@@ -21755,16 +21755,17 @@ function esim_region_art($c) {
 function esim_gb_art($k) {
   $key = trim((string)itc_setting('dashscope_key', ''));
   if ($key === '') return ['ok'=>false, 'error'=>'Не задан ключ рисовалки (DashScope)'];
-  $S = ['GB1'=>'a small glossy blue SIM card chip with a single soft glowing wifi wave above it',
-        'GB2'=>'a glossy blue SIM card chip with two glowing wifi waves above it',
-        'GB3'=>'a glossy blue SIM card chip with three glowing wifi waves and a small white cloud',
-        'GB5'=>'a glossy blue SIM card chip sitting on a fluffy white cloud with bright streams of glowing data',
-        'GB10'=>'a glossy blue SIM card chip riding a white paper airplane through clouds, streams of glowing data behind it',
-        'GB20'=>'a glossy blue SIM card chip on a small rocket taking off, bright glowing data trails',
-        'GB50'=>'a glossy blue SIM card chip as a powerful rocket flying into space among stars and planets, a galaxy of glowing data',
-        'GBD'=>'a glossy blue SIM card chip with a smiling sun and an infinity loop made of glowing data, daily internet concept'];
-  $prompt = 'Cute 3D render app icon illustration, ' . ($S[$k] ?? $S['GB1']) . ', centered composition, soft studio lighting, glossy materials, navy blue, turquoise and white palette, clean soft light-blue gradient background, high detail, friendly travel tech mood';
-  $r = ds_draw($prompt, '1024*1024', 'text, letters, numbers, digits, words, watermark, logo, brand, people, faces, hands, blurry, low quality, dark, cluttered', 'wanx2.1-t2i-plus');
+  /* №615 · не «сим-карта», а красивые сцены-путешествия с фоном; чем больше объём — тем шире и ярче сцена */
+  $S = ['GB1'=>'a cozy street cafe table in an old European town at golden hour, a cup of cappuccino and a smartphone with a glowing map, warm bokeh lights in the background',
+        'GB2'=>'a colorful narrow old-town street with a vintage tram, flowers on balconies, a traveler taking a photo with a phone, warm sunset light',
+        'GB3'=>'a tropical beach with turquoise water and palm trees, a hammock and a smartphone on a beach towel, bright sunny day',
+        'GB5'=>'dozens of colorful hot air balloons flying over a dramatic valley at sunrise, soft morning mist, a traveler watching from a hill',
+        'GB10'=>'view from an airplane window above pink and golden clouds at sunset, the wing glowing in the light',
+        'GB20'=>'a red convertible car on a winding mountain road along the sea coast, dramatic cliffs, bright blue sky, epic road trip',
+        'GB50'=>'planet Earth seen from space at night with glowing city lights and luminous blue data network lines connecting continents, aurora on the horizon',
+        'GBD'=>'a beautiful sunrise over a modern city skyline with soft glowing light trails in the sky, fresh new day mood'];
+  $prompt = 'Beautiful vivid travel illustration, cinematic digital painting, ' . ($S[$k] ?? $S['GB1']) . ', rich detailed background, depth of field, vibrant harmonious colors, premium travel poster style, high detail, no text';
+  $r = ds_draw($prompt, '1024*1024', 'text, letters, numbers, digits, words, signs, watermark, logo, brand, close-up faces, deformed hands, blurry, low quality, dull colors', 'wanx2.1-t2i-plus');
   if (!empty($r['err'])) return ['ok'=>false, 'error'=>$r['err']];
   $f = esim_art_dir() . '/' . $k . '.jpg'; $im = @imagecreatefromstring($r['img']);
   if ($im) { $o = imagecreatetruecolor(512, 512); imagecopyresampled($o, $im, 0, 0, 0, 0, 512, 512, imagesx($im), imagesy($im)); @imagejpeg($o, $f, 85); imagedestroy($o); imagedestroy($im); }
