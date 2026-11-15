@@ -1,6 +1,6 @@
 /* «Космос» · sw.js v2 (№16) — страница открывается сразу из телефона, свежая версия тихо догружается в фоне
    и откроется в следующий раз. Команды и голос (/api/) — всегда через сеть. */
-var C = 'itc-kosmos-v48';   // номер — как у apps/fil (№537)
+var C = 'itc-kosmos-v49';   // номер — как у apps/fil (№537)
 var SHELL = ['./', 'index.html', 'kosmos-splash.jpg?v=1', 'itc-logo-w.svg', 'voice.js', 'manifest.webmanifest', 'icon-192.png', 'fav-64.png', 'kosmos-face.jpg', 'kosmos-face-s.jpg', 'kosmos-cut.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(C).then(function (c) { return Promise.all(SHELL.map(function (u) { return c.add(new Request(u, { cache: 'reload' })).catch(function () {}); })); }));

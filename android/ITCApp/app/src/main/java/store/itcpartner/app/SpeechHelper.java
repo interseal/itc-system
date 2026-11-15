@@ -144,8 +144,10 @@ public class SpeechHelper {
             i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
             i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
             i.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, act.getPackageName());
-            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L);
-            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L);
+            // 2.2.5 · длинная диктовка: паузы до 4 с не обрывают фразу (раньше 1 с — распознавание перезапускалось и слова терялись)
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L);
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L);
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 20000L);
             sr.startListening(i);
         } catch (Exception e) {
             release();

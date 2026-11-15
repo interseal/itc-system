@@ -17,24 +17,24 @@
     prev = { p: window.itcSpeechPartial, r: window.itcSpeechResult, e: window.itcSpeechError };
     /* №19 · слушаем, пока человек не закончит: телефон отдаёт фразу после короткой паузы — мы её копим
        и сразу слушаем дальше. Конец — повторное нажатие микрофона или долгая тишина (телефон сам скажет «ничего не услышал»). */
-    window.itcSpeechPartial = function (t) { if (native && cb.partial) cb.partial((BUF ? BUF + ' ' : '') + t); };
+    window.itcSpeechPartial = function (t) { if (!native) return; LASTP = String(t || '').trim(); if (cb.partial) cb.partial((BUF ? BUF + ' ' : '') + t); };   // №616 · помним недоговорённый кусок
     window.itcSpeechResult = function (t) {
-      if (!native) return; t = String(t || '').trim(); if (t) BUF = (BUF ? BUF + ' ' : '') + t;
+      if (!native) return; t = String(t || '').trim() || LASTP; LASTP = ''; if (t) BUF = (BUF ? BUF + ' ' : '') + t;
       if (STOP || Date.now() - T0 > (cb.keep ? 600000 : 120000)) { done(); return; }
       if (cb.partial && BUF) cb.partial(BUF + ' …');
-      setTimeout(function () { if (native && !STOP) { try { AndroidSpeech.listen('ru-RU'); } catch (e) { done(); } } else if (native) done(); }, 120);
+      setTimeout(function () { if (native && !STOP) { try { AndroidSpeech.listen('ru-RU'); } catch (e) { done(); } } else if (native) done(); }, 0);   // №616 · без паузы: пока перезапускались — слова терялись
     };
     window.itcSpeechError = function (m) {
       if (!native) return;
       // №303 · режим «нажал — говоришь — нажал ещё раз»: тишина не заканчивает запись, слушаем дальше до второго нажатия
-      if (cb.keep && !STOP && Date.now() - T0 < 600000) { setTimeout(function () { if (native && !STOP) { try { AndroidSpeech.listen('ru-RU'); } catch (e) { if (BUF) done(); } } else if (native) done(); }, 150); return; }
+      if (cb.keep && !STOP && Date.now() - T0 < 600000) { setTimeout(function () { if (native && !STOP) { try { AndroidSpeech.listen('ru-RU'); } catch (e) { if (BUF) done(); } } else if (native) done(); }, 0); return; }
       if (STOP && BUF) { done(); return; }
       if (BUF) { done(); return; }                       // была речь, потом тишина — фраза закончена
       native = null; unhook(); if (cb.error) cb.error(m || 'Не расслышал');
     };
   }
-  var BUF = '', STOP = false, T0 = 0;
-  function done() { var t = BUF.trim(); BUF = ''; native = null; unhook(); if (cb.final) cb.final(t); }
+  var BUF = '', STOP = false, T0 = 0, LASTP = '';
+  function done() { if (LASTP) { BUF = (BUF ? BUF + ' ' : '') + LASTP; LASTP = ''; } var t = BUF.trim(); BUF = ''; native = null; unhook(); if (cb.final) cb.final(t); }
   function unhook() { if (!prev) return; window.itcSpeechPartial = prev.p; window.itcSpeechResult = prev.r; window.itcSpeechError = prev.e; prev = null; }
 
   /* начать слушать. ВАЖНО: вызывать прямо из нажатия кнопки (иначе браузер не даст звук) */
@@ -42,7 +42,7 @@
     V.hush();                                   // №29: начали говорить сами — Фил замолкает
     cb = o || {};
     if (V.hasNative()) {
-      native = true; BUF = ''; STOP = false; T0 = Date.now(); hook();
+      native = true; BUF = ''; LASTP = ''; STOP = false; T0 = Date.now(); hook();
       try { AndroidSpeech.listen('ru-RU'); if (cb.start) cb.start('native'); } catch (e) { native = null; unhook(); if (cb.error) cb.error('Распознавание недоступно'); }
       return;
     }
@@ -50,7 +50,7 @@
     var Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { if (cb.error) cb.error('Это устройство не даёт доступ к микрофону — напишите команду'); return; }
     var ctx = new Ctx(); try { ctx.resume(); } catch (e) {}
-    rec = { ctx: ctx, bufs: [], stream: null, pr: null, src: null, t0: Date.now(), peak: 0 };
+    rec = { ctx: ctx, bufs: [], stream: null, pr: null, src: null, t0: Date.now(), ct: Date.now(), parts: [], peak: 0 };
     navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } }).then(function (stream) {
       if (!rec) { stream.getTracks().forEach(function (x) { x.stop(); }); return; }
       rec.stream = stream; rec.src = ctx.createMediaStreamSource(stream); rec.pr = ctx.createScriptProcessor(4096, 1, 1);
@@ -63,7 +63,9 @@
         if (cb.level) cb.level(lvl);
         // сам замечаем конец фразы: была речь, потом 1,4 с тишины
         if (lvl > 0.02) { heard = true; quiet = 0; } else if (heard && !cb.keep) { quiet += d.length / ctx.sampleRate; if (quiet > 3) V.stop(); }
-        if (Date.now() - rec.t0 > (cb.keep ? 90000 : 29000)) V.stop();
+        if (!cb.keep && Date.now() - rec.t0 > 29000) V.stop();
+        else if (cb.keep && Date.now() - rec.ct > 80000) chunk(rec);   // №616 · длинная диктовка: каждые ~80 с кусок уходит на распознавание, запись идёт дальше
+        if (cb.keep && Date.now() - rec.t0 > 1800000) V.stop();
       };
       rec.src.connect(rec.pr); rec.pr.connect(ctx.destination);
       if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
@@ -74,6 +76,20 @@
     });
   };
 
+  /* №616 · куски длинной записи: распознаём по порядку, текст склеиваем при остановке */
+  function pcm64(bufs, rate) {
+    var n = 0; bufs.forEach(function (b) { n += b.length; }); if (n < rate * 0.4) return '';
+    var all = new Float32Array(n), o = 0; bufs.forEach(function (b) { all.set(b, o); o += b.length; });
+    var k = rate / 16000, m = Math.floor(n / k), pcm = new Int16Array(m);
+    for (var i = 0; i < m; i++) { var s = all[Math.floor(i * k)]; s = Math.max(-1, Math.min(1, s)); pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff; }
+    var u8 = new Uint8Array(pcm.buffer), bin = '', CH = 0x8000;
+    for (var j = 0; j < u8.length; j += CH) bin += String.fromCharCode.apply(null, u8.subarray(j, j + CH));
+    return btoa(bin);
+  }
+  function chunk(r) {
+    var bufs = r.bufs; r.bufs = []; r.ct = Date.now(); var b64 = pcm64(bufs, r.ctx.sampleRate); if (!b64) return;
+    r.parts.push(api('sp_hear', { pcm: b64 }).then(function (x) { return x && x.ok ? String(x.text || '').trim() : ''; }).catch(function () { return ''; }));
+  }
   /* закончить: у телефона — «хватит слушать», в браузере — отправить запись на распознавание */
   V.stop = function () {
     if (native) { STOP = true; try { AndroidSpeech.stopListen(); } catch (e) {} setTimeout(function () { if (native) done(); }, 1500); return; }
@@ -84,6 +100,13 @@
     var rate = r.ctx.sampleRate; try { r.ctx.close(); } catch (e) {}
     if (r.peak < 0.004) { if (cb.error) cb.error('Микрофон молчит — проверьте, что разрешён доступ к микрофону'); return; }
     var n = 0; r.bufs.forEach(function (b) { n += b.length; });
+    if (r.parts && r.parts.length) {   // №616 · были куски — дораспознаём хвост и склеиваем по порядку
+      var tail = n >= rate * 0.4 ? pcm64(r.bufs, rate) : '';
+      if (tail) r.parts.push(api('sp_hear', { pcm: tail }).then(function (x) { return x && x.ok ? String(x.text || '').trim() : ''; }).catch(function () { return ''; }));
+      if (cb.busy) cb.busy();
+      Promise.all(r.parts).then(function (L) { var t = L.filter(Boolean).join(' ').trim(); if (cb.final) cb.final(t); });
+      return;
+    }
     if (n < rate * 0.4) { if (cb.error) cb.error('Слишком коротко — скажите ещё раз'); return; }
     var all = new Float32Array(n), o = 0; r.bufs.forEach(function (b) { all.set(b, o); o += b.length; });
     var k = rate / 16000, m = Math.floor(n / k), pcm = new Int16Array(m);

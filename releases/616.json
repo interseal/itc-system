@@ -1,0 +1,20 @@
+{
+ "n": 616,
+ "title": "Фил и Космос: диктовка не теряет слова",
+ "what": [
+  "Длинная диктовка: недоговорённый кусок фразы больше не пропадает при нажатии «Отправить».",
+  "Распознавание перезапускается без паузы — слова между фразами не теряются.",
+  "Без приложения (в браузере) диктовка больше не обрывается через 90 секунд: длинная запись распознаётся частями и склеивается."
+ ],
+ "files": [
+  "store/apps/fil/voice.js",
+  "store/apps/kosmos/voice.js",
+  "store/apps/fil/index.html",
+  "store/apps/kosmos/index.html",
+  "store/apps/crm/index.html",
+  "store/apps/draw/index.html",
+  "store/apps/fil/sw.js",
+  "store/apps/kosmos/sw.js"
+ ],
+ "kosmos": false
+}
