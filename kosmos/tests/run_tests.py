@@ -645,6 +645,9 @@ try:
     check('шлюз: снимка нет — 409 need_images (магазин пришлёт целиком)', c == 409 and j.get('need_images') == ['f' * 64], (c, j))
     r = subprocess.run(['php', f'{ROOT}/tests/ff_ocr_test.php'], capture_output=True, text=True, timeout=60)
     check('магазин: отпечатки снимков, распознавание после ответа, одно соединение — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
+    print('27. Ответы не обрываются (№628): история разговора целиком, результаты инструментов 8000, max_tokens — повтор, озвучка целиком')
+    r = subprocess.run(['php', f'{ROOT}/tests/talk_cut_test.php'], capture_output=True, text=True, timeout=60)
+    check('история 3 реплики целиком / 4000, Claude и DeepSeek без обрывков, озвучка 12000 — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

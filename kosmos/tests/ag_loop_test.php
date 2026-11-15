@@ -17,10 +17,10 @@ foreach (['store/api/flow.php', 'store/api/kosmos_flow.php'] as $fn) {
 $src = (string)file_get_contents("$root/store/api/flow.php");
 $a = strpos($src, 'function ag_calls(');   // №626 · ag_calls лежит прямо перед ag_run
 $b = strpos($src, "\n}\n", strpos($src, 'function ag_run(', $a));
-preg_match_all('~^const (AG_REPEAT|AG_STALL|AG_MAX_STEPS|AG_BG_STEPS|AG_MULTI|AG_DYN|AG_FAST_RULES)\b[^\n]*~m', $src, $cm);
+preg_match_all('~^const (AG_REPEAT|AG_STALL|AG_MAX_STEPS|AG_BG_STEPS|AG_MULTI|AG_DYN|AG_FAST_RULES|AG_TOOL_CUT|AG_TOOL_CUT_BG|AG_TOOL_KEEP|AG_TOOL_OLD|AG_ANS_TOK)\b[^\n]*~m', $src, $cm);
 foreach (['FIL_SELF', 'FIL_CORE', 'FIL_KP', 'FIL_CATALOG', 'FE_RULES', 'PL_RULES', 'FIL_SEARCH', 'CRM_RULES', 'RB_RULES', 'FIL_EX', 'FIL_LAST', 'AG_BG_RULES', 'AG_TASK_RULES', 'AG_DEEP_RULES'] as $c) define($c, '');
 eval(implode("\n", $cm[0]) . "\n");
-function ag_tools($me, $ctx) { return ['web' => ['{"q":""}', function ($a) { return $GLOBALS['TOOL_OUT'] === 'same' ? 'ничего не нашёл' : 'нашёл: ' . json_encode($a, JSON_UNESCAPED_UNICODE) . ' ' . (++$GLOBALS['N']); }]]; }
+function ag_tools($me, $ctx) { return ['web' => ['{"q":""}', function ($a) { return is_int($GLOBALS['TOOL_OUT']) ? str_repeat('я', $GLOBALS['TOOL_OUT']) . 'КОНЕЦ' : ($GLOBALS['TOOL_OUT'] === 'same' ? 'ничего не нашёл' : 'нашёл: ' . json_encode($a, JSON_UNESCAPED_UNICODE) . ' ' . (++$GLOBALS['N'])); }]]; }
 function fl_staff() { return []; } function fil_io($p, $n) { return ''; } function fil_boss_io() { return 'Алексей Николаевич'; }
 function pl_loc($a, $b, $c) { return '1'; } function pl_tz() { return 'Europe/Moscow'; } function fil_memo() { return ''; } function fil_learn() { return ''; }
 function ag_peer_block($me) { return '[ДЕЛА НАПАРНИКА]'; } function nvk_block($t) { return '[НАВЫКИ]'; } function sp_get($k) { return ''; }
@@ -71,6 +71,19 @@ run(function ($n, $u) { return ['do' => 'answer', 'say' => 'ок']; });
 $sys = $GLOBALS['SYS']; $p = strpos($sys, AG_DYN);
 t('правила: время, дела напарника и навыки — после метки', $p > 0 && strpos($sys, 'СЕЙЧАС У ЧЕЛОВЕКА', $p) !== false && strpos($sys, '[ДЕЛА НАПАРНИКА]', $p) !== false && strpos($sys, '[НАВЫКИ]', $p) !== false && strpos(substr($sys, 0, $p), 'СЕЙЧАС У ЧЕЛОВЕКА') === false, $p);
 t('правила: «несколько сразу через tools» и «простое — сразу» есть в промпте', strpos($sys, '"tools":[') !== false && strpos($sys, 'БЫСТРО, ГДЕ МОЖНО') !== false);
+
+// 8) №628 · результаты инструментов: в разговоре до 8000 знаков (было 4000), последние 8 — целиком, ранние — до 3000; фон — до 10000
+[$j, $tr] = run(function ($n, $u) { return $n === 1 ? ['tool' => 'web', 'args' => ['q' => 'статус']] : ['do' => 'answer', 'say' => 'ок']; }, [], 7000);
+t('разговор: результат 7000 знаков доходит до модели целиком (раньше резался на 4000)', strpos(end($GLOBALS['ASKED']), 'КОНЕЦ') !== false && strpos(end($GLOBALS['ASKED']), '(обрезано)') === false);
+[$j, $tr] = run(function ($n, $u) { return $n === 1 ? ['tool' => 'web', 'args' => ['q' => 'статус']] : ['do' => 'answer', 'say' => 'ок']; }, [], 20000);
+$u = end($GLOBALS['ASKED']); preg_match('~РЕЗУЛЬТАТ web: "(я+)~u', $u, $mm);
+t('разговор: огромный результат режется на 8000 с пометкой', strpos($u, '…(обрезано)') !== false && mb_strlen($mm[1] ?? '') === AG_TOOL_CUT - 1, mb_strlen($mm[1] ?? ''));
+[$j, $tr] = run(function ($n, $u) { return $n === 1 ? ['tool' => 'web', 'args' => ['q' => 'статус']] : ['do' => 'answer', 'say' => 'ок']; }, ['bg' => true], 9500);
+t('фон: результат 9500 знаков — целиком (предел 10000)', strpos(end($GLOBALS['ASKED']), 'КОНЕЦ') !== false);
+[$j, $tr] = run(function ($n, $u) { return $n <= 10 ? ['tool' => 'web', 'args' => ['q' => 'q' . $n]] : ['do' => 'answer', 'say' => 'ок']; }, [], 5000);
+$u = end($GLOBALS['ASKED']);
+t('разговор: последние 8 результатов целиком, 2 ранних — до 3000', substr_count($u, 'КОНЕЦ') === 8 && substr_count($u, '…(ранний результат сокращён)') === 2, [substr_count($u, 'КОНЕЦ'), substr_count($u, 'ранний')]);
+t('запас на ответ модели — 4000 токенов (было 2500)', AG_ANS_TOK === 4000 && strpos($src, 'AG_ANS_TOK, true);') !== false);
 
 echo "Итого: $ok ✓, $bad ✗\n";
 exit($bad ? 1 : 0);

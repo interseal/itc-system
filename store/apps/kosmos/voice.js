@@ -127,7 +127,7 @@
   /* сказать вслух */
   /* №626 · текст → куски для озвучки: первый — короткий (первое предложение), дальше — до 240 знаков (столько Яндекс берёт за раз) */
   V.ttsParts = function (text) {
-    var t = String(text || '').replace(/\s+/g, ' ').trim().substr(0, 1800); if (!t) return [];
+    var t = String(text || '').replace(/\s+/g, ' ').trim().substr(0, 12000); if (!t) return [];   // №628 · было 1800 знаков и 8 кусков — длинный ответ обрывался на середине
     var ss = t.match(/[^.!?…;:]+(?:[.!?…;:]+|$)\s*/g) || [t], out = [], cur = '';
     ss.forEach(function (x) {
       x = x.trim(); if (!x) return;
@@ -137,7 +137,7 @@
       if (!out.length && cur.length >= 40) { out.push(cur); cur = ''; }   // первое предложение — сразу отдельным куском
     });
     if (cur) out.push(cur);
-    return out.slice(0, 8);
+    return out.slice(0, 80);
   };
   var cur = null, SEQ = 0;
   /* №29 · звук Космоса: можно выключить совсем (запоминается) и остановить на полуслове */
@@ -180,9 +180,12 @@
     // №626 · озвучка кусками: первое предложение заказываем отдельно и начинаем читать, как только оно готово;
     // остальные куски Яндекс готовит одновременно, пока звучит первый (раньше ждали, пока озвучится весь ответ).
     var parts = V.ttsParts(text); if (!parts.length) return;
-    var reqs = parts.map(function (p) { return api('sp_say', voice ? { text: p, voice: voice } : { text: p }).catch(function () { return null; }); });
+    // №628 · куски заказываются по мере чтения — на 4 вперёд (длинный ответ не шлёт десятки запросов разом)
+    var reqs = [];
+    function need(i) { for (var k = i; k < Math.min(parts.length, i + 4); k++) if (!reqs[k]) { var p = parts[k]; reqs[k] = api('sp_say', voice ? { text: p, voice: voice } : { text: p }).catch(function () { return null; }); } }
     function play(i) {
-      if (i >= reqs.length) { V.talking(false); return; }
+      if (i >= parts.length) { V.talking(false); return; }
+      need(i);
       reqs[i].then(function (r) {
         if (my !== SEQ || mute()) return;        // пока ждали голос — нажали «замолчать»
         if (!(r && r.ok)) { if (i === 0 && r && /не подключ/i.test(r.error || '')) phone(); else play(i + 1); return; }

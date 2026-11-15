@@ -290,12 +290,15 @@ function ds_balance($fresh = false) {
   sp_put('ds_bal', json_encode($o, JSON_UNESCAPED_UNICODE), 'сервер'); return $o;
 }
 function ds_ask($model, $sys, $user, $maxTok) {
+  $mt = min(16000, max(4000, $maxTok * 2)); $long = false;
   for ($try = 0; $try < 2; $try++) {   // №621: ответ не разобрался (теги <invoke>, мусор) — одна повторная попытка с напоминанием
-    $req = json_encode(['model' => $model, 'temperature' => 0.3, 'max_tokens' => min(16000, max(4000, $maxTok * 2)), 'stream' => false,
+    $req = json_encode(['model' => $model, 'temperature' => 0.3, 'max_tokens' => $mt, 'stream' => false,
       'messages' => [['role' => 'system', 'content' => $sys], ['role' => 'user', 'content' => $user . ($try ? ITCAI_ONE_JSON : '')]]], JSON_UNESCAPED_UNICODE);
     [$http, $r] = itcai_post('https://api.deepseek.com/chat/completions', $req, ['Content-Type: application/json', 'Authorization: Bearer ' . ds_key()], 110);
     if ($http !== 200) { $em = (string)(json_decode($r, true)['error']['message'] ?? ''); return [null, 'DeepSeek ' . $model . ': ошибка ' . ($http ?: 'связи') . ($em !== '' ? ' — ' . mb_substr($em, 0, 140) : '')]; }
     $t = trim(preg_replace('~<think>.*?</think>~s', '', (string)(json_decode($r, true)['choices'][0]['message']['content'] ?? '')));
+    /* №628 · ответ упёрся в предел длины — не показываем обрывок, а один раз просим заново с запасом 16000 */
+    if ((string)(json_decode($r, true)['choices'][0]['finish_reason'] ?? '') === 'length' && !$long && $mt < 16000) { $long = true; $mt = 16000; $try--; continue; }
     $j = $t !== '' ? itcai_step($t) : null;
     if ($j) { $j['_model'] = 'DeepSeek напрямую · ' . $model; return [$j, '']; }
     error_log('flow ai: DeepSeek ' . $model . ' ответ без разметки: ' . mb_substr($t, 0, 400));
@@ -312,9 +315,10 @@ function fl_ai($sys, $user, $maxTok = 1500, $soft = false) {
   for ($try = 0; $try < 2; $try++) {
     [$txt, $err, $real] = ks_gw_ask($sys, $user . ($try ? ITCAI_ONE_JSON : ''), $mt, $model, $GLOBALS['me'] ?? []);
     if ($txt === null) break;
-    $j = ks_ai_json($txt);
+    $j = ks_ai_json($txt); $stop = (string)($GLOBALS['KS_STOP'] ?? '');
+    // №628: ответ упёрся в max_tokens, но разобрался (простой текст без JSON) — это обрывок; просим заново с запасом 16000
+    if ($j && $stop === 'max_tokens' && $mt < 16000) { $mt = 16000; $try--; continue; }
     if ($j) { $j['_model'] = $real !== '' ? $real : fil_model_name($model); return $j; }
-    $stop = (string)($GLOBALS['KS_STOP'] ?? '');
     $err = 'Claude: ' . ($stop === 'max_tokens' ? 'ответ не уместился' : (trim((string)$txt) === '' ? 'пустой ответ' : 'ответ без разметки'));
     error_log('kosmos ai: ' . $err . ' [' . $stop . '] ' . mb_substr((string)$txt, 0, 600));
     if ($stop === 'max_tokens') $mt = 16000;
@@ -1794,6 +1798,14 @@ const AG_REPEAT = 3; const AG_STALL = 12;
 /* №626 · скорость ответа: несколько независимых инструментов за один ход (каждый считается в лимит шагов);
    переменная часть правил — после AG_DYN (постоянная часть берётся из кеша модели) */
 const AG_MULTI = 4;
+/* №628 · ответы «Космоса» обрывались: в «РАЗГОВОР ДО ЭТОГО» прошлые реплики помощника шли обрезанными до 700 знаков,
+   и он сам считал свой прошлый ответ оборванным и переспрашивал вместо «Да — делаю». Теперь последние AG_TALK_FULL реплик
+   целиком (страховка AG_TALK_MAX), более ранние — до AG_TALK_CUT; вопрос человека — до AG_TALK_SAID.
+   Результаты инструментов: до AG_TOOL_CUT (фон — AG_TOOL_CUT_BG) знаков, было 4000/6000; в разговоре последние AG_TOOL_KEEP —
+   целиком, более ранние — до AG_TOOL_OLD (чтобы длинный разговор не раздувал расход). */
+const AG_TALK_FULL = 3; const AG_TALK_CUT = 4000; const AG_TALK_MAX = 12000; const AG_TALK_SAID = 1500;
+const AG_TOOL_CUT = 8000; const AG_TOOL_CUT_BG = 10000; const AG_TOOL_KEEP = 8; const AG_TOOL_OLD = 3000;
+const AG_ANS_TOK = 4000;   // №628 · запас на ответ модели (было 2500; платится только написанное — расход не растёт)
 const AG_DYN = "\n\n=== ПО ЭТОМУ ЗАПРОСУ ===";
 const AG_FAST_RULES = "\nБЫСТРО, ГДЕ МОЖНО: приветствие, благодарность, «как дела», вопрос о тебе, просьба повторить или пояснить твой прошлый ответ — отвечай сразу, без инструментов. Нужны данные из нескольких мест — запроси их одним ходом через \"tools\", а не по очереди. Глубину проверки это не отменяет: где нужны данные — смотри их.";
 /* №550 · думать глубоко и широко — одинаково у Космоса и у «Космоса» */
@@ -2327,6 +2339,16 @@ function ag_col($t, $c) { static $cache = []; $k = "$t.$c"; if (!isset($cache[$k
 
 /* один разговор с Космосом: думает → смотрит → … → отвечает или действует */
 /* №626 · шаг модели → список вызовов [['tool'=>имя, 'args'=>[…]], …]: {"tool":…} или {"tools":[{"tool":…,"args":…}, …]}; пусто — это ответ */
+/* №628 · история разговора для модели: $hh — реплики от новой к старой (как из базы, ORDER BY id DESC) */
+function ag_talk($hh) {
+  $n = count($hh); $o = '';
+  foreach (array_reverse($hh) as $k => $h) {
+    $r = (string)$h['reply']; $full = $k >= $n - AG_TALK_FULL; $lim = $full ? AG_TALK_MAX : AG_TALK_CUT;
+    if (mb_strlen($r) > $lim) $r = mb_substr($r, 0, $lim) . '…(дальше в этой реплике сокращено при пересылке — сам ответ был полным)';
+    $o .= 'Сотрудник: ' . mb_substr((string)$h['said'], 0, AG_TALK_SAID) . "\nКосмос: " . $r . "\n";
+  }
+  return $o;
+}
 function ag_calls($j) {
   if (!is_array($j)) return [];
   if (!empty($j['tool']) && is_string($j['tool'])) return [['tool' => $j['tool'], 'args' => is_array($j['args'] ?? null) ? $j['args'] : []]];
@@ -2387,7 +2409,7 @@ function ag_run($me, $ctx, $text, $talk = '', $opt = []) {
     . FIL_LAST;
   $GLOBALS['FIL_MODEL'] = $GLOBALS['FIL_MODEL'] ?? sp_get('ks_model');
   $head = ($talk !== '' ? "РАЗГОВОР ДО ЭТОГО (последние реплики — помни контекст, новый вопрос может продолжать старый):\n" . $talk . "\n\n" : '') . ($bg ? 'ФОНОВАЯ ЗАДАЧА: ' : 'НОВЫЙ ЗАПРОС: ') . $text;
-  $ent = $opt['ent'] ?? []; $trace = array_column($ent, 'n'); $keep = $bg ? 8 : 99; $cut = $bg ? 6000 : 4000;
+  $ent = $opt['ent'] ?? []; $trace = array_column($ent, 'n'); $keep = $bg ? 8 : AG_TOOL_KEEP; $cut = $bg ? AG_TOOL_CUT_BG : AG_TOOL_CUT;   // №628 · было 4000/6000, в разговоре все результаты целиком
   $imgs = $GLOBALS['FC_IMGS'] ?? [];   // №623 · снимки видит Claude · №624: в разговоре — на всех шагах, в фоновой задаче — на первых 12
   /* №624 · защита от зацикливания и от работы без толку (считаем и по уже сделанным шагам фоновой задачи) */
   $rep = 0; $stall = 0; $seen = []; $prev = '';
@@ -2401,10 +2423,10 @@ function ag_run($me, $ctx, $text, $talk = '', $opt = []) {
     if ($bg && !empty($opt['stop']) && ($opt['stop'])()) return [['do' => 'answer', 'say' => 'Остановил задачу по вашей просьбе.'], $trace];
     $late = $bg && !empty($opt['until']) && time() > $opt['until'];
     $hist = $head; $nE = count($ent);
-    foreach ($ent as $i => $e) $hist .= "\n\nТЫ: " . ($i < $nE - 60 ? mb_substr($e['j'], 0, 200) : $e['j']) . "\nРЕЗУЛЬТАТ " . $e['n'] . ': ' . ($i < $nE - $keep ? mb_substr($e['o'], 0, $i < $nE - 60 ? 100 : 300) . '…(старый результат сокращён — что важно, уже занесено)' : $e['o']);   // №624: очень старые шаги — короче (400 шагов не раздувают запрос)
+    foreach ($ent as $i => $e) $hist .= "\n\nТЫ: " . ($i < $nE - 60 ? mb_substr($e['j'], 0, 200) : $e['j']) . "\nРЕЗУЛЬТАТ " . $e['n'] . ': ' . ($i < $nE - $keep ? (!$bg ? (mb_strlen($e['o']) > AG_TOOL_OLD ? mb_substr($e['o'], 0, AG_TOOL_OLD) . '…(ранний результат сокращён)' : $e['o']) : mb_substr($e['o'], 0, $i < $nE - 60 ? 100 : 300) . '…(старый результат сокращён — что важно, уже занесено)') : $e['o']);   // №624: очень старые шаги — короче (400 шагов не раздувают запрос) · №628: в разговоре ранние — до AG_TOOL_OLD
     $last = $step >= $max || $late || $why !== '';
     if ($why !== '') $GLOBALS['FC_IMGS'] = [];
-    $j = fl_ai($sys, $hist . ($why !== '' ? "\n\nСТОП, нет продвижения: " . $why . '.' : '') . ($last ? "\n\nИнструменты больше нельзя — ответь по тому, что уже узнал и сделал" . ($why !== '' ? ', и честно скажи, чего не удалось найти и почему.' : '.') : ''), 2500, true);
+    $j = fl_ai($sys, $hist . ($why !== '' ? "\n\nСТОП, нет продвижения: " . $why . '.' : '') . ($last ? "\n\nИнструменты больше нельзя — ответь по тому, что уже узнал и сделал" . ($why !== '' ? ', и честно скажи, чего не удалось найти и почему.' : '.') : ''), AG_ANS_TOK, true);   // №628 · было 2500
     if (!is_array($j)) return [null, $trace];
     if ($why !== '') {   // №624 · остановились из-за зацикливания — причину видит человек
       $pre = ($bg ? 'Остановил задачу: нет продвижения — ' : 'Остановился: ') . $why . '.';
@@ -4239,7 +4261,7 @@ try {
     $CONV = fm_conv_for($me, fl_in('conv', 'old'), $t);      // №50: каждый разговор — отдельно, Космос помнит его целиком
     $talk = ''; try { if ($CONV !== '') { $q = db()->prepare("SELECT said,reply FROM itc_ks_log WHERE phone=? AND conv_id=? AND kind<>'deal_voice' ORDER BY id DESC LIMIT 8"); $q->execute([$me['phone'], $CONV]); }
       else { $q = db()->prepare("SELECT said,reply FROM itc_ks_log WHERE phone=? AND kind<>'deal_voice' AND created_at > NOW() - INTERVAL 3 HOUR ORDER BY id DESC LIMIT 6"); $q->execute([$me['phone']]); }
-      $hh = $q->fetchAll(); foreach (array_reverse($hh) as $h) $talk .= 'Сотрудник: ' . mb_substr($h['said'], 0, 400) . "\nКосмос: " . mb_substr($h['reply'], 0, 700) . "\n";
+      $hh = $q->fetchAll(); $talk = ag_talk($hh);   // №628 · свои прошлые ответы помощник видит целиком (было 700 знаков)
       if (!$GLOBALS['FC_IMGS'] && defined('KS_MODEL0')) {   // №623 · вопрос о снимке, приложенном раньше («что я подсветил?») — «Космос» снова видит сам снимок (последние 4 реплики)
         $pid = []; foreach (array_slice($hh, 0, 4) as $h) $pid = array_merge($pid, ff_ids_in($h['said']));
         if ($pid) { $GLOBALS['FC_IMGS'] = ff_attach_imgs($me, array_slice(array_unique($pid), 0, FF_IMG_MAX)); $att .= ff_imgs_note($GLOBALS['FC_IMGS'], true); }
