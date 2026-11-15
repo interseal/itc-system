@@ -410,7 +410,7 @@ try:
     zb = urllib.request.urlopen(urllib.request.Request(f'{STORE}/api/kosmos.php?a=upd_get&n=9010&t=boss-t'), timeout=30).read(); z = zipfile.ZipFile(io.BytesIO(zb))
     vj = json.loads(z.read('store/app/fil/version.json'))
     check('в обновлении APK и version.json по адресам приложений', {'store/app/fil/itc-fil.apk', 'store/app/kosmos/itc-kosmos.apk', 'store/app/kosmos/version.json'} <= set(z.namelist())
-          and vj['code'] == 27 and vj['name'] == '2.2.4' and vj['url'] == 'https://itcpartner.store/app/fil/itc-fil.apk' and vj['notes'] == 'Быстрее открывается', (z.namelist(), vj))
+          and vj['code'] == 27 and vj['name'] == '2.2.4' and vj['url'] == 'https://itcpartner.store/app/fil/itc-fil.apk?v=27' and vj['notes'] == 'Быстрее открывается', (z.namelist(), vj))
     log_all = open(f'{TMP}/rel/android/9010/ok.json').read() + r.stdout + r.stderr
     check('пароли и ключ нигде не записаны', 'storepw-123456' not in log_all and 'keypw-654321' not in log_all and KS not in log_all)
     json.dump({'n': 9011, 'title': 'Сломанная сборка', 'what': [], 'files': [], 'kosmos': False, 'android': {'apps': ['fil'], 'code': 28, 'name': '2.2.5'}}, open(f'{GD}/releases/9011.json', 'w'), ensure_ascii=False)

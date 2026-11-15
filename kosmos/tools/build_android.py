@@ -247,7 +247,7 @@ def main():
         m = re.search(r'certificate SHA-256 digest:\s*([0-9a-f]{64})', v.stdout)
         if v.returncode != 0 or not m: raise SystemExit(f'{x}: файл не подписан — такое приложение не обновится у людей')
         certs.add(m.group(1))
-        dst = store_path(fl[x]); url = fl[x].rsplit('/', 1)[0] + f'/itc-{x}.apk'
+        dst = store_path(fl[x]); url = fl[x].rsplit('/', 1)[0] + f'/itc-{x}.apk?v={a.code}'   # №607 · ?v= — телефон не возьмёт старый файл из памяти
         size = os.path.getsize(apk)
         vj = {'code': a.code, 'name': a.name, 'size': mb(size), 'url': url, 'notes': a.notes or 'Новая версия приложения.'}
         if x == 'sklad': vj['notes_zh'] = '仓库App新版本，请更新。'
