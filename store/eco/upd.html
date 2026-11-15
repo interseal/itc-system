@@ -476,7 +476,9 @@ function rdDraw(){
   // а №591 было собрано после №567 — кнопки не было, хотя ставить можно (сервер тоже принимает needs ≤ установленного).
   // Из подходящих — самое новое; ставить его безопасно: оно собрано позже установленного.
   var ok = list.filter(function(y){ return !y.needs || y.needs <= cur; }).sort(function(a, b){ return a.n - b.n; });
-  var hidden = list.length - ok.length; list = ok.length ? [ok[ok.length - 1]] : [];
+  // №608 · строго по порядку: следующее после установленного (самое раннее из подходящих). 15.11 «самое новое» перепрыгнуло
+  // через №604–605 (Android-группы не накопительные) — новые приложения Фила, Космоса и др. на хостинг не попали.
+  var hidden = list.length - ok.length; list = ok.length ? [ok[0]] : [];
   if (list.length) {
     var x = list[0], can = true;
     h += '<div class="note" style="margin-top:12px"><b>Готово к установке: обновление №' + x.n + '</b> — ' + esc(x.title) + (x.by ? '<br>' + byTag(x.by) : '') + (x.what && x.what.length ? '<ul style="margin:6px 0 0 18px;padding:0">' + x.what.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '')
