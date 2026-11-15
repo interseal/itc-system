@@ -104,8 +104,20 @@ function ks_gw_ask($sys, $user, $maxTok, $model, $me) {
 function ks_ai_json($txt) {
   $t = trim(preg_replace('~<think>.*?</think>~s', '', (string)$txt));
   $t = trim(preg_replace('~^[ \t]*```[a-zA-Z]*[ \t]*$~m', '', $t));
+  if (function_exists('itcai_clean')) {   // №621 · служебные теги (<invoke…>, </invoke>, <function_calls>, <parameter…>) — вон
+    $raw = $t; $t = itcai_clean($t);
+    $inv = $raw !== $t ? itcai_invoke($raw) : null;   // вызов инструмента тегами вместо JSON → обычный {"tool":…}
+    if ($t === '' || strpos($t, '{') === false) { if ($inv) return $inv; }
+    else { $j = itcai_step_clean(ks_ai_json_obj($t)); if ($j) return $j; if ($inv) return $inv; return null; }
+    if ($t === '') return null;
+    return ['do' => 'answer', 'say' => $t];
+  }
   if ($t === '') return null;
   if (strpos($t, '{') === false) return ['do' => 'answer', 'say' => $t];
+  return ks_ai_json_obj($t);
+}
+/* Первый целый объект {…} из текста (с починкой переводов строк внутри строк). */
+function ks_ai_json_obj($t) {
   $n = strlen($t); $a = strpos($t, '{');
   while ($a !== false) {
     $d = 0; $in = false; $esc = false; $end = -1;

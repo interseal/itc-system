@@ -73,6 +73,53 @@ function itcai_json($txt) {
   return is_array($j) ? $j : null;
 }
 
+/* №621 · Служебные теги вызова инструментов (<function_calls>, <invoke…>, <parameter…>, <invoke_placeholder…> и т. п.)
+   иногда попадают в текст ответа модели. Человеку их не показываем и в журнал не пишем. */
+const ITCAI_TAGS = '(?:[a-z_]+:)?(?:function_calls|function_results|invoke_placeholder|invoke|parameter|tool_use|tool_call|tool_calls|tool_result)';
+function itcai_clean($txt) {
+  $t = (string)$txt;
+  if (strpos($t, '<') === false) return trim($t);
+  for ($i = 0; $i < 4; $i++) {   // парные блоки вместе с содержимым (вложенные — за несколько проходов)
+    $n = preg_replace('~<(' . ITCAI_TAGS . ')\b[^>]*>(?:(?!<\1\b).)*?</\1\s*>~si', '', $t);
+    if ($n === null || $n === $t) break; $t = $n;
+  }
+  $t = (string)preg_replace('~<(?:[a-z_]+:)?parameter\b[^>]*>[^<]*$~si', '', $t);   // оборванный в конце параметр — вместе со значением
+  $t = (string)preg_replace('~</?' . ITCAI_TAGS . '\b[^>]*(?:>|$)~si', '', $t);   // одиночные и оборванные теги
+  $t = (string)preg_replace('~[ \t]+\n~', "\n", $t);
+  $t = (string)preg_replace('~\n{3,}~', "\n\n", $t);
+  return trim($t);
+}
+/* №621 · Модель вернула вызов в виде <invoke name="X"><parameter name="k">v</parameter></invoke> вместо JSON →
+   обычный шаг {"tool":"X","args":{k:v}}. Нет такого вызова — null. */
+function itcai_invoke($txt) {
+  if (!preg_match('~<(?:[a-z_]+:)?invoke\s+name\s*=\s*["\']([A-Za-z][A-Za-z0-9_.-]{0,60})["\'][^>]*>(.*?)(?:</(?:[a-z_]+:)?invoke\s*>|$)~si', (string)$txt, $m)) return null;
+  $args = [];
+  if (preg_match_all('~<(?:[a-z_]+:)?parameter\s+name\s*=\s*["\']([^"\'<>]{1,60})["\'][^>]*>(.*?)</(?:[a-z_]+:)?parameter\s*>~si', $m[2], $ps, PREG_SET_ORDER))
+    foreach ($ps as $p) {
+      $v = trim($p[2]); $d = preg_match('~^(?:[\[{"]|-?\d|true$|false$|null$)~', $v) ? json_decode($v, true) : null;
+      $args[trim($p[1])] = ($d !== null || $v === 'null') ? $d : $v;
+    }
+  return ['tool' => $m[1], 'args' => $args];
+}
+/* №621 · Шаг помощника («Фил», «Космос») после разбора: чистим say и другие тексты от служебных тегов.
+   Ответ/вопрос, в котором после очистки ничего не осталось, — неудача разбора (null). */
+function itcai_step_clean($j) {
+  if (!is_array($j)) return null;
+  if (!empty($j['tool'])) return $j;
+  foreach (['say', 'text', 'what', 'note', 'log', 'think'] as $k) if (isset($j[$k]) && is_string($j[$k])) $j[$k] = itcai_clean($j[$k]);
+  $do = (string)($j['do'] ?? '');
+  if (($do === 'answer' || $do === 'ask' || ($do === '' && array_key_exists('say', $j) && count($j) === 1)) && trim((string)($j['say'] ?? '')) === '') return null;
+  return $j;
+}
+/* №621 · Текст ответа модели → шаг: JSON из очищенного текста; нет JSON — вызов <invoke>; иначе null. */
+function itcai_step($txt) {
+  $t = trim(preg_replace('~<think>.*?</think>~s', '', (string)$txt));
+  $j = itcai_step_clean(itcai_json(itcai_clean($t)));
+  if ($j) return $j;
+  return itcai_invoke($t);
+}
+const ITCAI_ONE_JSON = "\n\nВНИМАНИЕ: прошлый ответ не разобрался. Верни строго один JSON-объект в том виде, как просили выше, — без текста вокруг и без тегов <invoke>, <function_calls>, <parameter>.";
+
 function itcai_err_text() { return 'DeepSeek: ' . implode(', ', $GLOBALS['ITCAI_ERR'] ?? []); }
 
 /* Простой кэш в файлах: ключ → массив, со сроком жизни. */

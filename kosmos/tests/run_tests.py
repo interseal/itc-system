@@ -547,6 +547,9 @@ try:
     c, j = call('dev_limit', B, {'limit': '2'}); c, j = call('dev_add', B, {'text': 'Ещё одно поручение на сегодня', 'model': 'opus'})
     check('лимит расходов в день — поручение не принимается', c == 400 and 'Лимит' in j.get('error', ''), j)
     c, j = call('dev', B); check('ключ записи в GitHub создан и показан руководителю', j['state'].get('pub', '').startswith('ssh-ed25519'), j['state'])
+    print('22. «Фил» и «Космос»: служебные теги <invoke…> не попадают в ленту (№621)')
+    r = subprocess.run(['php', f'{ROOT}/tests/ai_clean_test.php'], capture_output=True, text=True, timeout=60)
+    check('очистка ответа и разбор <invoke name=…> — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-1500:] + r.stderr[-500:])
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

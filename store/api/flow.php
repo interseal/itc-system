@@ -281,15 +281,20 @@ function ds_balance($fresh = false) {
   sp_put('ds_bal', json_encode($o, JSON_UNESCAPED_UNICODE), 'сервер'); return $o;
 }
 function ds_ask($model, $sys, $user, $maxTok) {
-  $req = json_encode(['model' => $model, 'temperature' => 0.3, 'max_tokens' => min(16000, max(4000, $maxTok * 2)), 'stream' => false,
-    'messages' => [['role' => 'system', 'content' => $sys], ['role' => 'user', 'content' => $user]]], JSON_UNESCAPED_UNICODE);
-  [$http, $r] = itcai_post('https://api.deepseek.com/chat/completions', $req, ['Content-Type: application/json', 'Authorization: Bearer ' . ds_key()], 110);
-  if ($http !== 200) { $em = (string)(json_decode($r, true)['error']['message'] ?? ''); return [null, 'DeepSeek ' . $model . ': ошибка ' . ($http ?: 'связи') . ($em !== '' ? ' — ' . mb_substr($em, 0, 140) : '')]; }
-  $t = trim(preg_replace('~<think>.*?</think>~s', '', (string)(json_decode($r, true)['choices'][0]['message']['content'] ?? '')));
-  $j = $t !== '' ? itcai_json($t) : null; if (!$j) return [null, 'DeepSeek ' . $model . ': ответ без разметки'];
-  $j['_model'] = 'DeepSeek напрямую · ' . $model; return [$j, ''];
+  for ($try = 0; $try < 2; $try++) {   // №621: ответ не разобрался (теги <invoke>, мусор) — одна повторная попытка с напоминанием
+    $req = json_encode(['model' => $model, 'temperature' => 0.3, 'max_tokens' => min(16000, max(4000, $maxTok * 2)), 'stream' => false,
+      'messages' => [['role' => 'system', 'content' => $sys], ['role' => 'user', 'content' => $user . ($try ? ITCAI_ONE_JSON : '')]]], JSON_UNESCAPED_UNICODE);
+    [$http, $r] = itcai_post('https://api.deepseek.com/chat/completions', $req, ['Content-Type: application/json', 'Authorization: Bearer ' . ds_key()], 110);
+    if ($http !== 200) { $em = (string)(json_decode($r, true)['error']['message'] ?? ''); return [null, 'DeepSeek ' . $model . ': ошибка ' . ($http ?: 'связи') . ($em !== '' ? ' — ' . mb_substr($em, 0, 140) : '')]; }
+    $t = trim(preg_replace('~<think>.*?</think>~s', '', (string)(json_decode($r, true)['choices'][0]['message']['content'] ?? '')));
+    $j = $t !== '' ? itcai_step($t) : null;
+    if ($j) { $j['_model'] = 'DeepSeek напрямую · ' . $model; return [$j, '']; }
+    error_log('flow ai: DeepSeek ' . $model . ' ответ без разметки: ' . mb_substr($t, 0, 400));
+  }
+  $GLOBALS['FL_AI_BAD'] = 1; return [null, 'DeepSeek ' . $model . ': ответ без разметки'];
 }
 function fl_ai($sys, $user, $maxTok = 1500, $soft = false) {
+  $GLOBALS['FL_AI_BAD'] = 0;   // №621: 1 — модель ответила, но ответ не разобрался даже со второй попытки
   $err = ''; $fm = $GLOBALS['FIL_MODEL'] ?? '';
   if (ds_key() !== '' && ($fm === '' || strpos($fm, 'ds:') === 0)) {   // №40: сначала DeepSeek напрямую
     [$j, $err] = ds_ask($fm !== '' ? substr($fm, 3) : ds_pick(), $sys, $user, $maxTok); if ($j) return $j;
@@ -303,11 +308,16 @@ function fl_ai($sys, $user, $maxTok = 1500, $soft = false) {
   foreach ($models as $m) {
     $req = json_encode(['model' => "gpt://$YF/{$m[0]}", 'temperature' => 0.3, 'max_tokens' => $maxTok, 'stream' => false,
       'messages' => [['role' => 'system', 'content' => $sys], ['role' => 'user', 'content' => $user]]], JSON_UNESCAPED_UNICODE);
-    foreach (['Bearer ', 'Api-Key '] as $auth) {
+    $again = false;   // №621: ответ не разобрался — одна повторная попытка этой же модели с напоминанием «строго один JSON»
+    $auths = ['Bearer ', 'Api-Key '];
+    for ($ai = 0; $ai < 2; $ai++) { $auth = $auths[$ai];
       [$http, $r] = itcai_post('https://llm.api.cloud.yandex.net/v1/chat/completions', $req, ['Content-Type: application/json', 'Authorization: ' . $auth . $YK, 'OpenAI-Project: ' . $YF, 'x-folder-id: ' . $YF], 90);
       if ($http === 200) {
         $t = trim(preg_replace('~<think>.*?</think>~s', '', (string)(json_decode($r, true)['choices'][0]['message']['content'] ?? '')));
-        if ($t !== '') { $j = itcai_json($t); if ($j) { $j['_model'] = $m[1]; return $j; } $err = $m[1] . ': ответ без разметки'; break; }
+        if ($t !== '') { $j = itcai_step($t); if ($j) { $j['_model'] = $m[1]; return $j; } $err = $m[1] . ': ответ без разметки'; $GLOBALS['FL_AI_BAD'] = 1;
+          error_log('flow ai: ' . $err . ': ' . mb_substr($t, 0, 400));
+          if (!$again) { $again = true; $req = json_encode(['model' => "gpt://$YF/{$m[0]}", 'temperature' => 0.3, 'max_tokens' => $maxTok, 'stream' => false, 'messages' => [['role' => 'system', 'content' => $sys], ['role' => 'user', 'content' => $user . ITCAI_ONE_JSON]]], JSON_UNESCAPED_UNICODE); $ai--; continue; }   // тот же способ входа ещё раз
+          break; }
       } else { $em = (string)(json_decode($r, true)['error']['message'] ?? ''); $err = $m[1] . ': ошибка ' . ($http ?: 'связи') . ($em !== '' ? ' — ' . mb_substr($em, 0, 140) : '');
         if ($http === 400 && $maxTok > 1500) { $maxTok = 1500; $req = json_encode(['model' => "gpt://$YF/{$m[0]}", 'temperature' => 0.3, 'max_tokens' => $maxTok, 'stream' => false, 'messages' => [['role' => 'system', 'content' => $sys], ['role' => 'user', 'content' => $user]]], JSON_UNESCAPED_UNICODE); continue; }
         if (!in_array($http, [401, 403], true)) break; }
@@ -3251,10 +3261,10 @@ function ft_run($me, $id) {
   if (!is_array($j)) {   // ИИ не ответил — снимаем замок, продолжим позже (до 4 попыток)
     db()->prepare('UPDATE itc_fil_task SET tries=tries+1 WHERE id=?')->execute([$id]); $now['tries'] = (int)$now['tries'] + 1;
     db()->prepare("UPDATE itc_fil_task SET lock_until=NULL" . ((int)$now['tries'] >= 4 ? ", status='fail', result=?, done_at=NOW()" : '') . " WHERE id=?")
-      ->execute((int)$now['tries'] >= 4 ? ['Не смог закончить: ИИ не отвечает (' . ($GLOBALS['FL_AI_ERR'] ?? 'нет связи') . '). Найденное до этого уже в базе.', $id] : [$id]);
+      ->execute((int)$now['tries'] >= 4 ? [(!empty($GLOBALS['FL_AI_BAD']) ? 'Не смог закончить: не получилось разобрать ответ ИИ.' : 'Не смог закончить: ИИ не отвечает (' . itcai_clean($GLOBALS['FL_AI_ERR'] ?? 'нет связи') . ').') . ' Найденное до этого уже в базе.', $id] : [$id]);
     return;
   }
-  $say = trim((string)($j['say'] ?? '')) ?: 'Задачу закончил.';
+  $say = itcai_clean((string)($j['say'] ?? '')) ?: 'Задачу закончил.';   // №621
   if (!empty($j['learn'])) { $lt = fil_learn_add($me, (string)$j['learn']); if ($lt !== '') $say .= "\nЗапомнил на будущее: " . $lt; }   // №38
   $say .= nvk_take($me, $j, $trace);   // №538 · навыки
   $st = $now['status'] === 'stop' ? 'stop' : 'done';
@@ -4068,9 +4078,9 @@ try {
     $popt = ['on_pre' => function ($n, $a, $think) use ($pf, &$steps) { $steps[] = ['t' => fp_pre_line($n, $a), 'd' => fp_think($think), 'run' => 1]; fp_save($pf, $steps); },
       'on_step' => function ($ent, $n, $a, $res) use ($pf, &$steps) { $k = count($steps) - 1; if ($k >= 0) { $steps[$k]['t'] = ft_line($n, $a, $res); unset($steps[$k]['run']); } fp_save($pf, $steps); }];
     [$j, $trace] = ag_run($me, $ctx, $t . $att, $talk, $popt);      // №15: Фил сам смотрит данные (до 5 источников), потом отвечает или действует
-    if (!is_array($j)) fl_fail('Фил сейчас не ответил — ИИ вернул ошибку (' . ($GLOBALS['FL_AI_ERR'] ?? 'нет связи') . '). Попробуйте ещё раз; если повторяется — пришлите этот текст');
+    if (!is_array($j)) fl_fail(!empty($GLOBALS['FL_AI_BAD']) ? 'Не получилось ответить, повторите запрос.' : 'Фил сейчас не ответил — ИИ вернул ошибку (' . itcai_clean($GLOBALS['FL_AI_ERR'] ?? 'нет связи') . '). Попробуйте ещё раз; если повторяется — пришлите этот текст');   // №621: без технического мусора
     if (($j['do'] ?? '') === 'task') {      // №24: большая задача — в фон
-      $tid = ft_new($me, $t . $att, $j); $say = trim((string)($j['say'] ?? '')) ?: 'Взял в работу. Пришлю уведомление, когда закончу.';
+      $tid = ft_new($me, $t . $att, $j); $say = itcai_clean((string)($j['say'] ?? '')) ?: 'Взял в работу. Пришлю уведомление, когда закончу.';
       db()->prepare('INSERT INTO itc_fc_log (phone,who,said,reply,kind,deal_id) VALUES (?,?,?,?,?,?)')->execute([$me['phone'], $me['name'], $t, $say, 'task', '']); fm_tag_last($CONV);
       try { db()->prepare('UPDATE itc_fil_task SET conv_id=? WHERE id=?')->execute([$CONV, $tid]); } catch (Throwable $e) {}
       if ($pf) @unlink($pf);
@@ -4078,6 +4088,7 @@ try {
       ft_run($me, $tid); exit;
     }
     [$say, $deal, $undo] = fc_exec($me, $ctx, $j);
+    $say = itcai_clean($say); if ($say === '') $say = 'Не получилось ответить, повторите запрос.';   // №621: служебные теги не показываем и не пишем в журнал
     if (!empty($j['learn'])) { $lt = fil_learn_add($me, (string)$j['learn']); if ($lt !== '') $say .= "\nЗапомнил на будущее: " . $lt; }   // №38
     $say .= nvk_take($me, $j, $trace);   // №538 · навыки: отметить применённый, записать новый
     $say .= kp_marks() . fe_marks() . dr_marks();     // №36 КП, №42 правки сайта — кнопками под ответом
