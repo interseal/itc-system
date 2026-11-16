@@ -721,6 +721,9 @@ try:
     check('цены каждой версии — по таблице Anthropic (старые Opus/Sonnet/Haiku дороже новых)', all(json.loads(pr.get(k, 'null')) == v for k, v in exp.items()), (r.stdout, r.stderr[-300:]))
     con = sqlite3.connect(f'{TMP}/kosmos.sqlite'); lg = con.execute("SELECT what FROM log WHERE what LIKE 'gw_think%'").fetchall(); con.close()
     check('откаты записаны в журнал «Космоса» (gw_think_effort, gw_think_off)', ('gw_think_off',) in lg and ('gw_think_effort',) in lg, lg)
+    print('33. «Фил» — диспетчер китайских моделей (№634): роли фото / длинные тексты / китайский / простые ответы, запасные, отказ → DeepSeek, лимит, журнал')
+    r = subprocess.run(['php', f'{ROOT}/tests/fil_roles_test.php'], capture_output=True, text=True, timeout=120)
+    check('роли моделей «Фила»: ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-2500:] + r.stderr[-500:])
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

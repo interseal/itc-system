@@ -127,6 +127,13 @@ input[type=password]{width:100%;padding:10px;border:1px solid var(--line);border
     <div id="kbProvF"></div>
   </div>
 
+  <div class="card" id="cFr" style="font-family:Roboto,system-ui,Arial,sans-serif">
+    <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M15 9H9v6h6V9zm-2 4h-2v-2h2v2zm8-2V9h-2V7c0-1.1-.9-2-2-2h-2V3h-2v2h-2V3H9v2H7c-1.1 0-2 .9-2 2v2H3v2h2v2H3v2h2v2c0 1.1.9 2 2 2h2v2h2v-2h2v2h2v-2h2c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2zm-4 6H7V7h10v10z"/></svg>Модели Фила</h2>
+    <div class="mut">«Фил» раздаёт работу китайским моделям по ролям: фото читает Qwen-VL, длинные тексты — Kimi, письма фабрикам — Qwen, короткие ответы — Doubao. Решает и действует в базе по-прежнему DeepSeek. Нет ключа, ошибка, молчание дольше 60 секунд или исчерпан дневной лимит — эту часть сразу делает DeepSeek.</div>
+    <div id="frBox"><div class="mut">Загрузка…</div></div>
+    <div id="frMsg"></div>
+  </div>
+
   <div class="card" id="cSrv">
     <h2><svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM20 3H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>Сервер в Китае</h2>
     <div class="mut">Сервер Aliyun в Гуанчжоу: хранит копии базы и работает для удалённого доступа. Здесь видно, жив ли он, сколько места, баланс Aliyun и до какого числа оплачен сервер.</div>
@@ -420,6 +427,73 @@ function kbProvTest(id){ kbMsg('wait', 'Проверяю…'); api('kb.php','pro
 function kbProvUse(id){ api('kb.php','prov_use',{id:id}).then(function(r){ if (!r.ok) { kbMsg('bad', esc(r.error)); return; } kbMsg('ok', id ? '«Фил» теперь думает этой моделью — с теми же знаниями.' : '«Фил» снова думает DeepSeek.'); kbLoad(); }); }
 function kbProvDel(id){ if (!confirm('Удалить эту модель?')) return; api('kb.php','prov_del',{id:id}).then(function(){ kbLoad(); }); }
 
+/* №634 · окно «Модели Фила»: роли китайских моделей, ключи, проверка, расход */
+var FR = null;
+var FR_IC = {
+  photo_camera:'M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z',
+  article:'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z',
+  translate:'M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0 0 14.07 6H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z',
+  hub:'M17 16l-4-4V8.82C14.16 8.4 15 7.3 15 6c0-1.66-1.34-3-3-3S9 4.34 9 6c0 1.3.84 2.4 2 2.82V12l-4 4H3v5h5v-3.05l4-4.2 4 4.2V21h5v-5h-4z',
+  chat:'M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z',
+  key:'M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z',
+  pay:'M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z'
+};
+function frI(n){ return '<svg viewBox="0 0 24 24"><path fill="currentColor" d="' + (FR_IC[n] || FR_IC.chat) + '"/></svg>'; }
+function frLoad(){ api('kb.php','fr_status').then(function(d){ FR = d; frDraw(); }).catch(function(){}); }
+function frMsg(cls, t){ var m = document.getElementById('frMsg'); m.innerHTML = ''; return step(m, cls, t); }
+function frUsd(v){ v = +v || 0; return '$' + (v < 0.01 ? v.toFixed(4) : v.toFixed(3)); }
+function frPrice(m){ return m.id === 'deepseek' ? 'по счёту DeepSeek' : (m.in === 0 && m.out === 0 ? 'бесплатно' : '$' + m.in + ' / $' + m.out + ' за 1 млн токенов (вход / выход)'); }
+var FR_ST = {ok:['ok','работает'], nokey:['mut','нет ключа'], bad:['bad','ошибка'], 'new':['mut','не проверена']};
+function frModel(id){ return (FR.models || []).filter(function(m){ return m.id === id; })[0] || {id:id, name:id, state:'nokey', in:0, out:0}; }
+function frSel(r, f){
+  var cur = r[f], h = '<select onchange="frSet(\'' + r.id + '\',\'' + f + '\',this.value)" style="width:100%;margin:4px 0">' + (f === 'fb' ? '<option value="">— без запасной —</option>' : '');
+  (FR.models || []).forEach(function(m){ if (m.id === 'deepseek' || (r.vision && !m.vision)) return;
+    h += '<option value="' + esc(m.id) + '"' + (m.id === cur ? ' selected' : '') + '>' + esc(m.name) + ' · ' + esc(FR_ST[m.state][1]) + '</option>'; });
+  return h + '</select>';
+}
+function frDraw(){
+  var d = FR, b = document.getElementById('frBox'); if (!b) return;
+  if (!d || !d.ok) { b.innerHTML = '<div class="err">' + esc((d && d.error) || 'Нет ответа') + '</div>'; return; }
+  var h = '<div class="row">' + frI('pay') + '<div>Потрачено на модели ролей: сегодня <b>' + frUsd(d.day) + '</b> из ' + frUsd(d.limit) + ', за месяц <b>' + frUsd(d.month) + '</b>. Отдельно от бюджета Claude. Лимит исчерпан — всё делает DeepSeek.</div></div>'
+    + '<div class="row"><span class="mut">Лимит в день, $:</span><input type="number" id="frLim" min="0" step="0.5" value="' + esc(d.limit) + '" style="width:90px"><button class="lnk" onclick="frLimit()">Сохранить</button></div>';
+  h += '<h3 style="margin:14px 0 6px;font-size:15px">Роли</h3>';
+  (d.roles || []).forEach(function(r){
+    var m = frModel(r.m), fb = r.fb ? frModel(r.fb) : null, st = FR_ST[m.state];
+    h += '<div class="hist"><div class="row" style="margin:0">' + frI(r.icon) + '<b>' + esc(r.name) + '</b>' + (r.off ? ' · <span class="mut">выключена</span>' : '') + '</div><div class="mut">' + esc(r.about) + '</div>';
+    if (r.id === 'main') { h += '<div>Модель: <b>DeepSeek</b> · <span class="' + st[0] + '">' + st[1] + '</span> · ' + esc(frPrice(m)) + '</div></div>'; return; }
+    h += '<div class="mut" style="margin-top:6px">Модель</div>' + frSel(r, 'm') + '<div><span class="' + st[0] + '">' + esc(st[1]) + '</span> · ' + esc(frPrice(m)) + (m.err ? '<div class="bad">' + esc(m.err) + '</div>' : '') + '</div>'
+      + '<div class="mut" style="margin-top:6px">Запасная</div>' + frSel(r, 'fb') + (fb ? '<div><span class="' + FR_ST[fb.state][0] + '">' + esc(FR_ST[fb.state][1]) + '</span> · ' + esc(frPrice(fb)) + '</div>' : '')
+      + '<button class="lnk" onclick="frTest(\'' + esc(r.m) + '\')">Проверить модель</button>' + (r.fb ? ' · <button class="lnk" onclick="frTest(\'' + esc(r.fb) + '\')">Проверить запасную</button>' : '')
+      + ' · <button class="lnk" onclick="frSet(\'' + r.id + '\',\'off\',' + (r.off ? 0 : 1) + ')">' + (r.off ? 'Включить роль' : 'Выключить роль') + '</button></div>';
+  });
+  h += '<h3 style="margin:14px 0 6px;font-size:15px">Ключи</h3><div class="mut">Хранятся только на сервере и нигде не показываются. Сначала — международные платформы без китайских документов.</div>';
+  (d.prov || []).forEach(function(p){
+    h += '<div class="hist"><div class="row" style="margin:0">' + frI('key') + '<b>' + esc(p.name) + '</b> · ' + (p.has ? '<span class="ok">ключ есть …' + esc(p.key4) + (p.from_art ? ' (от рисовалки)' : '') + '</span>' : '<span class="mut">нет ключа</span>') + '</div>'
+      + '<div class="mut">Где взять: ' + esc(p.where) + (p.cn ? '' : ' · без китайских документов') + '</div>'
+      + '<div class="row"><input type="password" id="frK_' + esc(p.id) + '" placeholder="Вставьте ключ" autocomplete="new-password" style="flex:1"><button class="lnk" onclick="frKey(\'' + esc(p.id) + '\')">Сохранить</button>' + (p.has && !p.from_art ? ' · <button class="lnk" onclick="frKey(\'' + esc(p.id) + '\',1)">Убрать</button>' : '') + '</div></div>';
+  });
+  h += '<h3 style="margin:14px 0 6px;font-size:15px">Все модели</h3>' + (d.models || []).map(function(m){ var st = FR_ST[m.state];
+    var t = m.tests ? Object.keys(m.tests).map(function(k){ return (m.tests[k] ? '✓ ' : '✗ ') + k; }).join(', ') : '';
+    return '<div class="hist"><b>' + esc(m.name) + '</b> <span class="mut">(' + esc(m.id) + ')</span> · <span class="' + st[0] + '">' + esc(st[1]) + '</span>' + (m.vision ? ' · видит картинки' : '') + '<div class="mut">' + esc(frPrice(m)) + (t ? ' · проверка ' + esc(m.at) + ': ' + esc(t) : '') + '</div>'
+      + (m.id !== 'deepseek' && m.state !== 'nokey' ? '<button class="lnk" onclick="frTest(\'' + esc(m.id) + '\')">Проверить</button>' : '') + '</div>'; }).join('');
+  var bm = d.by_model || [];
+  h += '<h3 style="margin:14px 0 6px;font-size:15px">Расход по моделям</h3>' + (bm.length ? bm.map(function(x){ var a = x.day || {n:0, usd:0}, m = x.month || {n:0, usd:0};
+    return '<div class="row">' + esc(x.name) + ': сегодня ' + a.n + ' раз, ' + frUsd(a.usd) + ' · за месяц ' + m.n + ' раз, ' + frUsd(m.usd) + '</div>'; }).join('') : '<div class="mut">Пока ничего.</div>');
+  if ((d.last || []).length) h += '<h3 style="margin:14px 0 6px;font-size:15px">Последние ответы «Фила»: кто что сделал</h3>' + d.last.map(function(x){ return '<div class="hist"><span class="mut">' + esc(x.at) + ' · ' + esc(x.who) + ':</span> «' + esc(x.said) + '»<div>' + esc(x.ai) + '</div></div>'; }).join('');
+  b.innerHTML = h;
+}
+function frSet(role, f, v){ var o = {role:role}; o[f] = v; api('kb.php','fr_set',o).then(function(r){ if (!r.ok) frMsg('bad', esc(r.error)); else frMsg('ok', 'Сохранено.'); frLoad(); }); }
+function frLimit(){ api('kb.php','fr_set',{limit:document.getElementById('frLim').value}).then(function(r){ frMsg(r.ok ? 'ok' : 'bad', r.ok ? 'Лимит сохранён.' : esc(r.error)); frLoad(); }); }
+function frKey(p, del){ var k = del ? '-' : document.getElementById('frK_' + p).value.trim(); if (!k) { frMsg('bad', 'Вставьте ключ.'); return; }
+  if (del && !confirm('Убрать этот ключ?')) return;
+  api('kb.php','fr_key',{prov:p, key:k}).then(function(r){ if (!r.ok) { frMsg('bad', esc(r.error)); return; } frMsg('ok', del ? 'Ключ убран.' : 'Ключ сохранён. Проверьте модели этого поставщика кнопкой «Проверить».'); frLoad(); }); }
+function frTest(m){ frMsg('wait', 'Проверяю «' + esc(m) + '»: текст, китайский, инструменты, картинка…');
+  api('kb.php','fr_test',{model:m}).then(function(r){
+    if (!r.ok) { frMsg('bad', esc(r.error)); return; }
+    var t = Object.keys(r.tests || {}).map(function(k){ return (r.tests[k] ? '✓ ' : '✗ ') + k; }).join(', ');
+    frMsg(r.works ? 'ok' : 'bad', (r.works ? 'Работает: ' : 'Не подходит: ') + esc(t) + (r.error ? ' — ' + esc(r.error) : '') + '. Проверка стоила ' + frUsd(r.usd) + '.'); frLoad(); });
+}
+
 /* №39 · сервер в Китае */
 var SRV = null, SRV_LINK = '';
 function srvLoad(show, isNew){ api('flow.php','srv_status',{show:show?1:0,'new':isNew?1:0}).then(function(d){ if (!d.ok) { document.getElementById('srvBox').innerHTML = '<div class="err">' + esc(d.error || 'Нет доступа') + '</div>'; return; } SRV = d; if (d.link) SRV_LINK = d.link; srvDraw(); }); }
@@ -477,7 +551,7 @@ function load(){
   if (!T) { document.getElementById('cState').innerHTML = '<div class="err">Войдите в Экосистему как босс, затем откройте этот раздел снова.</div>'; return; }
   api('upd.php','upd_status').then(function(d){
     if (!d.ok) { document.getElementById('cState').innerHTML = '<div class="err">' + esc(d.error || 'Нет доступа') + '</div>'; document.getElementById('cUp').classList.add('hide'); document.getElementById('cHist').classList.add('hide'); return; }
-    ST = d; drawState(); drawCats(); drawHist(); yaDraw(); bkLoad(); srvLoad(); dsDraw(); sgLoad(); rdLoad(); kbLoad();
+    ST = d; drawState(); drawCats(); drawHist(); yaDraw(); bkLoad(); srvLoad(); dsDraw(); sgLoad(); rdLoad(); kbLoad(); frLoad();
     document.getElementById('cSeed').classList.toggle('hide', !d.seed_left);
   });
 }

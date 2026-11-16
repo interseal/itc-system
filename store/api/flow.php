@@ -49,7 +49,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/ai_lib.php';
-require_once __DIR__ . '/kb_lib.php';   // №631 · единая база знаний ИТК (памятка, выученное, правила помощников, история) — не зависит от модели ИИ
+require_once __DIR__ . '/kb_lib.php'; require_once __DIR__ . '/fil_roles.php';   // №634 · «Фил» — диспетчер китайских моделей (роли: фото, длинные тексты, китайский, простые ответы)   // №631 · единая база знаний ИТК (памятка, выученное, правила помощников, история) — не зависит от модели ИИ
 require_once __DIR__ . '/fil_kp.php';   // №36 · Фил делает коммерческие предложения (PDF и Excel)
 require_once __DIR__ . '/sup_hist.php';
 require_once __DIR__ . '/brand.php';
@@ -288,6 +288,7 @@ function ds_ask($model, $sys, $user, $maxTok) {
       'messages' => [['role' => 'system', 'content' => $sys], ['role' => 'user', 'content' => $user . ($try ? ITCAI_ONE_JSON : '')]]], JSON_UNESCAPED_UNICODE);
     [$http, $r] = itcai_post('https://api.deepseek.com/chat/completions', $req, ['Content-Type: application/json', 'Authorization: Bearer ' . ds_key()], 110);
     if ($http !== 200) { $em = (string)(json_decode($r, true)['error']['message'] ?? ''); return [null, 'DeepSeek ' . $model . ': ошибка ' . ($http ?: 'связи') . ($em !== '' ? ' — ' . mb_substr($em, 0, 140) : '')]; }
+    if (function_exists('fr_ds_usage')) fr_ds_usage(json_decode($r, true)['usage'] ?? null);   // №634 · сколько токенов потратил диспетчер — в журнал и учёт
     $t = trim(preg_replace('~<think>.*?</think>~s', '', (string)(json_decode($r, true)['choices'][0]['message']['content'] ?? '')));
     /* №628 · ответ упёрся в предел длины — не показываем обрывок, а один раз просим заново с запасом 16000 */
     if ((string)(json_decode($r, true)['choices'][0]['finish_reason'] ?? '') === 'length' && !$long && $mt < 16000) { $long = true; $mt = 16000; $try--; continue; }
@@ -1957,11 +1958,11 @@ function ag_journal_rows($me, $tbl, $q = '', $days = 2, $limit = 6) {
   $ws = array_slice(array_values(array_unique(array_filter(array_map(function ($x) { $n = mb_strlen($x); return $n >= 7 ? mb_substr($x, 0, $n - 2) : ($n >= 5 ? mb_substr($x, 0, $n - 1) : ($n >= 3 ? $x : '')); },
     preg_split('~[\s,;.!?«»"]+~u', mb_strtolower($q)))))), 0, 6);
   if ($ws) { $c = []; foreach ($ws as $x) { $l = ag_like($x); $c[] = '(said LIKE ? OR reply LIKE ? OR who LIKE ?)'; array_push($args, $l, $l, $l); } $w .= ' AND (' . implode(' OR ', $c) . ')'; }
-  try { $st = db()->prepare("SELECT who,said,reply,kind,deal_id,created_at FROM $tbl WHERE $w ORDER BY id DESC LIMIT " . max(1, min(60, (int)$limit))); $st->execute($args); return $st->fetchAll(); }
+  try { $st = db()->prepare("SELECT * FROM $tbl WHERE $w ORDER BY id DESC LIMIT " . max(1, min(60, (int)$limit))); $st->execute($args); return $st->fetchAll(); }
   catch (Throwable $e) { return []; }
 }
 function ag_journal_line($r, $name) {
-  return substr((string)$r['created_at'], 5, 11) . ' · ' . $name . ', просил(а) ' . $r['who'] . ': «' . mb_substr(trim((string)$r['said']), 0, 180) . '» → ' . mb_substr(trim(preg_replace('~\s+~u', ' ', (string)$r['reply'])), 0, 300);
+  return substr((string)$r['created_at'], 5, 11) . ' · ' . $name . ', просил(а) ' . $r['who'] . ': «' . mb_substr(trim((string)$r['said']), 0, 180) . '» → ' . mb_substr(trim(preg_replace('~\s+~u', ' ', (string)$r['reply'])), 0, 300) . (!empty($r['ai']) ? ' [модели: ' . $r['ai'] . ']' : '');   // №634
 }
 /* в правила каждого ответа: что недавно делал второй помощник (двое суток, до 6 записей) */
 function ag_peer_block($me) {
@@ -2341,7 +2342,7 @@ function ag_tools($me, $ctx) {
         foreach ($c as &$x) $x['сообщения'] = array_map(function ($m) { return $m['at'] . ' ' . ($m['dir'] === 'in' ? 'фабрика' : 'мы') . ': ' . mb_substr((string)($m['ru'] ?: $m['text']), 0, ag_lim('chat_len', 200)); }, array_reverse(ag_rows('SELECT dir,text,ru,at FROM itc_wc_msg WHERE chat_id=? ORDER BY at DESC LIMIT ' . (int)ag_lim('chat_msgs', 8), [$x['id']])));
         return $c ?: 'не нашёл';
       }],
-  ] + fe_tools($me) + pl_tools($me) + crm_fil_tools($me) + rb_tools($me, $ctx) + rp_tools($me) + fl_items_tools($me) + (function_exists('ml_tools') ? ml_tools($me) : []) + (function_exists('msp_tools') ? msp_tools($me) : []) + (function_exists('pr_tools') ? pr_tools($me) : []) + dr_tools($me) + dv_tools($me) + sh_tools($me) + br_tools($me) + pc_tools($me);   // №42, №43, №237 клиенты и счета
+  ] + fe_tools($me) + pl_tools($me) + crm_fil_tools($me) + rb_tools($me, $ctx) + rp_tools($me) + fl_items_tools($me) + (function_exists('ml_tools') ? ml_tools($me) : []) + (function_exists('msp_tools') ? msp_tools($me) : []) + (function_exists('pr_tools') ? pr_tools($me) : []) + dr_tools($me) + dv_tools($me) + sh_tools($me) + br_tools($me) + pc_tools($me) + (function_exists('fr_tools') ? fr_tools($me) : []);   // №634 cn_text — китайский и переводы (Qwen)   // №42, №43, №237 клиенты и счета
 }
 function ag_col($t, $c) { static $cache = []; $k = "$t.$c"; if (!isset($cache[$k])) { try { $q = db()->query("SHOW COLUMNS FROM `$t` LIKE " . db()->quote($c)); $cache[$k] = (bool)$q->fetch(); } catch (Throwable $e) { $cache[$k] = false; } } return $cache[$k]; }
 
@@ -2451,6 +2452,7 @@ function ag_run($me, $ctx, $text, $talk = '', $opt = []) {
         $n = $c['tool']; $args = $c['args'];
         if (!empty($opt['on_pre'])) ($opt['on_pre'])($n, $args, $ci === 0 ? (string)($j['think'] ?? '') : '');
         $res = isset($tools[$n]) ? ($tools[$n][1])($args) : 'нет такого инструмента';
+        if (function_exists('fr_tool_res')) $res = fr_tool_res($n, $args, $res, $text);   // №634 · длинный текст PDF / переписка — Kimi читает целиком, DeepSeek получает главное
         $out = json_encode($res, JSON_UNESCAPED_UNICODE); if (mb_strlen($out) > $cut) $out = mb_substr($out, 0, $cut) . '…(обрезано)';
         $jj = count($calls) > 1 ? ['tool' => $n, 'args' => $args] : $j; unset($jj['_model']);
         $ent[] = ['j' => json_encode($jj, JSON_UNESCAPED_UNICODE), 'n' => $n, 'o' => $out]; $trace[] = $n; $mark(end($ent));
@@ -4299,6 +4301,7 @@ try {
     $att = ff_attach_text($me, fl_in('files', []));     // №16: приложенные фото и файлы
     if (!empty($GLOBALS['FF_NAMES'])) $t .= ' [📎 приложены файлы: ' . implode(', ', $GLOBALS['FF_NAMES']) . ']';   // №578 · в истории разговора видно, что файлы были
     $GLOBALS['FC_IMGS'] = defined('KS_MODEL0') ? ff_attach_imgs($me, fl_in('files', [])) : [];   // №575 · «Космос» видит сами фото (Фил на DeepSeek — только текст, как раньше)
+    if (!defined('KS_MODEL0') && fl_in('files')) $att .= fr_photo_att($me, fl_in('files', []), $t) . fr_long_att($me, fl_in('files', []), $t);   // №634 · снимки читает Qwen-VL (запасная GLM), длинные файлы — Kimi; не вышло — DeepSeek по тексту, как раньше
     $att .= ff_imgs_note($GLOBALS['FC_IMGS']);
     $CONV = fm_conv_for($me, fl_in('conv', 'old'), $t);      // №50: каждый разговор — отдельно, Фил помнит его целиком
     $talk = ''; try { if ($CONV !== '') { $q = db()->prepare("SELECT said,reply FROM itc_fc_log WHERE phone=? AND conv_id=? AND kind<>'deal_voice' ORDER BY id DESC LIMIT 8"); $q->execute([$me['phone'], $CONV]); }
@@ -4311,11 +4314,12 @@ try {
     $pf = fp_file($me, fl_in('rid', '')); $steps = []; fp_save($pf, $steps); $GLOBALS['KP_MADE'] = [];
     $popt = ['on_pre' => function ($n, $a, $think) use ($pf, &$steps) { $steps[] = ['t' => fp_pre_line($n, $a), 'd' => fp_think($think), 'run' => 1]; fp_save($pf, $steps); },
       'on_step' => function ($ent, $n, $a, $res) use ($pf, &$steps) { $k = count($steps) - 1; if ($k >= 0) { $steps[$k]['t'] = ft_line($n, $a, $res); unset($steps[$k]['run']); } fp_save($pf, $steps); }];
-    [$j, $trace] = ag_run($me, $ctx, $t . $att, $talk, $popt);      // №15: Фил сам смотрит данные (до 5 источников), потом отвечает или действует
+    $j = (!defined('KS_MODEL0') && $att === '') ? fr_easy($me, $t, $talk) : null; $trace = [];   // №634 · «спасибо», «привет» — дешёвая модель (Doubao); нет — DeepSeek
+    if (!$j) [$j, $trace] = ag_run($me, $ctx, $t . $att, $talk, $popt);      // №15: Фил сам смотрит данные (до 5 источников), потом отвечает или действует
     if (!is_array($j)) fl_fail(!empty($GLOBALS['FL_AI_BAD']) ? 'Не получилось ответить, повторите запрос.' : 'Фил сейчас не ответил — ИИ вернул ошибку (' . itcai_clean($GLOBALS['FL_AI_ERR'] ?? 'нет связи') . '). Попробуйте ещё раз; если повторяется — пришлите этот текст');   // №621: без технического мусора
     if (($j['do'] ?? '') === 'task') {      // №24: большая задача — в фон
       $tid = ft_new($me, $t . $att, $j); $say = itcai_clean((string)($j['say'] ?? '')) ?: 'Взял в работу. Пришлю уведомление, когда закончу.';
-      db()->prepare('INSERT INTO itc_fc_log (phone,who,said,reply,kind,deal_id) VALUES (?,?,?,?,?,?)')->execute([$me['phone'], $me['name'], $t, $say, 'task', '']); fm_tag_last($CONV);
+      db()->prepare('INSERT INTO itc_fc_log (phone,who,said,reply,kind,deal_id) VALUES (?,?,?,?,?,?)')->execute([$me['phone'], $me['name'], $t, $say, 'task', '']); if (function_exists('fr_log_done')) fr_log_done((int)db()->lastInsertId()); fm_tag_last($CONV);
       try { db()->prepare('UPDATE itc_fil_task SET conv_id=? WHERE id=?')->execute([$CONV, $tid]); } catch (Throwable $e) {}
       if ($pf) @unlink($pf);
       fl_out_keep(['ok' => true, 'say' => $say, 'do' => 'task', 'task' => ft_view(ft_get($me, $tid)), 'looked' => $trace, 'steps' => $steps, 'conv' => $CONV ?: 'old']);
@@ -4326,7 +4330,7 @@ try {
     if (!empty($j['learn'])) { $lt = fil_learn_add($me, (string)$j['learn']); if ($lt !== '') $say .= "\nЗапомнил на будущее: " . $lt; }   // №38
     $say .= nvk_take($me, $j, $trace);   // №538 · навыки: отметить применённый, записать новый
     $say .= kp_marks() . fe_marks() . dr_marks();     // №36 КП, №42 правки сайта — кнопками под ответом
-    db()->prepare('INSERT INTO itc_fc_log (phone,who,said,reply,kind,deal_id) VALUES (?,?,?,?,?,?)')->execute([$me['phone'], $me['name'], $t, $say, (string)($j['do'] ?? ''), $deal]); fm_tag_last($CONV);
+    db()->prepare('INSERT INTO itc_fc_log (phone,who,said,reply,kind,deal_id) VALUES (?,?,?,?,?,?)')->execute([$me['phone'], $me['name'], $t, $say, (string)($j['do'] ?? ''), $deal]); if (function_exists('fr_log_done')) fr_log_done((int)db()->lastInsertId()); fm_tag_last($CONV);   // №634 · в журнал — какая модель что сделала и сколько стоило
     if ($pf) @unlink($pf);
     fl_out(['ok' => true, 'say' => $say, 'do' => (string)($j['do'] ?? ''), 'deal' => $deal, 'undo' => $undo, 'looked' => $trace, 'steps' => $steps, 'conv' => $CONV ?: 'old']);
   }

@@ -6,10 +6,13 @@
 //   export     — скачать базу знаний одним архивом (.zip: Markdown по разделам, kb.json, README — как подключить к любому ИИ)
 //   import     — восстановить из такого архива (тело запроса — сам архив)
 //   prov_save / prov_del / prov_test / prov_use — другие модели ИИ для «Фила» (OpenAI-совместимый вход), см. kb_lib.php
+//   fr_status / fr_set / fr_key / fr_test — №634 окно «Модели Фила» (роли китайских моделей), см. fil_roles.php
 // Сами знания и функции — api/kb_lib.php.
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/kb_lib.php';
+require_once __DIR__ . '/ai_lib.php';
+require_once __DIR__ . '/fil_roles.php';   // №634 · роли и модели «Фила»
 if (is_file(__DIR__ . '/kosmos_lib.php')) require_once __DIR__ . '/kosmos_lib.php';   // навыки — с сервера «Космоса» (шлюз)
 
 function kb_out($a, $code = 200) {
@@ -66,6 +69,11 @@ try {
   case 'prov_save': { $who = kb_boss(); $r = kb_prov_save(kb_in(), $who); if (!empty($r['ok'])) $r['test'] = kb_prov_test($r['id']); kb_out($r, empty($r['ok']) ? 400 : 200); }
   case 'prov_del':  { $who = kb_boss(); $id = (string)(kb_in()['id'] ?? ''); if (kb_sp_get('fil_model2') === 'oa:' . $id) kb_sp_put('fil_model2', '', $who); kb_out(kb_prov_del($id, $who)); }
   case 'prov_test': { kb_boss(); kb_out(kb_prov_test((string)(kb_in()['id'] ?? ''))); }
+  /* №634 · окно «Модели Фила»: роли, модели, ключи (только «есть / нет»), проверка, расход и дневной лимит */
+  case 'fr_status': { kb_boss(); kb_out(fr_status()); }
+  case 'fr_set':    { $who = kb_boss(); $r = fr_set(kb_in(), $who); kb_out($r, empty($r['ok']) ? 400 : 200); }
+  case 'fr_key':    { $who = kb_boss(); $i = kb_in(); $r = fr_key_put((string)($i['prov'] ?? ''), (string)($i['key'] ?? ''), $who); kb_out($r, empty($r['ok']) ? 400 : 200); }
+  case 'fr_test':   { $who = kb_boss(); @set_time_limit(300); kb_out(fr_test((string)(kb_in()['model'] ?? ''), $who)); }
   case 'prov_use':  {   // «Фил» думает этой моделью (или снова DeepSeek — id пустой). Знания те же — из базы знаний
     $who = kb_boss(); $id = (string)(kb_in()['id'] ?? '');
     if ($id !== '' && !isset(kb_prov_all()[$id])) kb_out(['ok' => false, 'error' => 'Нет такой модели'], 400);
