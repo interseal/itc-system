@@ -128,6 +128,12 @@ function gw_think_put(array $p, string $lv, string $how): array {
   else { $p['thinking'] = ['type' => 'adaptive']; $p['output_config'] = ['effort' => GW_EFFORT[$lv] ?? 'medium']; }
   return $p;
 }
+/* 0.5.9 (№633) · способ размышлений — по модели (проверено по нашему ключу 16.11.2026): budget_tokens ({type: enabled}) принимают
+   только Claude 4.5/4.6 (opus-4-5, opus-4-6, sonnet-4-6, haiku-4-5; opus-4-5 и haiku-4-5 adaptive не берут вовсе). Все новые — 4.7, 4.8, 5, 5.5,
+   Fable — только adaptive + effort: раньше их первый запрос с размышлениями всегда получал 400 и шёл второй раз. Ошибётся — запасной путь ниже. */
+function gw_think_how(string $model): string {
+  return preg_match('~^claude-(opus|sonnet|haiku)-4-[56](-|$)~', $model) ? 'budget' : 'effort';
+}
 function gw_ask(array $in): void {
   // 0.5.3 (№627) · снимок по отпечатку, которого здесь нет — просим целиком (до учёта обращения, чтобы повтор не считался дважды)
   $need = gw_img_need((array)($in['images'] ?? []));
@@ -165,7 +171,8 @@ function gw_ask(array $in): void {
                                                         ['type' => 'text', 'text' => substr($sys, $cut), 'cache_control' => ['type' => 'ephemeral']]];
   // 0.5.8 (№632) · уровень сложности: размышления; «Максимум» — поток до 14 мин (claude_once), остальное — как было
   $think = gw_think_level($model, $in['think'] ?? ''); $thinkOff = '';
-  $payload = gw_think_put($payload, $think, 'budget'); $max = (int)$payload['max_tokens'];
+  $how = gw_think_how($model);
+  $payload = gw_think_put($payload, $think, $how); $max = (int)$payload['max_tokens'];
   $GLOBALS['GW_STREAM_TMO'] = $think === 'max' ? 840 : 600;
   $switched = '';
   $onSw = function ($old, $new) use (&$switched) { $switched = 'Ключ «' . $old . '» перестал работать — переключился на «' . $new . '»'; };
@@ -177,11 +184,12 @@ function gw_ask(array $in): void {
     if (isset($payload['thinking']['budget_tokens']) && $payload['thinking']['budget_tokens'] > $max - GW_THINK_ANS) $payload['thinking']['budget_tokens'] = $max - GW_THINK_ANS;
     $res = gw_claude($payload, $onSw);
   }
-  // 0.5.8 (№632) · модель не приняла размышления (400) — тот же вопрос через effort, потом без размышлений: без ответа Босс не остаётся
+  // 0.5.8 (№632) · модель не приняла размышления (400) — тот же вопрос другим способом (0.5.9: budget ↔ effort), потом без размышлений:
+  // без ответа Босс не остаётся
   if (!empty($res['error']) && (int)($res['http'] ?? 0) === 400 && isset($payload['thinking'])) {
-    $why = mb_substr((string)$res['error'], 0, 300);
-    $payload = gw_think_put($payload, $think, 'effort'); $res = gw_claude($payload, $onSw);
-    if (!empty($res['error']) && (int)($res['http'] ?? 0) === 400) { $thinkOff = $why . ' · effort: ' . mb_substr((string)$res['error'], 0, 200); $payload = gw_think_put($payload, $think, ''); $res = gw_claude($payload, $onSw); }
+    $why = mb_substr((string)$res['error'], 0, 300); $how2 = $how === 'budget' ? 'effort' : 'budget';
+    $payload['max_tokens'] = $max; $payload = gw_think_put($payload, $think, $how2); $res = gw_claude($payload, $onSw);
+    if (!empty($res['error']) && (int)($res['http'] ?? 0) === 400) { $thinkOff = $why . ' · ' . $how2 . ': ' . mb_substr((string)$res['error'], 0, 200); $payload = gw_think_put($payload, $think, ''); $res = gw_claude($payload, $onSw); }
     // через effort получилось — это не отказ (think_off пустой), но причину всё равно пишем в журнал
     log_add($u['phone'], $thinkOff !== '' ? 'gw_think_off' : 'gw_think_effort', ['model' => $model, 'think' => $think, 'error' => $thinkOff !== '' ? $thinkOff : $why]);
   }

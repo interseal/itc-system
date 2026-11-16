@@ -195,6 +195,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
 .mi{display:flex;align-items:center;gap:16px;width:100%;padding:13px 14px;border:0;border-radius:12px;background:transparent;color:#fff;font:400 1.02rem Roboto,sans-serif;text-align:left;cursor:pointer}.mi svg{width:24px;height:24px;flex:none;color:#dce8ff}.mi:active,.mi.cur{background:rgba(255,255,255,.1)}
 .mrec{color:var(--sub);font-weight:500;font-size:.9rem;margin:16px 14px 6px;padding-top:12px;border-top:1px solid var(--line)}
 .hd .mdl{display:none;align-items:center;gap:3px;height:34px;margin:0 4px 0 0;padding:0 4px 0 8px;border:1px solid rgba(255,255,255,.35);border-radius:17px;background:rgba(255,255,255,.1);color:#fff;font:500 .85rem Roboto,sans-serif;cursor:pointer;flex:none;box-sizing:border-box}.hd .mdl svg{width:18px;height:18px;flex:none}.hd .mdl .dd{width:20px;height:20px;margin-left:-2px}.hd .mdl #mdlName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40vw}
+.md-old{display:flex;align-items:center;justify-content:space-between;width:100%;margin:10px 0 4px;padding:10px 12px;border:1px dashed var(--line);border-radius:12px;background:none;color:var(--sub);font:500 .9rem Roboto,sans-serif;cursor:pointer;box-sizing:border-box}.md-old svg{width:22px;height:22px}.cfg-in p.md-oh{font-size:.8rem;margin:2px 0 4px}
 .mdo{display:flex;align-items:center;gap:12px;width:100%;margin:6px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.04);color:#fff;font:400 1rem Roboto,sans-serif;text-align:left;cursor:pointer;box-sizing:border-box}.mdo.on{border-color:#5b8cff;background:rgba(91,140,255,.16)}.mdo b{font-weight:500}.mdo .md-t{flex:1;min-width:0}.mdo small{display:block;color:var(--sub);font-size:.8rem;margin-top:2px}.mdo .md-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:9px;background:rgba(255,183,77,.18);color:#ffcc80;font-size:.72rem;font-weight:500;vertical-align:1px}.mdo .md-ck{width:22px;height:22px;flex:none;color:#8fb3ff;visibility:hidden}.mdo.on .md-ck{visibility:visible}.mdo:disabled{opacity:.6}
 .thk{display:flex;gap:6px;margin:8px 0 4px}.thk button{flex:1 1 0;min-width:0;padding:10px 4px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.04);color:#fff;font:500 .88rem Roboto,sans-serif;cursor:pointer;box-sizing:border-box}.thk button.on{border-color:#5b8cff;background:rgba(91,140,255,.22)}.thk button:disabled{opacity:.35;cursor:default}.thk-h{color:var(--sub);font-size:.8rem;margin:2px 0 8px}
 .mi .mt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mi small{color:var(--sub);font-size:.75rem;flex:none}
@@ -913,7 +914,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
     $('cfgIn').innerHTML = '<h3>Настройки Космоса</h3>'
       + '<div class="r" style="margin:-4px 0 6px"><button class="cb s" onclick="$(\'cfg\').style.display=\'none\';capsOpen()">Что умеет Космос — рассказать голосом</button></div>'
       + dsBlock(c)
-      + '<h4>Модель — «мозги» Космоса</h4><p>На какой модели Claude думает Космос. Sonnet — основной, Opus — сильнее и дороже, Haiku — быстрее и дешевле. Сравнить модели можно внизу.</p>'
+      + '<h4>Модель — «мозги» Космоса</h4><p>На какой модели Claude думает Космос. Sonnet — основная, Opus — сильнее и дороже, Fable — новая, сильнее Opus, ещё дороже, Haiku — быстрее и дешевле. Есть и предыдущие версии. Сравнить модели можно внизу.</p>'
       + '<select id="cfM">' + c.models.map(function(m){ return '<option value="' + esc(m.id) + '"' + (m.id === c.model ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select>'
       + '<div class="r"><button class="cb" onclick="cfgSave(\'model\')">Сохранить модель</button></div>'
       + '<div id="cfThk">' + thkHtml(false) + '</div>'
@@ -1047,7 +1048,11 @@ html.fil-talk .hd .snd-t{background:#e5484d}
   /* №630 · быстрый переключатель модели (шапка и меню): тот же ключ ks_model, что и в настройках (fil_cfg) */
   var MDL = [['sonnet', 'Sonnet', 'Рекомендуемая, по умолчанию', ''], ['opus', 'Opus', 'Самая сильная', 'сильнее, дороже'], ['haiku', 'Haiku', 'Быстрая и недорогая', '']];
   function mdlKind(id){ id = String(id || ''); for (var i = 0; i < MDL.length; i++) if (id.indexOf(MDL[i][0]) >= 0) return MDL[i]; return null; }
-  function mdlShort(id){ var k = mdlKind(id); if (k) return k[1]; var m = /claude-([a-z]+)/.exec(String(id || '')); return m ? m[1].charAt(0).toUpperCase() + m[1].slice(1) : 'Модель'; }
+  /* №633 · список моделей и подписи приходят с сервера (fil_cfg → models: short, desc, tag, grp); MDL — запасной, если сервер старый */
+  function mdlInfo(id){ var m = ((CFG && CFG.models) || []).filter(function(x){ return x.id === id; })[0]; return m && m.short ? m : null; }
+  var MDL_OLD = false;
+  window.mdlOld = function(){ MDL_OLD = !MDL_OLD; mdlRender(false); };
+  function mdlShort(id){ var i = mdlInfo(id); if (i) return i.short; var k = mdlKind(id); if (k) return k[1]; var m = /claude-([a-z]+)/.exec(String(id || '')); return m ? m[1].charAt(0).toUpperCase() + m[1].slice(1) : 'Модель'; }
   window.mdlShow = function(){
     if (!CFG || !CFG.models) return;
     var t = thkName(CFG.think), n = mdlShort(CFG.model) + (t ? ' · ' + t : '');
@@ -1055,15 +1060,21 @@ html.fil-talk .hd .snd-t{background:#e5484d}
     $('mdlBtn').title = 'Модель Космоса: ' + n + ' — нажмите, чтобы сменить модель или уровень сложности';
   };
   function mdlList(){
-    var o = [];
-    MDL.forEach(function(k){ var m = (CFG.models || []).filter(function(x){ return x.id.indexOf(k[0]) >= 0; })[0]; if (m) o.push({id:m.id, k:k}); });
+    var o = [], ms = CFG.models || [];
+    if (ms.some(function(x){ return x.short; })) ms.forEach(function(m){ o.push({id:m.id, k:[null, m.short, m.desc || '', m.tag || ''], grp:m.grp || 'main'}); });
+    else MDL.forEach(function(k){ var m = (CFG.models || []).filter(function(x){ return x.id.indexOf(k[0]) >= 0; })[0]; if (m) o.push({id:m.id, k:k}); });
     if (CFG.model && !o.some(function(x){ return x.id === CFG.model; })) o.push({id:CFG.model, k:[null, mdlShort(CFG.model), 'Выбрана в настройках', '']});
     return o;
   }
   function mdlRender(busy){
     var CK = '<svg class="md-ck" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+    var L = mdlList(), main = L.filter(function(x){ return x.grp !== 'old'; }), old = L.filter(function(x){ return x.grp === 'old'; });
+    var open = MDL_OLD;
+    var one = function(x){ return '<button class="mdo' + (x.id === CFG.model ? ' on' : '') + '"' + (busy ? ' disabled' : '') + ' onclick="mdlPick(\'' + esc(x.id) + '\')"><span class="md-t"><b>' + esc(x.k[1]) + '</b>' + (x.k[3] ? '<span class="md-tag">' + esc(x.k[3]) + '</span>' : '') + '<small>' + esc(x.k[2]) + '</small></span>' + CK + '</button>'; };
     $('mdlIn').innerHTML = '<h3>Модель Космоса</h3><p>Переключается сразу, следующий вопрос получит выбранная модель. То же самое — в настройках.</p>'
-      + mdlList().map(function(x){ return '<button class="mdo' + (x.id === CFG.model ? ' on' : '') + '"' + (busy ? ' disabled' : '') + ' onclick="mdlPick(\'' + esc(x.id) + '\')"><span class="md-t"><b>' + esc(x.k[1]) + '</b>' + (x.k[3] ? '<span class="md-tag">' + esc(x.k[3]) + '</span>' : '') + '<small>' + esc(x.k[2]) + '</small></span>' + CK + '</button>'; }).join('')
+      + main.map(one).join('')
+      + (old.length ? '<button class="md-old" onclick="mdlOld()" aria-expanded="' + (open ? 'true' : 'false') + '"><span>Предыдущие версии (' + old.length + ')</span><svg viewBox="0 0 24 24" fill="currentColor"><path d="' + (open ? 'M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z' : 'M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z') + '"/></svg></button>'
+        + (open ? '<p class="md-oh">Старые версии — на случай, если новая отвечает хуже. Новее та, у которой больше номер.</p>' + old.map(one).join('') : '') : '')
       + thkHtml(busy)
       + '<div class="r"><button class="cb" onclick="mdlClose()">Закрыть</button></div>';
   }
@@ -1089,6 +1100,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
   };
   window.mdlOpen = function(){
     if (!CFG) { st('Загружаю…'); api('fil_cfg', {}).then(function(r){ if (r && r.ok) { CFG = r; mdlShow(); mdlOpen(); } else st((r && r.error) || 'Ошибка'); }); return; }
+    var cur = mdlInfo(CFG.model); MDL_OLD = !!(cur && cur.grp === 'old');   // №633 · выбрана старая версия — список «Предыдущие версии» сразу открыт
     mdlRender(false); $('mdlBox').style.display = 'flex';
   };
   window.mdlClose = function(){ $('mdlBox').style.display = 'none'; };

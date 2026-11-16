@@ -255,7 +255,24 @@ const FIL_MODELS = [['deepseek-v4.1-flash', 'DeepSeek 4.1 (рекомендую)
    пока не вставлен — работает ключ из настроек сервера */
 function fl_yk() { $k = sp_get('yc_main'); return $k !== '' ? $k : (defined('YC_API_KEY') ? YC_API_KEY : ($GLOBALS['YC_API_KEY'] ?? '')); }
 /* «Космос»: модели Claude на выбор руководителю (настройки). По умолчанию — Sonnet. */
-const KS_MODELS = [['claude-sonnet-5-5', 'Claude Sonnet 5.5 (рекомендую)'], ['claude-opus-5-5', 'Claude Opus 5.5 — самый сильный, дороже'], ['claude-haiku-5-5', 'Claude Haiku 5.5 — быстрый и недорогой'], ['claude-fable-5-2', 'Claude Fable 5.2 — старший уровень, самый дорогой']];
+/* №633 · модели Claude, проверенные по нашему ключу 16.11.2026 (отвечают, JSON, инструменты, снимки). Поля: id, название в настройках,
+   короткое (шапка), подпись, метка цены (если дороже Opus 5.5 — $4/$20 за млн), группа (main — основные, old — предыдущие версии). */
+const KS_MODELS = [
+  ['claude-sonnet-5-5', 'Claude Sonnet 5.5 (рекомендую)', 'Sonnet', 'Рекомендуемая, по умолчанию', '', 'main'],
+  ['claude-opus-5-5', 'Claude Opus 5.5 — самый сильный из основных, дороже', 'Opus', 'Самая сильная из основных', 'сильнее, дороже', 'main'],
+  ['claude-fable-5-2', 'Claude Fable 5.2 — новая, сильнее Opus, дороже Opus в 2 раза', 'Fable', 'Новая, сильнее Opus — для самого сложного', 'дороже Opus ×2', 'main'],
+  ['claude-haiku-5-5', 'Claude Haiku 5.5 — быстрый и недорогой', 'Haiku', 'Быстрая и недорогая', '', 'main'],
+  ['claude-fable-5-1', 'Claude Fable 5.1 — предыдущая версия Fable', 'Fable 5.1', 'Предыдущая версия Fable, дороже новой', 'дороже Opus ×2,5', 'old'],
+  ['claude-fable-5', 'Claude Fable 5 — первая версия Fable', 'Fable 5', 'Первая версия Fable, дороже новой', 'дороже Opus ×2,5', 'old'],
+  ['claude-opus-5', 'Claude Opus 5 — предыдущая версия Opus', 'Opus 5', 'Предыдущая версия Opus', 'дороже Opus ×1,25', 'old'],
+  ['claude-opus-4-8', 'Claude Opus 4.8 — старая версия Opus', 'Opus 4.8', 'Старая версия Opus', 'дороже Opus ×1,25', 'old'],
+  ['claude-opus-4-7', 'Claude Opus 4.7 — старая версия Opus', 'Opus 4.7', 'Старая версия Opus', 'дороже Opus ×1,25', 'old'],
+  ['claude-opus-4-6', 'Claude Opus 4.6 — старая версия Opus', 'Opus 4.6', 'Старая версия Opus', 'дороже Opus ×1,25', 'old'],
+  ['claude-opus-4-5-20251101', 'Claude Opus 4.5 — старая версия Opus, память короче', 'Opus 4.5', 'Старая версия Opus, помнит меньше (200 тыс. токенов)', 'дороже Opus ×1,25', 'old'],
+  ['claude-sonnet-5', 'Claude Sonnet 5 — предыдущая версия Sonnet', 'Sonnet 5', 'Предыдущая версия Sonnet', '', 'old'],
+  ['claude-sonnet-4-6', 'Claude Sonnet 4.6 — старая версия Sonnet', 'Sonnet 4.6', 'Старая версия Sonnet', '', 'old'],
+  ['claude-haiku-4-5-20251001', 'Claude Haiku 4.5 — предыдущая версия Haiku', 'Haiku 4.5', 'Предыдущая версия Haiku, дороже новой, помнит меньше', '', 'old'],
+];
 const KS_MODEL0 = 'claude-sonnet-5-5';
 /* №630 · запас токенов на ответ Claude: предел моделей 64000 (шлюз сам снизит до 32000, если модель столько не берёт) */
 const KS_TOK_TOP = 64000;
@@ -4275,7 +4292,7 @@ try {
     if (fl_in('model', null) !== null && fl_in('model') !== '') { $m = preg_replace('~[^a-z0-9.-]~', '', (string)fl_in('model')); if (preg_match('~^claude-[a-z0-9.-]{3,50}$~', $m)) sp_put('ks_model', $m, $me['name']); }
     // №632 · уровень сложности: для указанной модели (think_model) или для выбранной сейчас
     if (fl_in('think', null) !== null && fl_in('think') !== '') { $tm = (string)fl_in('think_model', ''); if ($tm === '') $tm = ks_model_pick(); if (!ks_think_set($tm, (string)fl_in('think'), $me['name'])) fl_fail('Этот уровень у этой модели недоступен'); }
-    $mods = array_map(function ($m) { return ['id' => $m[0], 'name' => $m[1], 'think' => ks_think_pick($m[0]), 'think_no' => array_values(array_map(function ($t) { return $t[0]; }, array_filter(KS_THINK, function ($t) use ($m) { return !ks_think_ok($m[0], $t[0]); })))]; }, KS_MODELS);
+    $mods = array_map(function ($m) { return ['id' => $m[0], 'name' => $m[1], 'short' => $m[2] ?? '', 'desc' => $m[3] ?? '', 'tag' => $m[4] ?? '', 'grp' => $m[5] ?? 'main', 'think' => ks_think_pick($m[0]), 'think_no' => array_values(array_map(function ($t) { return $t[0]; }, array_filter(KS_THINK, function ($t) use ($m) { return !ks_think_ok($m[0], $t[0]); })))]; }, KS_MODELS);
     $thl = array_map(function ($t) { return ['id' => $t[0], 'name' => $t[1], 'hint' => $t[2]]; }, KS_THINK);
     fl_out(['ok' => true, 'memo' => fil_memo(), 'learn' => fil_learn(), 'model' => ks_model_pick(), 'think' => ks_think_pick(ks_model_pick()), 'thinks' => $thl, 'models' => $mods, 'ds' => ['has' => false], 'ks' => ks_gw_status(), 'ks_admin' => KS_SERVER . '/',
       'staff' => array_map(function ($s) { return ['phone' => $s['phone'], 'name' => $s['name'], 'role' => $s['role'], 'io' => fil_io($s['phone'], '')]; }, fl_staff())]);

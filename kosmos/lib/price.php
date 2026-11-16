@@ -19,9 +19,20 @@ const PRICES = [
   'haiku+' => [0.50, 2.50, 0.625, 0.05],
 ];
 const PRICE_HAIKU_LONG = 100000;
+// 0.5.9 (№633) · предыдущие версии стоят по-другому (обычно дороже новых) — цена по началу id; самое длинное совпадение важнее
+// (claude-opus-5-5 — это Opus 5.5, а не Opus 5). Источник тот же, проверено 16.11.2026. Новые 5.5 / Fable 5.2 / Haiku 5.5 — PRICES выше.
+const PRICE_IDS = [
+  'claude-fable-5-1' => [10.0, 50.0, 12.5, 0.25], 'claude-fable-5'  => [10.0, 50.0, 12.5, 1.0],
+  'claude-opus-5'    => [5.0, 25.0, 6.25, 0.50],  'claude-opus-4'   => [5.0, 25.0, 6.25, 0.50],
+  'claude-sonnet-5'  => [2.0, 10.0, 2.5, 0.20],   'claude-sonnet-4' => [3.0, 15.0, 3.75, 0.30],
+  'claude-haiku-4'   => [1.0, 5.0, 1.25, 0.10],
+];
+const PRICE_NEW = ['claude-fable-5-2', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
 
 function price_of(string $model, int $prompt): array {
   $m = strtolower($model);
+  $new = false; foreach (PRICE_NEW as $p) if (strpos($m, $p) === 0) $new = true;
+  if (!$new) { $best = ''; foreach (PRICE_IDS as $p => $v) if (strpos($m, $p) === 0 && strlen($p) > strlen($best)) $best = $p; if ($best !== '') return PRICE_IDS[$best]; }
   if (strpos($m, 'haiku') !== false) return PRICES[$prompt > PRICE_HAIKU_LONG ? 'haiku+' : 'haiku'];
   foreach (['fable', 'opus', 'sonnet'] as $f) if (strpos($m, $f) !== false) return PRICES[$f];
   return PRICES['opus'];   // незнакомая модель — по цене Opus, чтобы остаток не выглядел больше, чем есть

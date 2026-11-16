@@ -5,14 +5,25 @@ declare(strict_types=1);
 // на сервере «Космоса» (база SQLite). В аккаунте Anthropic не хранится ничего,
 // поэтому ключ Claude можно менять — «Космос» продолжает с того же места.
 
-const KOSMOS_VERSION = '0.5.8';
+const KOSMOS_VERSION = '0.5.9';
 
 // Модели Claude на выбор руководителю (настройки «Космоса»). Можно вписать и другую — по её названию в API.
 const MODEL_LIST = [
   ['id' => 'claude-haiku-5-5',  'name' => 'Haiku 5.5 — быстрый и недорогой'],
   ['id' => 'claude-sonnet-5-5', 'name' => 'Sonnet 5.5 — сильный, основной'],
   ['id' => 'claude-opus-5-5',   'name' => 'Opus 5.5 — самый сильный из основных, дороже'],
-  ['id' => 'claude-fable-5-2',  'name' => 'Fable 5.2 — старший уровень, самый дорогой'],
+  ['id' => 'claude-fable-5-2',  'name' => 'Fable 5.2 — новая, сильнее Opus, дороже Opus в 2 раза'],
+  // 0.5.9 (№633) · предыдущие версии — все отвечают по нашему ключу (проверено 16.11.2026)
+  ['id' => 'claude-fable-5-1',  'name' => 'Fable 5.1 — предыдущая версия Fable'],
+  ['id' => 'claude-fable-5',    'name' => 'Fable 5 — первая версия Fable'],
+  ['id' => 'claude-opus-5',     'name' => 'Opus 5 — предыдущая версия Opus'],
+  ['id' => 'claude-opus-4-8',   'name' => 'Opus 4.8 — старая версия Opus'],
+  ['id' => 'claude-opus-4-7',   'name' => 'Opus 4.7 — старая версия Opus'],
+  ['id' => 'claude-opus-4-6',   'name' => 'Opus 4.6 — старая версия Opus'],
+  ['id' => 'claude-opus-4-5-20251101',  'name' => 'Opus 4.5 — старая версия Opus'],
+  ['id' => 'claude-sonnet-5',   'name' => 'Sonnet 5 — предыдущая версия Sonnet'],
+  ['id' => 'claude-sonnet-4-6', 'name' => 'Sonnet 4.6 — старая версия Sonnet'],
+  ['id' => 'claude-haiku-4-5-20251001', 'name' => 'Haiku 4.5 — предыдущая версия Haiku'],
 ];
 
 function cfg(?string $k = null, $def = null) {

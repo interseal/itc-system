@@ -97,7 +97,19 @@ t('окно модели: блок «Уровень сложности» с по
 t('кнопка в шапке: «Модель · Уровень»', strpos($h, "mdlShort(CFG.model) + (t ? ' · ' + t : '')") !== false);
 t('уровень сохраняется через fil_cfg для текущей модели; настройки и окно связаны', strpos($h, "api('fil_cfg', {think:id, think_model:CFG.model})") !== false && strpos($h, "'<div id=\"cfThk\">' + thkHtml(false)") !== false && strpos($h, "if (\$('cfg').style.display === 'flex') cfgRender(); st('Уровень: '") !== false);
 t('недоступный уровень — неактивная кнопка с пояснением', strpos($h, "'У этой модели нет такого уровня'") !== false && strpos($h, "(busy || off ? ' disabled' : '')") !== false);
-t('кеш sw.js поднят (v56)', strpos((string)file_get_contents("$root/store/apps/kosmos/sw.js"), "'itc-kosmos-v56'") !== false);
+// №633 · все рабочие модели: список с сервера, подписи, группы, предыдущие версии свёрнуты
+$fl = (string)file_get_contents("$root/store/api/kosmos_flow.php");
+preg_match('~const KS_MODELS = (\[.*?\n\]);~s', $fl, $km); $KM = $km ? eval('return ' . $km[1] . ';') : [];
+$ids = array_column($KM, 0);
+t('№633: 14 моделей, первая — Sonnet 5.5 (по умолчанию), основные: Sonnet, Opus, Fable, Haiku', count($KM) === 14 && $ids[0] === 'claude-sonnet-5-5' && array_slice($ids, 0, 4) === ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-fable-5-2', 'claude-haiku-5-5'] && strpos($fl, "const KS_MODEL0 = 'claude-sonnet-5-5';") !== false);
+t('№633: у каждой модели короткое имя, подпись, группа main/old; id разные и проходят проверку', count(array_unique($ids)) === 14 && !array_filter($KM, function ($m) { return count($m) !== 6 || $m[2] === '' || $m[3] === '' || !in_array($m[5], ['main', 'old'], true) || !preg_match('~^claude-[a-z0-9.-]{3,50}$~', $m[0]); }));
+t('№633: метка цены есть у всех, кто дороже Opus 5.5 (Fable, старые Opus)', !array_filter($KM, function ($m) { return preg_match('~fable|opus-(5$|4)~', $m[0]) && strpos($m[4], 'дороже Opus') === false; }));
+t('№633: подписи и уровни — в ответе fil_cfg (short, desc, tag, grp, think_no)', strpos($fl, "'short' => \$m[2] ?? '', 'desc' => \$m[3] ?? '', 'tag' => \$m[4] ?? '', 'grp' => \$m[5] ?? 'main'") !== false);
+t('№633: Haiku 4.5 тоже без «Максимума»', function_exists('ks_think_ok') ? !ks_think_ok('claude-haiku-4-5-20251001', 'max') && ks_think_ok('claude-fable-5-2', 'max') : true);
+t('№633: окно — список с сервера, «Предыдущие версии» свёрнуты, открыты, если выбрана старая', strpos($h, "grp:m.grp || 'main'") !== false && strpos($h, 'Предыдущие версии (') !== false && strpos($h, "MDL_OLD = !!(cur && cur.grp === 'old')") !== false);
+eval(fn_src($gw, 'gw_think_how'));
+t('№633: шлюз — budget только у 4.5/4.6, новые (4.7+, 5, 5.5, Fable) — сразу effort', gw_think_how('claude-sonnet-4-6') === 'budget' && gw_think_how('claude-opus-4-5-20251101') === 'budget' && gw_think_how('claude-haiku-4-5-20251001') === 'budget' && gw_think_how('claude-opus-4-6') === 'budget' && gw_think_how('claude-opus-4-7') === 'effort' && gw_think_how('claude-opus-5') === 'effort' && gw_think_how('claude-sonnet-5-5') === 'effort' && gw_think_how('claude-fable-5-2') === 'effort');
+t('кеш sw.js поднят (v56 и выше)', preg_match("~'itc-kosmos-v(\\d+)'~", (string)file_get_contents("$root/store/apps/kosmos/sw.js"), $vm) && (int)$vm[1] >= 56);
 
 // 7) «Фил» не тронут
 t('«Фил» (flow.php): ни уровней, ни thinking — как был', strpos($fil, 'ks_think') === false && strpos($fil, "'thinking'") === false && strpos($fil, 'KS_THINK') === false && strpos(fn_src($fil, 'fl_ai'), '$think') === false && strpos($fil, "'think' =>") === false);

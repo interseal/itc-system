@@ -65,7 +65,7 @@ $GLOBALS['CC'] = []; $GLOBALS['CR'] = [['content' => []]]; gw_claude(['max_token
 $GLOBALS['CR'] = [['error' => 'перегрузка', 'http' => 529], ['content' => []]]; gw_claude(['max_tokens' => 64000], function () {});
 t('шлюз: 8000 — обычным запросом; 64000 — потоком, сбой — ещё раз', $GLOBALS['CC'] === [[8000, false], [64000, true], [64000, true]], $GLOBALS['CC']);
 $lib = (string)file_get_contents("$root/store/api/kosmos_lib.php");
-t('магазин ждёт длинный ответ / Opus до 660 с (было 150/240)', strpos($lib, "\$tmo = \$long ? 660 :") !== false && strpos($lib, "stripos((string)\$model, 'opus')") !== false);
+t('магазин ждёт длинный ответ / Opus до 660 с (было 150/240)', strpos($lib, "\$tmo = \$long ? 660 :") !== false && strpos($lib, "preg_match('~opus|fable~i', (string)\$model)") !== false);
 $dev = (string)file_get_contents("$root/kosmos/lib/dev.php");
 t('сервер: список поручений по запросу до 50 (по умолчанию 10), итог хранится до 20000', strpos($dev, "dev_list(max(1, min(50, (int)(\$in['n'] ?? 10))))") !== false && strpos($dev, "(\$a['result'] ?? ''), 0, 20000)") !== false);
 

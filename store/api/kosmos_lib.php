@@ -123,7 +123,7 @@ function ks_gw_ask($sys, $user, $maxTok, $model, $me, $think = '') {
   if (in_array($think, ['fast', 'norm', 'deep', 'max'], true)) $req['think'] = $think;
   if (!empty($GLOBALS['FC_IMGS'])) $req['images'] = ks_gw_imgs((array)$GLOBALS['FC_IMGS']);   // №575 · фото — самому Claude (№627: уже отданные — по отпечатку)
   // №630 · длинный ответ (запас больше 16000 токенов) или Opus — ждём дольше: шлюз пишет такой ответ потоком до 10 минут (было 150/240 с)
-  $long = (int)$maxTok > 16000 || stripos((string)$model, 'opus') !== false;
+  $long = (int)$maxTok > 16000 || preg_match('~opus|fable~i', (string)$model);   // №633 · Fable пишет так же долго, как Opus
   $tmo = $long ? 660 : (!empty($req['images']) ? 240 : 150);
   // №632 · размышления — дольше: «Обычно» до 4 мин, «Глубоко» 11 мин (поток), «Максимум» 14,5 мин (предел сервера «Космоса» — 15 мин)
   if ($think === 'max') $tmo = 870; elseif ($think === 'deep') $tmo = max($tmo, 660); elseif ($think === 'norm') $tmo = max($tmo, 240);
@@ -204,9 +204,9 @@ function ks_ai_json_fix($s) {
   return $o;
 }
 function ks_model_title($id) {
-  $n = ['claude-sonnet-5-5' => 'Claude Sonnet 5.5', 'claude-opus-5-5' => 'Claude Opus 5.5', 'claude-haiku-5-5' => 'Claude Haiku 5.5', 'claude-fable-5-2' => 'Claude Fable 5.2'];
-  foreach ($n as $k => $v) if (strpos($id, $k) === 0) return $v;
-  return $id;
+  // №633 · название из самого id (claude-opus-4-5-20251101 → Claude Opus 4.5): подходит для любой версии, новой и предыдущей
+  if (preg_match('~^claude-([a-z]+)-(\d{1,2})(?:-(\d{1,2}))?(?:-\d{8})?$~', (string)$id, $m)) return 'Claude ' . ucfirst($m[1]) . ' ' . $m[2] . (isset($m[3]) && $m[3] !== '' ? '.' . $m[3] : '');
+  return (string)$id;
 }
 /* Состояние сервера и ключей — для настроек «Космоса». */
 function ks_gw_status() {
