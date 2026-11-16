@@ -37,6 +37,7 @@ t('короткий ответ — без пометок и без измене�
 t('kosmos_flow: реплики подписаны «Космос:»', strpos(fn_src($ksrc, 'ag_talk'), '"\nКосмос: "') !== false);
 
 // 2) «Космос»: max_tokens
+function ks_think_pick($m) { return 'fast'; }   // №632 · уровень сложности проверяет kosmos_think_test.php
 function ks_model_pick() { return 'claude-sonnet-5-5'; } function fil_model_name($m) { return $m; } function fl_fail($m) { throw new Exception($m); }
 function test_ask($sys, $user, $mt, $model, $me) {   // вместо ks_gw_ask (сервер «Космоса»)
   $GLOBALS['MT'][] = $mt; $r = array_shift($GLOBALS['ANS']); $GLOBALS['KS_STOP'] = $r[1]; return [$r[0], '', 'Claude'];

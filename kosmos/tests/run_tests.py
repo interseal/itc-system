@@ -677,6 +677,34 @@ try:
     r = subprocess.run(['php', f'{ROOT}/bin/agent.php', 'kbdata'], env=env, capture_output=True, text=True, timeout=60)
     kd = json.loads(r.stdout or '{}') if r.stdout.strip().startswith('{') else {}
     check('сервер: история поручений и память для базы знаний собираются (agent.php kbdata)', isinstance(kd.get('dev'), list) and isinstance(kd.get('mem'), list) and (not kd['mem'] or all(m.get('author') == 'Космос' and m.get('src') for m in kd['mem'])), (r.stdout[:500], r.stderr[:500]))
+    print('31. Уровень сложности «Космоса» (№632): размышления Claude через шлюз, откат без них, «Фил» без изменений')
+    r = subprocess.run(['php', f'{ROOT}/tests/kosmos_think_test.php'], capture_output=True, text=True, timeout=60)
+    check('уровни, хранение по моделям, передача на шлюз, приложение — ' + (r.stdout.strip().split('\n')[-1] if r.stdout.strip() else 'нет вывода'), r.returncode == 0, r.stdout[-2000:] + r.stderr[-500:])
+    def mlast(n=1): return [json.loads(l) for l in open(f'{TMP}/mock.log')][-n:]
+    c, j = gw({'a': 'ask', 'user': 'Вопрос посложнее', 'who': BOSS, 'max_tokens': 4000, 'think': 'norm'}, key='ab' * 32); rec = mlast()[0]
+    check('«Обычно»: бюджет 4000, запас 12000, обычный запрос; ход размышлений в ответ не попал', c == 200 and j.get('ok') and j.get('think') == 'norm' and rec.get('thinking') == {'type': 'enabled', 'budget_tokens': 4000} and rec.get('max_tokens') == 12000 and rec.get('stream') is False and 'СКРЫТЫЕ' not in j.get('text', ''), (c, j, rec))
+    c, j = gw({'a': 'ask', 'user': 'Глубокий разбор', 'who': BOSS, 'max_tokens': 8000, 'think': 'deep'}, key='ab' * 32); rec = mlast()[0]
+    check('«Глубоко»: бюджет 16000 < max_tokens 24000, потоком; размышления не в тексте', c == 200 and j.get('ok') and rec.get('thinking', {}).get('budget_tokens') == 16000 and rec.get('max_tokens') == 24000 and rec.get('stream') is True and j.get('text') and 'СКРЫТЫЕ' not in j.get('text', ''), (c, j, rec))
+    c, j = gw({'a': 'ask', 'user': 'Самое сложное', 'who': BOSS, 'max_tokens': 32000, 'model': 'claude-opus-5-5', 'think': 'max'}, key='ab' * 32); rec = mlast()[0]
+    check('Opus «Максимум»: бюджет 32000, max_tokens 64000, потоком', c == 200 and j.get('ok') and rec.get('thinking', {}).get('budget_tokens') == 32000 and rec.get('max_tokens') == 64000 and rec.get('stream') is True, (c, j, rec))
+    c, j = gw({'a': 'ask', 'user': 'Haiku максимум', 'who': BOSS, 'max_tokens': 4000, 'model': 'claude-haiku-5-5', 'think': 'max'}, key='ab' * 32); rec = mlast()[0]
+    check('Haiku: «Максимум» не бывает — идёт «Глубоко» (16000)', c == 200 and j.get('think') == 'deep' and rec.get('thinking', {}).get('budget_tokens') == 16000, (c, j, rec))
+    c, j = gw({'a': 'ask', 'user': 'Быстрый вопрос', 'who': BOSS, 'max_tokens': 4000, 'think': 'fast'}, key='ab' * 32); rec = mlast()[0]
+    check('«Быстро»: без размышлений, запрос как раньше', c == 200 and j.get('ok') and rec.get('thinking') is None and rec.get('max_tokens') == 4000, (c, j, rec))
+    sysk = 'Ты — Космос. Отвечай ТОЛЬКО один JSON.'
+    u = 'Проверка навыка: подготовь КП для гостиницы Метрополь'; steps = []
+    for i in range(3):
+        c, j = gw({'a': 'ask', 'system': sysk, 'user': u, 'who': BOSS, 'max_tokens': 4000, 'think': 'deep'}, key='ab' * 32)
+        steps.append((c, j.get('ok'), (j.get('text') or '')[:60], mlast()[0].get('n_msgs'), mlast()[0].get('thinking', {}).get('type')))
+        st = json.loads(j.get('text') or '{}') if (j.get('text') or '').startswith('{') else {}
+        if st.get('tool'): u += f"\n\nТЫ: {j['text']}\nРЕЗУЛЬТАТ {st['tool']}: найдено 1"
+    check('размышления + инструменты: 3 шага подряд без ошибки 400, каждый шаг — один вопрос (thinking не переносится)', all(x[0] == 200 and x[1] and x[3] == 1 and x[4] == 'enabled' and 'СКРЫТЫЕ' not in x[2] for x in steps) and '"tool"' in steps[0][2], steps)
+    c, j = gw({'a': 'ask', 'user': 'Отказ бюджета: модель берёт только effort', 'who': BOSS, 'max_tokens': 8000, 'think': 'deep'}, key='ab' * 32); r2 = mlast(2)
+    check('модель не берёт budget_tokens — тот же вопрос через effort high, ответ есть', c == 200 and j.get('ok') and j.get('think') == 'deep' and not j.get('think_off') and r2[0]['thinking']['type'] == 'enabled' and r2[1]['thinking'] == {'type': 'adaptive'} and r2[1]['effort'] == 'high', (c, j, r2))
+    c, j = gw({'a': 'ask', 'user': 'Отказ размышлений: модель их не умеет', 'who': BOSS, 'max_tokens': 8000, 'think': 'deep'}, key='ab' * 32); r3 = mlast(3)
+    check('модель не берёт размышления совсем — ответ без них, причина в think_off', c == 200 and j.get('ok') and j.get('think') == 'fast' and 'thinking' in j.get('think_off', '') and r3[2].get('thinking') is None and j.get('text'), (c, j, r3))
+    con = sqlite3.connect(f'{TMP}/kosmos.sqlite'); lg = con.execute("SELECT what FROM log WHERE what LIKE 'gw_think%'").fetchall(); con.close()
+    check('откаты записаны в журнал «Космоса» (gw_think_effort, gw_think_off)', ('gw_think_off',) in lg and ('gw_think_effort',) in lg, lg)
 finally:
     for p in procs: p.terminate()
 print(f'\nИтог: {ok_n} прошло, {fail_n} не прошло')

@@ -35,6 +35,7 @@ eval(line_fn($ks, 'ks_tok_first'));
 define('KS_TOK_TOP', cst($ks, 'KS_TOK_TOP'));
 t('Opus — сразу 32000, Sonnet — как раньше 8000, предел 64000', ks_tok_first('claude-opus-5-5', 4000) === 32000 && ks_tok_first('claude-sonnet-5-5', 4000) === 8000 && KS_TOK_TOP === 64000);
 $GLOBALS['MODEL'] = 'claude-opus-5-5';
+function ks_think_pick($m) { return 'fast'; }   // №632 · уровень сложности проверяет kosmos_think_test.php
 function ks_model_pick() { return $GLOBALS['MODEL']; } function fil_model_name($m) { return $m; } function fl_fail($m) { throw new Exception($m); }
 function ks_ai_json($t) { $j = json_decode($t, true); return is_array($j) ? $j : ['do' => 'answer', 'say' => $t]; }
 const ITCAI_ONE_JSON = '';
@@ -73,7 +74,7 @@ $h = (string)file_get_contents("$root/store/apps/kosmos/index.html");
 t('приложение: кнопка модели в шапке и пункт «Модель» в меню', strpos($h, 'id="mdlBtn" onclick="mdlOpen()"') !== false && strpos($h, 'id="miMdl"') !== false && strpos($h, "\$('miMdl').style.display = 'flex'") !== false);
 t('приложение: Sonnet, Opus («сильнее, дороже»), Haiku; сохраняет тот же ks_model через fil_cfg', strpos($h, "['opus', 'Opus', 'Самая сильная', 'сильнее, дороже']") !== false && strpos($h, "['sonnet', 'Sonnet', 'Рекомендуемая, по умолчанию'") !== false && strpos($h, "['haiku', 'Haiku'") !== false && strpos($h, "api('fil_cfg', {model:id})") !== false);
 t('приложение: настройки и шапка показывают одно (mdlShow после сохранения в настройках)', strpos($h, 'CFG = r; cfgRender(); mdlShow();') !== false && strpos($h, "CFG = r; \$('gear').style.display = 'flex'; mdlShow();") !== false);
-t('приложение: кеш sw.js поднят (v55)', strpos((string)file_get_contents("$root/store/apps/kosmos/sw.js"), "'itc-kosmos-v55'") !== false);
+t('приложение: кеш sw.js поднят (v55 и новее)', preg_match("~'itc-kosmos-v(\\d+)'~", (string)file_get_contents("$root/store/apps/kosmos/sw.js"), $m) && (int)$m[1] >= 55);
 
 echo "Итого: $ok ✓, $bad ✗\n";
 exit($bad ? 1 : 0);

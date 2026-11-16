@@ -105,6 +105,29 @@ function gw_claude(array $payload, callable $onSw): array {
   }
   return $res;
 }
+/* 0.5.8 (№632) · УРОВЕНЬ СЛОЖНОСТИ — глубина размышлений Claude (extended thinking). Бюджет — сколько токенов модель может
+   потратить на размышления до ответа (берёт столько, сколько нужно, не больше). Размышления — это выходные токены: входят в расход
+   (usage.output_tokens) и в учёт денег как обычно. Ход размышлений в ответ магазину не попадает — только текст (blocks_text).
+   «Максимум» 32000: больше не уложится в 15 минут сервера (nginx/PHP 900 с); у Haiku «Максимум» — как «Глубоко». */
+const GW_THINK = ['fast' => 0, 'norm' => 4000, 'deep' => 16000, 'max' => 32000];
+const GW_EFFORT = ['norm' => 'medium', 'deep' => 'high', 'max' => 'max'];   // запасной путь: модель без budget_tokens (adaptive + effort)
+const GW_THINK_ANS = 8000;   // запас на сам ответ сверх размышлений
+function gw_think_level(string $model, $lv): string {
+  $lv = is_string($lv) && isset(GW_THINK[$lv]) ? $lv : 'fast';
+  return ($lv === 'max' && stripos($model, 'haiku') !== false) ? 'deep' : $lv;
+}
+/* Размышления в запрос: бюджет меньше max_tokens (поднимаем запас), temperature/top_k с размышлениями нельзя — убираем.
+   $how: 'budget' — {type: enabled, budget_tokens}, 'effort' — {type: adaptive} + output_config.effort, '' — без размышлений. */
+function gw_think_put(array $p, string $lv, string $how): array {
+  unset($p['thinking'], $p['output_config']);
+  $b = GW_THINK[$lv] ?? 0;
+  if ($b <= 0 || $how === '') return $p;
+  unset($p['temperature'], $p['top_k'], $p['top_p']);
+  if ($how === 'budget') $p['max_tokens'] = min(GW_TOK_MAX, $b + max(GW_THINK_ANS, (int)$p['max_tokens']));   // запасные пути запас не поднимают
+  if ($how === 'budget') { if ($b >= $p['max_tokens']) $b = (int)$p['max_tokens'] - GW_THINK_ANS; $p['thinking'] = ['type' => 'enabled', 'budget_tokens' => max(1024, $b)]; }
+  else { $p['thinking'] = ['type' => 'adaptive']; $p['output_config'] = ['effort' => GW_EFFORT[$lv] ?? 'medium']; }
+  return $p;
+}
 function gw_ask(array $in): void {
   // 0.5.3 (№627) · снимок по отпечатку, которого здесь нет — просим целиком (до учёта обращения, чтобы повтор не считался дважды)
   $need = gw_img_need((array)($in['images'] ?? []));
@@ -140,12 +163,28 @@ function gw_ask(array $in): void {
   // идёт отдельным блоком со своей меткой кеша: её Claude берёт из кеша и в следующих командах, а не только в шагах одной команды
   if (($cut = gw_sys_cut($sys)) > 0) $payload['system'] = [['type' => 'text', 'text' => substr($sys, 0, $cut), 'cache_control' => ['type' => 'ephemeral']],
                                                         ['type' => 'text', 'text' => substr($sys, $cut), 'cache_control' => ['type' => 'ephemeral']]];
+  // 0.5.8 (№632) · уровень сложности: размышления; «Максимум» — поток до 14 мин (claude_once), остальное — как было
+  $think = gw_think_level($model, $in['think'] ?? ''); $thinkOff = '';
+  $payload = gw_think_put($payload, $think, 'budget'); $max = (int)$payload['max_tokens'];
+  $GLOBALS['GW_STREAM_TMO'] = $think === 'max' ? 840 : 600;
   $switched = '';
   $onSw = function ($old, $new) use (&$switched) { $switched = 'Ключ «' . $old . '» перестал работать — переключился на «' . $new . '»'; };
   // 0.5.6 (№630) · длинный ответ (больше 16000 токенов запаса, Opus пишет его минутами) — потоком: соединение не простаивает
   // и не рвётся по пути; ответ собирается целиком, магазин получает его как раньше. Короткий — обычным запросом (с повторами).
   $res = gw_claude($payload, $onSw);
-  if (!empty($res['error']) && (int)($res['http'] ?? 0) === 400 && $max > 32000) { $payload['max_tokens'] = $max = 32000; $res = gw_claude($payload, $onSw); }   // модель не берёт 64000
+  if (!empty($res['error']) && (int)($res['http'] ?? 0) === 400 && $max > 32000) {   // модель не берёт 64000
+    $payload['max_tokens'] = $max = 32000;
+    if (isset($payload['thinking']['budget_tokens']) && $payload['thinking']['budget_tokens'] > $max - GW_THINK_ANS) $payload['thinking']['budget_tokens'] = $max - GW_THINK_ANS;
+    $res = gw_claude($payload, $onSw);
+  }
+  // 0.5.8 (№632) · модель не приняла размышления (400) — тот же вопрос через effort, потом без размышлений: без ответа Босс не остаётся
+  if (!empty($res['error']) && (int)($res['http'] ?? 0) === 400 && isset($payload['thinking'])) {
+    $why = mb_substr((string)$res['error'], 0, 300);
+    $payload = gw_think_put($payload, $think, 'effort'); $res = gw_claude($payload, $onSw);
+    if (!empty($res['error']) && (int)($res['http'] ?? 0) === 400) { $thinkOff = $why . ' · effort: ' . mb_substr((string)$res['error'], 0, 200); $payload = gw_think_put($payload, $think, ''); $res = gw_claude($payload, $onSw); }
+    // через effort получилось — это не отказ (think_off пустой), но причину всё равно пишем в журнал
+    log_add($u['phone'], $thinkOff !== '' ? 'gw_think_off' : 'gw_think_effort', ['model' => $model, 'think' => $think, 'error' => $thinkOff !== '' ? $thinkOff : $why]);
+  }
   $kid = (int)($res['key_id'] ?? 0);
   if (!empty($res['error'])) {
     log_add($u['phone'], 'gw_error', ['model' => $model, 'error' => mb_substr((string)$res['error'], 0, 300)]);
@@ -158,5 +197,6 @@ function gw_ask(array $in): void {
   $kn = '';
   if ($kid) { $q = db()->prepare('SELECT name FROM keys WHERE id=?'); $q->execute([$kid]); $kn = (string)$q->fetchColumn(); }
   jout(['ok' => true, 'text' => blocks_text((array)($res['content'] ?? [])), 'model' => (string)($res['model'] ?? $model),
-        'stop' => (string)($res['stop_reason'] ?? ''), 'key' => $kn, 'switched' => $switched, 'img_cache' => 1]);
+        'stop' => (string)($res['stop_reason'] ?? ''), 'key' => $kn, 'switched' => $switched, 'img_cache' => 1,
+        'think' => isset($payload['thinking']) ? $think : 'fast', 'think_off' => $thinkOff]);
 }

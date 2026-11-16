@@ -113,14 +113,20 @@ function ks_gw_imgs_forget($shas) {
   foreach ($shas as $sha) if (preg_match('~^[a-f0-9]{64}$~', (string)$sha)) { unset($GLOBALS['KS_IMG_SENT'][$sha]); @unlink(ks_dir('imgsent') . '/' . $sha); }
 }
 /* Спросить Claude: [текст или null, ошибка, какая модель ответила]. $me — кто спрашивает (для доступа и лимитов «Космоса»). */
-function ks_gw_ask($sys, $user, $maxTok, $model, $me) {
+/* №632 · $think — уровень сложности (fast|norm|deep|max, '' — как раньше, без размышлений). Шлюз сам ставит бюджет размышлений
+   и запас на ответ; ход размышлений сюда не приходит (только текст ответа). Модель не взяла размышления — шлюз отвечает без них
+   (think_off — причина, пишем в журнал ошибок). */
+function ks_gw_ask($sys, $user, $maxTok, $model, $me, $think = '') {
   $who = ['phone' => (string)($me['phone'] ?? ''), 'name' => (string)($me['name'] ?? ''), 'role' => (string)($me['role'] ?? ''), 'boss' => !empty($me['boss'])];
   $GLOBALS['KS_STOP'] = '';
   $req = ['a' => 'ask', 'system' => (string)$sys, 'user' => (string)$user, 'max_tokens' => (int)$maxTok, 'model' => (string)$model, 'who' => $who];
+  if (in_array($think, ['fast', 'norm', 'deep', 'max'], true)) $req['think'] = $think;
   if (!empty($GLOBALS['FC_IMGS'])) $req['images'] = ks_gw_imgs((array)$GLOBALS['FC_IMGS']);   // №575 · фото — самому Claude (№627: уже отданные — по отпечатку)
   // №630 · длинный ответ (запас больше 16000 токенов) или Opus — ждём дольше: шлюз пишет такой ответ потоком до 10 минут (было 150/240 с)
   $long = (int)$maxTok > 16000 || stripos((string)$model, 'opus') !== false;
   $tmo = $long ? 660 : (!empty($req['images']) ? 240 : 150);
+  // №632 · размышления — дольше: «Обычно» до 4 мин, «Глубоко» 11 мин (поток), «Максимум» 14,5 мин (предел сервера «Космоса» — 15 мин)
+  if ($think === 'max') $tmo = 870; elseif ($think === 'deep') $tmo = max($tmo, 660); elseif ($think === 'norm') $tmo = max($tmo, 240);
   [$code, $j] = ks_gw_call($req, $tmo);
   if ($code === 409 && !empty($j['need_images']) && !empty($req['images'])) {   // №627 · шлюз снимка не нашёл — шлём целиком
     ks_gw_imgs_forget((array)$j['need_images']); $req['images'] = ks_gw_imgs((array)$GLOBALS['FC_IMGS'], true);
@@ -130,6 +136,8 @@ function ks_gw_ask($sys, $user, $maxTok, $model, $me) {
   if ($code === 200 && !empty($j['ok']) && is_string($j['text'] ?? null)) {
     $GLOBALS['KS_STOP'] = (string)($j['stop'] ?? '');   // №535: max_tokens — ответ не уместился
     if (!empty($j['switched'])) $GLOBALS['KS_SWITCHED'] = (string)$j['switched'];
+    $GLOBALS['KS_THINK_USED'] = (string)($j['think'] ?? '');
+    if (!empty($j['think_off'])) error_log('kosmos think: ответ без размышлений (' . $think . ') — ' . mb_substr((string)$j['think_off'], 0, 300));
     return [$j['text'], '', ks_model_title((string)($j['model'] ?? $model)) . (!empty($j['key']) ? ' · ключ «' . $j['key'] . '»' : '')];
   }
   if ($code === 0) return [null, 'нет связи с сервером «Космоса» в Сингапуре', ''];

@@ -41,7 +41,7 @@ function claude_once(string $key, array $payload, ?callable $onText, string $ws 
   $opts = [
     CURLOPT_POST => true, CURLOPT_HTTPHEADER => $headers,
     CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
-    CURLOPT_CONNECTTIMEOUT => 15, CURLOPT_TIMEOUT => $onText ? 600 : 300,
+    CURLOPT_CONNECTTIMEOUT => 15, CURLOPT_TIMEOUT => $onText ? max(600, min(870, (int)($GLOBALS['GW_STREAM_TMO'] ?? 600))) : 300,   // 0.5.8 (№632): «Максимум» — до 840 с
   ];
   if ($onText) {
     $opts[CURLOPT_WRITEFUNCTION] = function ($c, $chunk) use (&$st, $onText) {

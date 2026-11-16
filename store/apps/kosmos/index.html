@@ -194,8 +194,9 @@ html.fil-talk .hd .snd-t{background:#e5484d}
 .msrch input{flex:1;min-width:0;background:transparent;border:0;color:#fff;padding:11px 0;font:400 1rem Roboto,sans-serif;outline:0}.msrch input::placeholder{color:rgba(220,232,255,.5)}
 .mi{display:flex;align-items:center;gap:16px;width:100%;padding:13px 14px;border:0;border-radius:12px;background:transparent;color:#fff;font:400 1.02rem Roboto,sans-serif;text-align:left;cursor:pointer}.mi svg{width:24px;height:24px;flex:none;color:#dce8ff}.mi:active,.mi.cur{background:rgba(255,255,255,.1)}
 .mrec{color:var(--sub);font-weight:500;font-size:.9rem;margin:16px 14px 6px;padding-top:12px;border-top:1px solid var(--line)}
-.hd .mdl{display:none;align-items:center;gap:3px;height:34px;margin:0 4px 0 0;padding:0 4px 0 8px;border:1px solid rgba(255,255,255,.35);border-radius:17px;background:rgba(255,255,255,.1);color:#fff;font:500 .85rem Roboto,sans-serif;cursor:pointer;flex:none;box-sizing:border-box}.hd .mdl svg{width:18px;height:18px;flex:none}.hd .mdl .dd{width:20px;height:20px;margin-left:-2px}
+.hd .mdl{display:none;align-items:center;gap:3px;height:34px;margin:0 4px 0 0;padding:0 4px 0 8px;border:1px solid rgba(255,255,255,.35);border-radius:17px;background:rgba(255,255,255,.1);color:#fff;font:500 .85rem Roboto,sans-serif;cursor:pointer;flex:none;box-sizing:border-box}.hd .mdl svg{width:18px;height:18px;flex:none}.hd .mdl .dd{width:20px;height:20px;margin-left:-2px}.hd .mdl #mdlName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40vw}
 .mdo{display:flex;align-items:center;gap:12px;width:100%;margin:6px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.04);color:#fff;font:400 1rem Roboto,sans-serif;text-align:left;cursor:pointer;box-sizing:border-box}.mdo.on{border-color:#5b8cff;background:rgba(91,140,255,.16)}.mdo b{font-weight:500}.mdo .md-t{flex:1;min-width:0}.mdo small{display:block;color:var(--sub);font-size:.8rem;margin-top:2px}.mdo .md-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:9px;background:rgba(255,183,77,.18);color:#ffcc80;font-size:.72rem;font-weight:500;vertical-align:1px}.mdo .md-ck{width:22px;height:22px;flex:none;color:#8fb3ff;visibility:hidden}.mdo.on .md-ck{visibility:visible}.mdo:disabled{opacity:.6}
+.thk{display:flex;gap:6px;margin:8px 0 4px}.thk button{flex:1 1 0;min-width:0;padding:10px 4px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.04);color:#fff;font:500 .88rem Roboto,sans-serif;cursor:pointer;box-sizing:border-box}.thk button.on{border-color:#5b8cff;background:rgba(91,140,255,.22)}.thk button:disabled{opacity:.35;cursor:default}.thk-h{color:var(--sub);font-size:.8rem;margin:2px 0 8px}
 .mi .mt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mi small{color:var(--sub);font-size:.75rem;flex:none}
 .pnl{position:fixed;inset:0;z-index:75;background:#030b2e url(/apps/crm/bg/ice-p.jpg) center/cover no-repeat;display:none;flex-direction:column}.pnl.on{display:flex}
 .pnl-hd{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 10px 10px;background:rgba(6,18,66,.88)}.pnl-hd b{font-size:1.1rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -915,6 +916,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
       + '<h4>Модель — «мозги» Космоса</h4><p>На какой модели Claude думает Космос. Sonnet — основной, Opus — сильнее и дороже, Haiku — быстрее и дешевле. Сравнить модели можно внизу.</p>'
       + '<select id="cfM">' + c.models.map(function(m){ return '<option value="' + esc(m.id) + '"' + (m.id === c.model ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select>'
       + '<div class="r"><button class="cb" onclick="cfgSave(\'model\')">Сохранить модель</button></div>'
+      + '<div id="cfThk">' + thkHtml(false) + '</div>'
       + '<h4>Голос Космоса</h4><div id="cfVc">' + vcHtml() + '</div>'
       + '<h4>Как Космос обращается к людям</h4><p>Впишите имя и отчество — Космос будет обращаться так к сотруднику и так называть его в поручениях. Вас Космос называет «Босс», а при сотрудниках — по имени и отчеству.</p>'
       + (c.staff || []).map(function(s, i){ return '<div class="nmr"><span>' + esc(s.name) + (s.role === 'boss' ? ' (вы)' : '') + '</span><input data-ph="' + esc(s.phone) + '" class="nmi" placeholder="Имя Отчество" value="' + esc(s.io && s.io !== s.name ? s.io : '') + '"></div>'; }).join('')
@@ -1048,8 +1050,9 @@ html.fil-talk .hd .snd-t{background:#e5484d}
   function mdlShort(id){ var k = mdlKind(id); if (k) return k[1]; var m = /claude-([a-z]+)/.exec(String(id || '')); return m ? m[1].charAt(0).toUpperCase() + m[1].slice(1) : 'Модель'; }
   window.mdlShow = function(){
     if (!CFG || !CFG.models) return;
-    $('mdlName').textContent = mdlShort(CFG.model); $('mdlBtn').style.display = 'flex'; $('miMdlN').textContent = mdlShort(CFG.model);
-    $('mdlBtn').title = 'Модель Космоса: ' + mdlShort(CFG.model) + ' — нажмите, чтобы сменить';
+    var t = thkName(CFG.think), n = mdlShort(CFG.model) + (t ? ' · ' + t : '');
+    $('mdlName').textContent = n; $('mdlBtn').style.display = 'flex'; $('miMdlN').textContent = n;
+    $('mdlBtn').title = 'Модель Космоса: ' + n + ' — нажмите, чтобы сменить модель или уровень сложности';
   };
   function mdlList(){
     var o = [];
@@ -1061,8 +1064,29 @@ html.fil-talk .hd .snd-t{background:#e5484d}
     var CK = '<svg class="md-ck" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
     $('mdlIn').innerHTML = '<h3>Модель Космоса</h3><p>Переключается сразу, следующий вопрос получит выбранная модель. То же самое — в настройках.</p>'
       + mdlList().map(function(x){ return '<button class="mdo' + (x.id === CFG.model ? ' on' : '') + '"' + (busy ? ' disabled' : '') + ' onclick="mdlPick(\'' + esc(x.id) + '\')"><span class="md-t"><b>' + esc(x.k[1]) + '</b>' + (x.k[3] ? '<span class="md-tag">' + esc(x.k[3]) + '</span>' : '') + '<small>' + esc(x.k[2]) + '</small></span>' + CK + '</button>'; }).join('')
+      + thkHtml(busy)
       + '<div class="r"><button class="cb" onclick="mdlClose()">Закрыть</button></div>';
   }
+  /* №632 · уровень сложности (глубина размышлений Claude) — свой у каждой модели, хранится там же (fil_cfg → ks_think) */
+  function thkName(id){ var l = (CFG && CFG.thinks) || []; for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i].name; return ''; }
+  function thkNo(){ var m = (CFG.models || []).filter(function(x){ return x.id === CFG.model; })[0]; return (m && m.think_no) || []; }
+  window.thkHtml = function(busy){
+    if (!CFG || !CFG.thinks) return '';
+    var no = thkNo(), cur = CFG.think;
+    var h = '<h4>Уровень сложности — ' + esc(mdlShort(CFG.model)) + '</h4><div class="thk">'
+      + CFG.thinks.map(function(t){ var off = no.indexOf(t.id) >= 0; return '<button class="' + (t.id === cur ? 'on' : '') + '"' + (busy || off ? ' disabled' : '') + ' title="' + esc(off ? 'У этой модели нет такого уровня' : t.hint) + '" onclick="thkPick(\'' + esc(t.id) + '\')">' + esc(t.name) + '</button>'; }).join('')
+      + '</div><div class="thk-h">Глубже — точнее, но дольше и дороже. «Быстро» — сразу, без размышлений.' + (no.length ? ' У ' + esc(mdlShort(CFG.model)) + ' нет уровня «' + esc(no.map(thkName).join('», «')) + '» — для самого сложного выберите Opus.' : '') + ' Свой уровень у каждой модели.</div>';
+    return h;
+  };
+  window.thkPick = function(id){
+    if (!CFG || id === CFG.think) return;
+    var box = $('mdlBox').style.display === 'flex';
+    if (box) mdlRender(true);
+    api('fil_cfg', {think:id, think_model:CFG.model}).then(function(r){
+      if (r && r.ok) { CFG = r; mdlShow(); if (box) mdlRender(false); if ($('cfg').style.display === 'flex') cfgRender(); st('Уровень: ' + thkName(r.think)); }
+      else { if (box) mdlRender(false); st((r && r.error) || 'Ошибка'); }
+    }).catch(function(){ if (box) mdlRender(false); st('Нет связи — уровень не сменился'); });
+  };
   window.mdlOpen = function(){
     if (!CFG) { st('Загружаю…'); api('fil_cfg', {}).then(function(r){ if (r && r.ok) { CFG = r; mdlShow(); mdlOpen(); } else st((r && r.error) || 'Ошибка'); }); return; }
     mdlRender(false); $('mdlBox').style.display = 'flex';
@@ -1073,7 +1097,7 @@ html.fil-talk .hd .snd-t{background:#e5484d}
     if (!CFG || id === CFG.model) { mdlClose(); return; }
     mdlRender(true);
     api('fil_cfg', {model:id}).then(function(r){
-      if (r && r.ok) { CFG = r; mdlShow(); mdlClose(); if ($('cfg').style.display === 'flex') cfgRender(); st('Модель: ' + mdlShort(r.model) + (r.model === id ? '' : ' (выбрать не получилось)')); }
+      if (r && r.ok) { CFG = r; mdlShow(); mdlRender(false); if ($('cfg').style.display === 'flex') cfgRender(); st('Модель: ' + mdlShort(r.model) + (thkName(r.think) ? ' · ' + thkName(r.think) : '') + (r.model === id ? '' : ' (выбрать не получилось)')); }
       else { mdlRender(false); st((r && r.error) || 'Ошибка'); }
     }).catch(function(){ mdlRender(false); st('Нет связи — модель не сменилась'); });
   };

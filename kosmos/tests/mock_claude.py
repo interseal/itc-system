@@ -214,6 +214,7 @@ class H(BaseHTTPRequestHandler):
                                 'imgs': [b.get('source', {}).get('media_type', '') for m in req.get('messages', [])[:1] if isinstance(m.get('content'), list) for b in m['content'] if isinstance(b, dict) and b.get('type') == 'image'],
                                 'txt1': next((b.get('text', '')[:80] for m in req.get('messages', [])[:1] if isinstance(m.get('content'), list) for b in m['content'] if isinstance(b, dict) and b.get('type') == 'text'), ''),
                                 'sys_has_mem': '- [№' in system_text(req.get('system')),
+                                'thinking': req.get('thinking'), 'effort': (req.get('output_config') or {}).get('effort'), 'temperature': req.get('temperature'),
                                 'cache': any(isinstance(b, dict) and 'cache_control' in b for b in (req.get('system') or []) if not isinstance(req.get('system'), str)),
                                 'sys_blocks': [(len(b.get('text', '')), 'cache_control' in b) for b in (req.get('system') or []) if isinstance(b, dict)] if not isinstance(req.get('system'), str) else []},
                                ensure_ascii=False) + '\n')
@@ -245,8 +246,20 @@ class H(BaseHTTPRequestHandler):
                         return self.send_json(400, {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'empty text block'}})
                     if b.get('type') == 'tool_use' and not isinstance(b.get('input'), dict):
                         return self.send_json(400, {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'tool input must be object'}})
+        # №632 · размышления: бюджет меньше max_tokens; «Отказ размышлений» — модель их не берёт вовсе, «Отказ бюджета» — только adaptive
+        th = req.get('thinking')
+        utxt = last_user_text(msgs)[0]
+        if th:
+            if th.get('type') == 'enabled' and not (1024 <= int(th.get('budget_tokens', 0)) < int(req.get('max_tokens') or 0)):
+                return self.send_json(400, {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'max_tokens must be greater than thinking.budget_tokens'}})
+            if req.get('temperature') is not None:
+                return self.send_json(400, {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'temperature may only be set to 1 when thinking is enabled'}})
+            if 'Отказ размышлений' in utxt or ('Отказ бюджета' in utxt and th.get('type') == 'enabled'):
+                return self.send_json(400, {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': f'thinking type {th.get("type")} is not supported for this model'}})
         blocks, stop = plan(req, key)
-        usage = {'input_tokens': 100 + 10 * len(msgs), 'output_tokens': 20, 'cache_read_input_tokens': 0, 'cache_creation_input_tokens': 0}
+        if th:   # ход размышлений идёт первым блоком — наружу он попасть не должен
+            blocks = [{'type': 'thinking', 'thinking': 'СКРЫТЫЕ РАЗМЫШЛЕНИЯ', 'signature': 'sig1'}] + blocks
+        usage = {'input_tokens': 100 + 10 * len(msgs), 'output_tokens': 20 + (500 if th else 0), 'cache_read_input_tokens': 0, 'cache_creation_input_tokens': 0}
         model = req.get('model', '')
         if not req.get('stream'):
             return self.send_json(200, {'id': 'msg_1', 'type': 'message', 'role': 'assistant', 'model': model,
@@ -266,7 +279,11 @@ class H(BaseHTTPRequestHandler):
         ev('ping', {'type': 'ping'})
         slow = 0.12 if 'медленно' in last_user_text(msgs)[0].lower() else 0.005
         for i, b in enumerate(blocks):
-            if b['type'] == 'text':
+            if b['type'] == 'thinking':
+                ev('content_block_start', {'type': 'content_block_start', 'index': i, 'content_block': {'type': 'thinking', 'thinking': ''}})
+                ev('content_block_delta', {'type': 'content_block_delta', 'index': i, 'delta': {'type': 'thinking_delta', 'thinking': b['thinking']}})
+                ev('content_block_delta', {'type': 'content_block_delta', 'index': i, 'delta': {'type': 'signature_delta', 'signature': b['signature']}})
+            elif b['type'] == 'text':
                 ev('content_block_start', {'type': 'content_block_start', 'index': i, 'content_block': {'type': 'text', 'text': ''}})
                 t = b['text']
                 for j in range(0, len(t), 7):

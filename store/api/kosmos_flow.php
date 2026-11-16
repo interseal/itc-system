@@ -260,6 +260,14 @@ const KS_MODEL0 = 'claude-sonnet-5-5';
 /* №630 · запас токенов на ответ Claude: предел моделей 64000 (шлюз сам снизит до 32000, если модель столько не берёт) */
 const KS_TOK_TOP = 64000;
 function ks_tok_first($model, $maxTok) { return preg_match('~opus|fable~i', (string)$model) ? 32000 : min(16000, max(2000, (int)$maxTok * 2)); }
+/* №632 · уровень сложности (глубина размышлений Claude, extended thinking): свой для каждой модели, по умолчанию «Обычно».
+   Бюджет размышлений и запасные пути (effort, без размышлений) — на шлюзе (kosmos/lib/gw.php). Haiku «Максимум» не берёт. */
+const KS_THINK = [['fast', 'Быстро', 'без размышлений, сразу'], ['norm', 'Обычно', 'коротко подумает'], ['deep', 'Глубоко', 'подумает основательно'], ['max', 'Максимум', 'самое глубокое размышление']];
+const KS_THINK0 = 'norm';
+function ks_think_ok($model, $lv) { foreach (KS_THINK as $t) if ($t[0] === $lv) return !($lv === 'max' && stripos((string)$model, 'haiku') !== false); return false; }
+function ks_think_map() { $m = json_decode(sp_get('ks_think'), true); return is_array($m) ? $m : []; }
+function ks_think_pick($model) { $m = ks_think_map(); $lv = (string)($m[$model] ?? KS_THINK0); if (ks_think_ok($model, $lv)) return $lv; return $lv === 'max' ? 'deep' : KS_THINK0; }
+function ks_think_set($model, $lv, $by) { if (!preg_match('~^claude-[a-z0-9.-]{3,50}$~', (string)$model) || !ks_think_ok($model, $lv)) return false; $m = ks_think_map(); $m[$model] = $lv; sp_put('ks_think', json_encode($m), $by); return true; }
 function ks_model_pick() { $m = (string)($GLOBALS['FIL_MODEL'] ?? ''); if ($m === '') $m = sp_get('ks_model'); return preg_match('~^claude-[a-z0-9.-]{3,50}$~', $m) ? $m : KS_MODEL0; }
 function fil_model_name($id) { foreach (KS_MODELS as $m) if ($m[0] === $id) return $m[1]; return ks_model_title($id); }
 /* ========== №40 · DeepSeek напрямую (platform.deepseek.com, счёт Jinjia Enterprise) ==========
@@ -316,9 +324,11 @@ function fl_ai($sys, $user, $maxTok = 1500, $soft = false) {
   // №621: служебные теги (<invoke>, <function_calls>…) вырезаются; вызов <invoke name=…> выполняется как {"tool":…};
   // не разобралось — вторая попытка с напоминанием «строго один JSON»; сырой текст человеку не показываем
   // №630: запас на ответ — Opus/Fable сразу 32000, остальные как раньше (до 16000); упёрся — повтор с KS_TOK_TOP (64000, предел моделей)
-  $model = ks_model_pick(); $mt = ks_tok_first($model, $maxTok); $txt = null; $err = ''; $GLOBALS['FL_AI_BAD'] = 0;
+  // №632: уровень сложности выбранной модели (ks_think_pick) — шаги разговора и фоновых задач (ag_run, запас AG_ANS_TOK);
+  // мелкие служебные вызовы (перевод фабрике, разноска выписки) — «Быстро», как раньше. Ход размышлений шлюз не отдаёт
+  $model = ks_model_pick(); $think = (int)$maxTok >= (defined('AG_ANS_TOK') ? AG_ANS_TOK : 4000) ? ks_think_pick($model) : 'fast'; $mt = ks_tok_first($model, $maxTok); $txt = null; $err = ''; $GLOBALS['FL_AI_BAD'] = 0;
   for ($try = 0; $try < 2; $try++) {
-    [$txt, $err, $real] = ks_gw_ask($sys, $user . ($try ? ITCAI_ONE_JSON : ''), $mt, $model, $GLOBALS['me'] ?? []);
+    [$txt, $err, $real] = ks_gw_ask($sys, $user . ($try ? ITCAI_ONE_JSON : ''), $mt, $model, $GLOBALS['me'] ?? [], $think);
     if ($txt === null) break;
     $j = ks_ai_json($txt); $stop = (string)($GLOBALS['KS_STOP'] ?? '');
     // №628: ответ упёрся в max_tokens, но разобрался (простой текст без JSON) — это обрывок; просим заново с запасом 16000
@@ -4263,8 +4273,11 @@ try {
     if (is_array(fl_in('names', null))) { $nm = []; foreach (fl_in('names') as $p => $v) { $p = preg_replace('~[^0-9+]~', '', (string)$p); $v = trim(mb_substr(preg_replace('~\s+~u', ' ', (string)$v), 0, 80)); if ($p !== '' && $v !== '') $nm[$p] = $v; } sp_put('fil_names', json_encode($nm, JSON_UNESCAPED_UNICODE), $me['name']); }   // №45
     if (fl_in('learn', null) !== null) sp_put('fil_learn', mb_substr(trim((string)fl_in('learn')), 0, 12000), $me['name']);   // №536: выученное общее
     if (fl_in('model', null) !== null && fl_in('model') !== '') { $m = preg_replace('~[^a-z0-9.-]~', '', (string)fl_in('model')); if (preg_match('~^claude-[a-z0-9.-]{3,50}$~', $m)) sp_put('ks_model', $m, $me['name']); }
-    $mods = array_map(function ($m) { return ['id' => $m[0], 'name' => $m[1]]; }, KS_MODELS);
-    fl_out(['ok' => true, 'memo' => fil_memo(), 'learn' => fil_learn(), 'model' => ks_model_pick(), 'models' => $mods, 'ds' => ['has' => false], 'ks' => ks_gw_status(), 'ks_admin' => KS_SERVER . '/',
+    // №632 · уровень сложности: для указанной модели (think_model) или для выбранной сейчас
+    if (fl_in('think', null) !== null && fl_in('think') !== '') { $tm = (string)fl_in('think_model', ''); if ($tm === '') $tm = ks_model_pick(); if (!ks_think_set($tm, (string)fl_in('think'), $me['name'])) fl_fail('Этот уровень у этой модели недоступен'); }
+    $mods = array_map(function ($m) { return ['id' => $m[0], 'name' => $m[1], 'think' => ks_think_pick($m[0]), 'think_no' => array_values(array_map(function ($t) { return $t[0]; }, array_filter(KS_THINK, function ($t) use ($m) { return !ks_think_ok($m[0], $t[0]); })))]; }, KS_MODELS);
+    $thl = array_map(function ($t) { return ['id' => $t[0], 'name' => $t[1], 'hint' => $t[2]]; }, KS_THINK);
+    fl_out(['ok' => true, 'memo' => fil_memo(), 'learn' => fil_learn(), 'model' => ks_model_pick(), 'think' => ks_think_pick(ks_model_pick()), 'thinks' => $thl, 'models' => $mods, 'ds' => ['has' => false], 'ks' => ks_gw_status(), 'ks_admin' => KS_SERVER . '/',
       'staff' => array_map(function ($s) { return ['phone' => $s['phone'], 'name' => $s['name'], 'role' => $s['role'], 'io' => fil_io($s['phone'], '')]; }, fl_staff())]);
   }
   case 'fil_compare': {
